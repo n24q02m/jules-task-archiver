@@ -1,0 +1,4 @@
+version_toml = []
+version_variables = ["manifest.json:version"]
+tag_format = "v{version}"
+major_on_zero = false

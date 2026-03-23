@@ -1,0 +1,7 @@
+* text=auto
+*.js diff=javascript
+*.png binary
+*.json text
+*.md text
+*.css text
+*.html text

@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Jules Task Archiver</h1>
+      <span class="version">v1.0</span>
+    </header>
+
+    <section class="settings">
+      <h2>Settings</h2>
+      <label>
+        GitHub Owner
+        <input type="text" id="ghOwner" placeholder="your-github-username" />
+      </label>
+      <label>
+        GitHub Token <span class="hint">(optional, for private repos)</span>
+        <input type="password" id="ghToken" placeholder="ghp_..." />
+      </label>
+    </section>
+
+    <section class="options">
+      <h2>Options</h2>
+      <div class="radio-group">
+        <label><input type="radio" name="mode" value="dry" checked /> Dry Run</label>
+        <label><input type="radio" name="mode" value="archive" /> Archive</label>
+      </div>
+      <label class="checkbox">
+        <input type="checkbox" id="force" />
+        Force (skip PR check)
+      </label>
+      <div class="radio-group">
+        <label><input type="radio" name="scope" value="current" /> Current tab</label>
+        <label><input type="radio" name="scope" value="all" checked /> All Jules tabs</label>
+      </div>
+    </section>
+
+    <button type="button" id="startBtn" class="primary">Start</button>
+    <button type="button" id="resetBtn" class="secondary" style="display: none">Reset</button>
+
+    <section id="progressSection" style="display: none">
+      <h2>Progress</h2>
+      <div id="currentInfo" class="current-info"></div>
+      <div class="progress-bar">
+        <div id="progressFill" class="progress-fill"></div>
+      </div>
+      <pre id="log" class="log"></pre>
+    </section>
+
+    <section id="summarySection" style="display: none">
+      <h2>Summary</h2>
+      <div id="summary" class="summary"></div>
+    </section>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

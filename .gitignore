@@ -1,0 +1,26 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Node (dev tools only)
+node_modules/
+
+# Extension build artifacts
+*.zip
+*.crx
+*.pem
+
+# AI agents
+.jules/
+JULES.md
+.code-review-graph/
+
+# Environment
+.env
+.env.*

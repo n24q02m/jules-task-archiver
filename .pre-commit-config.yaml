@@ -1,0 +1,32 @@
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.24.3
+    hooks:
+      - id: gitleaks
+
+  - repo: local
+    hooks:
+      - id: biome-check
+        name: Biome check
+        entry: npx @biomejs/biome check --write
+        language: system
+        types_or: [javascript, json, css]
+        pass_filenames: false
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: check-merge-conflict
+      - id: check-json
+      - id: check-yaml
+      - id: end-of-file-fixer
+
+  - repo: local
+    hooks:
+      - id: enforce-commit
+        name: Enforce conventional commit
+        entry: bash scripts/enforce-commit.sh
+        language: system
+        stages: [commit-msg]
+        always_run: true

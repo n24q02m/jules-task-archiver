@@ -1,0 +1,23 @@
+{
+  "extends": ["config:recommended", ":semanticCommits"],
+  "schedule": ["before 5am"],
+  "timezone": "Asia/Ho_Chi_Minh",
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 3,
+  "labels": ["dependencies"],
+  "rangeStrategy": "bump",
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 5am"]
+  },
+  "packageRules": [
+    {
+      "matchManagers": ["github-actions"],
+      "pinDigests": true
+    },
+    {
+      "matchPackagePatterns": ["^python-semantic-release/"],
+      "allowedVersions": ">=10.0.0"
+    }
+  ]
+}
