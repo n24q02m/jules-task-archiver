@@ -7,38 +7,38 @@
 const $ = (sel) => document.querySelector(sel)
 
 // --- DOM refs ---
-const ghOwnerInput = $("#ghOwner")
-const ghTokenInput = $("#ghToken")
-const forceCheckbox = $("#force")
-const startBtn = $("#startBtn")
-const resetBtn = $("#resetBtn")
-const progressSection = $("#progressSection")
-const summarySection = $("#summarySection")
-const currentInfo = $("#currentInfo")
-const progressFill = $("#progressFill")
-const logPre = $("#log")
-const summaryDiv = $("#summary")
+const ghOwnerInput = $('#ghOwner')
+const ghTokenInput = $('#ghToken')
+const forceCheckbox = $('#force')
+const startBtn = $('#startBtn')
+const resetBtn = $('#resetBtn')
+const progressSection = $('#progressSection')
+const summarySection = $('#summarySection')
+const currentInfo = $('#currentInfo')
+const progressFill = $('#progressFill')
+const logPre = $('#log')
+const summaryDiv = $('#summary')
 
 // --- Load saved settings ---
-chrome.storage.sync.get(["ghOwner", "ghToken"], (data) => {
+chrome.storage.sync.get(['ghOwner', 'ghToken'], (data) => {
   if (data.ghOwner) ghOwnerInput.value = data.ghOwner
   if (data.ghToken) ghTokenInput.value = data.ghToken
 })
 
 // --- Save settings on change ---
-ghOwnerInput.addEventListener("change", () => {
+ghOwnerInput.addEventListener('change', () => {
   chrome.storage.sync.set({ ghOwner: ghOwnerInput.value.trim() })
 })
-ghTokenInput.addEventListener("change", () => {
+ghTokenInput.addEventListener('change', () => {
   chrome.storage.sync.set({ ghToken: ghTokenInput.value.trim() })
 })
 
 // --- Start archive ---
-startBtn.addEventListener("click", async () => {
+startBtn.addEventListener('click', async () => {
   // Save settings first
   chrome.storage.sync.set({
     ghOwner: ghOwnerInput.value.trim(),
-    ghToken: ghTokenInput.value.trim(),
+    ghToken: ghTokenInput.value.trim()
   })
 
   const mode = document.querySelector('input[name="mode"]:checked').value
@@ -46,42 +46,42 @@ startBtn.addEventListener("click", async () => {
 
   // Get active tab for "current" scope
   let activeTabId = null
-  if (scope === "current") {
+  if (scope === 'current') {
     const [tab] = await chrome.tabs.query({
       active: true,
-      currentWindow: true,
+      currentWindow: true
     })
     activeTabId = tab?.id
   }
 
   const options = {
-    dryRun: mode === "dry",
+    dryRun: mode === 'dry',
     force: forceCheckbox.checked,
     scope,
-    activeTabId,
+    activeTabId
   }
 
   // Reset UI
   startBtn.disabled = true
-  startBtn.textContent = "Running..."
-  resetBtn.style.display = "none"
-  progressSection.style.display = "block"
-  summarySection.style.display = "none"
-  currentInfo.textContent = "Starting..."
-  progressFill.style.width = "0%"
-  logPre.textContent = ""
+  startBtn.textContent = 'Running...'
+  resetBtn.style.display = 'none'
+  progressSection.style.display = 'block'
+  summarySection.style.display = 'none'
+  currentInfo.textContent = 'Starting...'
+  progressFill.style.width = '0%'
+  logPre.textContent = ''
 
-  chrome.runtime.sendMessage({ action: "START", options })
+  chrome.runtime.sendMessage({ action: 'START', options })
 })
 
 // --- Reset ---
-resetBtn.addEventListener("click", () => {
-  chrome.runtime.sendMessage({ action: "RESET" })
+resetBtn.addEventListener('click', () => {
+  chrome.runtime.sendMessage({ action: 'RESET' })
   startBtn.disabled = false
-  startBtn.textContent = "Start"
-  resetBtn.style.display = "none"
-  progressSection.style.display = "none"
-  summarySection.style.display = "none"
+  startBtn.textContent = 'Start'
+  resetBtn.style.display = 'none'
+  progressSection.style.display = 'none'
+  summarySection.style.display = 'none'
 })
 
 // --- Listen for state changes ---
@@ -96,40 +96,38 @@ chrome.storage.onChanged.addListener((changes) => {
 function renderState(state) {
   // Log
   if (state.log?.length > 0) {
-    logPre.textContent = state.log.join("\n")
+    logPre.textContent = state.log.join('\n')
     logPre.scrollTop = logPre.scrollHeight
-    progressSection.style.display = "block"
+    progressSection.style.display = 'block'
   }
 
   // Current info
-  if (state.status === "running") {
+  if (state.status === 'running') {
     const parts = []
     if (state.currentTab) parts.push(state.currentTab)
     if (state.currentRepo) parts.push(state.currentRepo)
-    currentInfo.textContent = parts.join(" > ")
+    currentInfo.textContent = parts.join(' > ')
 
     if (state.progress?.total > 0) {
-      const pct = Math.round(
-        ((state.progress.archived + state.progress.skipped) / state.progress.total) * 100,
-      )
+      const pct = Math.round(((state.progress.archived + state.progress.skipped) / state.progress.total) * 100)
       progressFill.style.width = `${pct}%`
       currentInfo.textContent += ` [${state.progress.archived + state.progress.skipped}/${state.progress.total}]`
     }
   }
 
   // Done or error
-  if (state.status === "done" || state.status === "error") {
+  if (state.status === 'done' || state.status === 'error') {
     startBtn.disabled = false
-    startBtn.textContent = "Start"
-    resetBtn.style.display = "block"
-    progressFill.style.width = "100%"
+    startBtn.textContent = 'Start'
+    resetBtn.style.display = 'block'
+    progressFill.style.width = '100%'
 
-    if (state.status === "done") {
-      currentInfo.textContent = "Complete"
+    if (state.status === 'done') {
+      currentInfo.textContent = 'Complete'
       renderSummary(state.results)
     } else {
       currentInfo.textContent = `Error: ${state.error}`
-      progressFill.style.background = "#f87171"
+      progressFill.style.background = '#f87171'
     }
   }
 }
@@ -138,15 +136,15 @@ function renderState(state) {
 function renderSummary(results) {
   if (!results?.length) return
 
-  summarySection.style.display = "block"
-  summaryDiv.textContent = ""
+  summarySection.style.display = 'block'
+  summaryDiv.textContent = ''
 
   let grand = 0
   for (const r of results) {
     grand += r.count
-    const div = document.createElement("div")
+    const div = document.createElement('div')
     if (r.err) {
-      div.className = "error"
+      div.className = 'error'
       div.textContent = `${r.label}: ERROR - ${r.err}`
     } else {
       div.textContent = `${r.label}: ${r.count} archived`
@@ -154,21 +152,21 @@ function renderSummary(results) {
     summaryDiv.appendChild(div)
   }
 
-  const totalDiv = document.createElement("div")
-  totalDiv.className = "total"
+  const totalDiv = document.createElement('div')
+  totalDiv.className = 'total'
   totalDiv.textContent = `TOTAL: ${grand} tasks archived`
   summaryDiv.appendChild(totalDiv)
 }
 
 // --- Check for existing state on popup open ---
-chrome.runtime.sendMessage({ action: "GET_STATE" }, (state) => {
-  if (state && state.status !== "idle") {
+chrome.runtime.sendMessage({ action: 'GET_STATE' }, (state) => {
+  if (state && state.status !== 'idle') {
     renderState(state)
-    if (state.status === "running") {
+    if (state.status === 'running') {
       startBtn.disabled = true
-      startBtn.textContent = "Running..."
+      startBtn.textContent = 'Running...'
     } else {
-      resetBtn.style.display = "block"
+      resetBtn.style.display = 'block'
     }
   }
 })

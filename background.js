@@ -10,26 +10,26 @@ const prCache = new Map()
 
 // --- State (restored from storage on SW restart) ---
 const DEFAULT_STATE = {
-  status: "idle",
-  currentTab: "",
-  currentRepo: "",
+  status: 'idle',
+  currentTab: '',
+  currentRepo: '',
   progress: { archived: 0, skipped: 0, total: 0 },
   results: [],
   log: [],
-  error: null,
+  error: null
 }
 
 let state = { ...DEFAULT_STATE }
 
 // Restore state from storage on SW startup
-const stateReadyPromise = chrome.storage.session.get("archiveState").then((data) => {
+const stateReadyPromise = chrome.storage.session.get('archiveState').then((data) => {
   if (data.archiveState) {
     state = data.archiveState
     // If SW died mid-operation, mark as error so user knows
-    if (state.status === "running") {
-      state.status = "error"
-      state.error = "Operation interrupted (browser killed service worker)"
-      state.log.push("\n[!] Service worker was terminated during operation.")
+    if (state.status === 'running') {
+      state.status = 'error'
+      state.error = 'Operation interrupted (browser killed service worker)'
+      state.log.push('\n[!] Service worker was terminated during operation.')
       chrome.storage.session.set({ archiveState: state })
     }
   }
@@ -71,7 +71,7 @@ async function getOpenPRCount(owner, repo, token) {
 
   try {
     const url = `https://api.github.com/repos/${owner}/${repo}/pulls?state=open&per_page=100`
-    const headers = { Accept: "application/vnd.github+json" }
+    const headers = { Accept: 'application/vnd.github+json' }
     if (token) headers.Authorization = `token ${token}`
 
     const res = await fetch(url, { headers })
@@ -92,30 +92,30 @@ async function getOpenPRCount(owner, repo, token) {
 
 // --- Tab management ---
 async function getJulesTabs() {
-  const tabs = await chrome.tabs.query({ url: "https://jules.google.com/*" })
+  const tabs = await chrome.tabs.query({ url: 'https://jules.google.com/*' })
   return tabs
-    .filter((t) => !t.url.includes("accounts.google"))
+    .filter((t) => !t.url.includes('accounts.google'))
     .sort((a, b) => {
-      const na = parseInt(a.url.match(/\/u\/(\d+)/)?.[1] || "0", 10)
-      const nb = parseInt(b.url.match(/\/u\/(\d+)/)?.[1] || "0", 10)
+      const na = parseInt(a.url.match(/\/u\/(\d+)/)?.[1] || '0', 10)
+      const nb = parseInt(b.url.match(/\/u\/(\d+)/)?.[1] || '0', 10)
       return na - nb
     })
 }
 
 function getTabLabel(tab) {
   const m = tab.url.match(/\/u\/(\d+)/)
-  return m ? `u/${m[1]}` : "default"
+  return m ? `u/${m[1]}` : 'default'
 }
 
 // --- Ensure content script is injected into a tab ---
 async function ensureContentScript(tabId) {
   try {
-    await chrome.tabs.sendMessage(tabId, { action: "PING" })
+    await chrome.tabs.sendMessage(tabId, { action: 'PING' })
   } catch {
     // Content script not loaded — inject it programmatically
     await chrome.scripting.executeScript({
       target: { tabId },
-      files: ["content.js"],
+      files: ['content.js']
     })
     // Wait for script to initialize
     await new Promise((r) => setTimeout(r, 500))
@@ -150,12 +150,12 @@ async function sendToTab(tabId, message, retries = 3) {
 async function processTab(tab, options) {
   const label = getTabLabel(tab)
   updateState({ currentTab: label })
-  addLog(`\n${"=".repeat(50)}`)
+  addLog(`\n${'='.repeat(50)}`)
   addLog(`${label}: ${tab.url}`)
-  addLog(`${"=".repeat(50)}`)
+  addLog(`${'='.repeat(50)}`)
 
   // Get repos with tasks (content script waits for sidebar to load)
-  const response = await sendToTab(tab.id, { action: "GET_REPOS" })
+  const response = await sendToTab(tab.id, { action: 'GET_REPOS' })
   const repos = response?.repos || []
 
   if (repos.length === 0) {
@@ -169,7 +169,7 @@ async function processTab(tab, options) {
   }
 
   // Check PRs and decide which repos to archive
-  const { ghOwner, ghToken } = await chrome.storage.sync.get(["ghOwner", "ghToken"])
+  const { ghOwner, ghToken } = await chrome.storage.sync.get(['ghOwner', 'ghToken'])
 
   addLog(`\n[${label}] Checking open PRs...`)
   const toArchive = []
@@ -180,14 +180,14 @@ async function processTab(tab, options) {
       toArchive.push(r)
       continue
     }
-    const owner = r.owner || ghOwner || ""
+    const owner = r.owner || ghOwner || ''
     if (!owner) {
       addLog(`  ${r.repo}: no owner configured, skipping PR check -> ARCHIVE`)
       toArchive.push(r)
       continue
     }
     const count = await getOpenPRCount(owner, r.repo, ghToken)
-    addLog(`  ${r.repo}: ${count} open PRs ${count === 0 ? "-> ARCHIVE" : "-> SKIP"}`)
+    addLog(`  ${r.repo}: ${count} open PRs ${count === 0 ? '-> ARCHIVE' : '-> SKIP'}`)
     if (count === 0) {
       toArchive.push(r)
     } else {
@@ -196,9 +196,7 @@ async function processTab(tab, options) {
   }
 
   if (toSkip.length > 0) {
-    addLog(
-      `\n[${label}] SKIPPING (has open PRs): ${toSkip.map((r) => `${r.name} (${r.tasks})`).join(", ")}`,
-    )
+    addLog(`\n[${label}] SKIPPING (has open PRs): ${toSkip.map((r) => `${r.name} (${r.tasks})`).join(', ')}`)
   }
 
   if (toArchive.length === 0) {
@@ -207,9 +205,7 @@ async function processTab(tab, options) {
   }
 
   // Archive each repo
-  addLog(
-    `\n[${label}] Archiving ${toArchive.length} repos: ${toArchive.map((r) => r.name).join(", ")}`,
-  )
+  addLog(`\n[${label}] Archiving ${toArchive.length} repos: ${toArchive.map((r) => r.name).join(', ')}`)
   let grandTotal = 0
 
   for (const r of toArchive) {
@@ -218,9 +214,9 @@ async function processTab(tab, options) {
 
     try {
       const result = await sendToTab(tab.id, {
-        action: "ARCHIVE_REPO",
+        action: 'ARCHIVE_REPO',
         repo: r.repo,
-        dryRun: options.dryRun,
+        dryRun: options.dryRun
       })
       grandTotal += result?.archived || 0
     } catch (e) {
@@ -237,28 +233,28 @@ async function startArchive(options) {
   prCache.clear()
   startKeepAlive()
   updateState({
-    status: "running",
-    currentTab: "",
-    currentRepo: "",
+    status: 'running',
+    currentTab: '',
+    currentRepo: '',
     progress: { archived: 0, skipped: 0, total: 0 },
     results: [],
     log: [],
-    error: null,
+    error: null
   })
 
-  addLog(options.dryRun ? "=== DRY RUN MODE ===" : "=== ARCHIVE MODE ===")
-  if (options.force) addLog("=== FORCE MODE (skip PR check) ===")
+  addLog(options.dryRun ? '=== DRY RUN MODE ===' : '=== ARCHIVE MODE ===')
+  if (options.force) addLog('=== FORCE MODE (skip PR check) ===')
 
   try {
     let tabs = await getJulesTabs()
 
-    if (options.scope === "current" && options.activeTabId) {
+    if (options.scope === 'current' && options.activeTabId) {
       tabs = tabs.filter((t) => t.id === options.activeTabId)
     }
 
     if (tabs.length === 0) {
-      addLog("No Jules tabs found. Open jules.google.com first.")
-      updateState({ status: "error", error: "No Jules tabs found" })
+      addLog('No Jules tabs found. Open jules.google.com first.')
+      updateState({ status: 'error', error: 'No Jules tabs found' })
       return
     }
 
@@ -277,9 +273,9 @@ async function startArchive(options) {
     }
 
     // Summary
-    addLog(`\n${"=".repeat(50)}`)
-    addLog("SUMMARY")
-    addLog(`${"=".repeat(50)}`)
+    addLog(`\n${'='.repeat(50)}`)
+    addLog('SUMMARY')
+    addLog(`${'='.repeat(50)}`)
     let grand = 0
     results.forEach((r) => {
       grand += r.count
@@ -287,10 +283,10 @@ async function startArchive(options) {
     })
     addLog(`\n  GRAND TOTAL: ${grand} tasks archived`)
 
-    updateState({ status: "done", results })
+    updateState({ status: 'done', results })
   } catch (e) {
     addLog(`FATAL ERROR: ${e.message}`)
-    updateState({ status: "error", error: e.message })
+    updateState({ status: 'error', error: e.message })
   } finally {
     stopKeepAlive()
   }
@@ -299,17 +295,17 @@ async function startArchive(options) {
 // --- Message handlers ---
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   switch (msg.action) {
-    case "START":
+    case 'START':
       startArchive(msg.options)
       sendResponse({ ok: true })
       break
 
-    case "GET_STATE":
+    case 'GET_STATE':
       // Wait for state restoration if SW just restarted
       stateReadyPromise.then(() => sendResponse(state))
       return true // async response
 
-    case "PROGRESS":
+    case 'PROGRESS':
       // Relay from content script
       if (msg.data?.message) {
         addLog(msg.data.message)
@@ -319,13 +315,13 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           progress: {
             archived: msg.data.archived,
             skipped: msg.data.skipped,
-            total: msg.data.total,
-          },
+            total: msg.data.total
+          }
         })
       }
       break
 
-    case "RESET":
+    case 'RESET':
       prCache.clear()
       stopKeepAlive()
       state = { ...DEFAULT_STATE }

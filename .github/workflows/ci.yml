@@ -4,15 +4,13 @@ on:
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
-  pull_request_target:
-    branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
   issue_comment:
     types: [created, edited]
   issues:
     types: [opened, reopened]
+  workflow_dispatch: {}
 
 permissions:
   contents: read
@@ -22,7 +20,7 @@ jobs:
   pr-title-check:
     name: PR Title Check
     if: >-
-      github.event_name == 'pull_request_target'
+      github.event_name == 'pull_request'
       && github.event.sender.type != 'Bot'
     runs-on: ubuntu-latest
     permissions:
@@ -108,7 +106,7 @@ jobs:
         github.event_name == 'issue_comment'
         && github.event.sender.type != 'Bot'
       ) || (
-        github.event_name == 'pull_request_target'
+        github.event_name == 'pull_request'
         && github.event.sender.type != 'Bot'
         && github.event.pull_request.user.login != github.repository_owner
       )
@@ -147,7 +145,7 @@ jobs:
   email-notify:
     name: Email Notification
     if: >-
-      (github.event_name == 'issues' || github.event_name == 'pull_request_target')
+      (github.event_name == 'issues' || github.event_name == 'pull_request')
       && github.actor != github.repository_owner
       && github.event.sender.type != 'Bot'
     runs-on: ubuntu-latest
@@ -167,11 +165,12 @@ jobs:
           server_port: 587
           username: ${{ secrets.SMTP_USERNAME }}
           password: ${{ secrets.SMTP_PASSWORD }}
-          subject: "[${{ github.repository }}] ${{ github.event_name }}"
+          subject: "[${{ github.event.repository.name }}] ${{ github.event_name == 'issues' && 'Issue' || 'PR' }}"
           to: ${{ secrets.NOTIFY_EMAIL }}
-          from: GitHub Actions <${{ secrets.SMTP_USERNAME }}>
+          from: GitHub Notify <${{ secrets.SMTP_USERNAME }}>
           body: |
             Event: ${{ github.event_name }}
             Actor: ${{ github.actor }}
             Title: ${{ env.EVENT_TITLE }}
             URL: ${{ env.EVENT_URL }}
+            Action: ${{ github.event.action }}

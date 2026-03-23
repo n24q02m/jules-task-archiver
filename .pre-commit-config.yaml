@@ -1,8 +1,13 @@
+# Pre-commit hooks
+# Install: pre-commit install --hook-type pre-commit --hook-type commit-msg
+# Bypass: git commit --no-verify (emergencies only)
+
 repos:
   - repo: https://github.com/gitleaks/gitleaks
-    rev: v8.24.3
+    rev: v8.30.1
     hooks:
       - id: gitleaks
+        name: gitleaks (detect secrets)
 
   - repo: local
     hooks:
@@ -11,16 +16,22 @@ repos:
         entry: npx @biomejs/biome check --write
         language: system
         types_or: [javascript, json, css]
-        pass_filenames: false
+        pass_filenames: true
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
       - id: trailing-whitespace
+        exclude_types: [image]
       - id: check-merge-conflict
       - id: check-json
+        types: [json]
       - id: check-yaml
+        types: [yaml]
+      - id: check-toml
+        types: [toml]
       - id: end-of-file-fixer
+        exclude_types: [image]
 
   - repo: local
     hooks:
@@ -29,4 +40,3 @@ repos:
         entry: bash scripts/enforce-commit.sh
         language: system
         stages: [commit-msg]
-        always_run: true

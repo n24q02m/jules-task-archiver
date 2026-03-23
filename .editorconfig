@@ -1,3 +1,6 @@
+# Editor configuration
+# https://editorconfig.org
+
 root = true
 
 [*]
@@ -8,6 +11,15 @@ trim_trailing_whitespace = true
 indent_style = space
 indent_size = 2
 
+[*.{js,mjs}]
+indent_size = 2
+
+[*.{json,yml,yaml,toml}]
+indent_size = 2
+
 [*.md]
 trim_trailing_whitespace = false
 max_line_length = off
+
+[Makefile]
+indent_style = tab

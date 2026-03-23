@@ -10,12 +10,12 @@
 
 // --- Selectors (update here if Jules UI changes) ---
 const SEL = {
-  repoLink: "a.source-row",
-  repoName: ".repo",
-  repoOwner: ".owner",
-  taskCount: ".source-task-count",
+  repoLink: 'a.source-row',
+  repoName: '.repo',
+  repoOwner: '.owner',
+  taskCount: '.source-task-count',
   taskOptions: 'button[aria-label="Task options"]',
-  menuItem: 'button[role="menuitem"]',
+  menuItem: 'button[role="menuitem"]'
 }
 
 // --- Timing (ms) ---
@@ -25,7 +25,7 @@ const TIMING = {
   taskDelay: 300,
   pageLoad: 4000,
   viewMore: 2000,
-  batchDelay: 1500,
+  batchDelay: 1500
 }
 
 // --- Batch size: archive N tasks, then reload page for fresh DOM ---
@@ -36,12 +36,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 // --- Detect account label from URL ---
 function getAccountLabel() {
   const m = location.href.match(/\/u\/(\d+)/)
-  return m ? `u/${m[1]}` : "default"
+  return m ? `u/${m[1]}` : 'default'
 }
 
 // --- Send progress to background ---
 function reportProgress(data) {
-  chrome.runtime.sendMessage({ action: "PROGRESS", data })
+  chrome.runtime.sendMessage({ action: 'PROGRESS', data })
 }
 
 // --- Read repos from sidebar ---
@@ -49,9 +49,9 @@ function getRepos() {
   const rows = document.querySelectorAll(SEL.repoLink)
   const repos = []
   for (const a of rows) {
-    const repo = a.querySelector(SEL.repoName)?.textContent?.trim() || ""
-    const owner = a.querySelector(SEL.repoOwner)?.textContent?.trim() || ""
-    const count = parseInt(a.querySelector(SEL.taskCount)?.textContent?.trim() || "0", 10)
+    const repo = a.querySelector(SEL.repoName)?.textContent?.trim() || ''
+    const owner = a.querySelector(SEL.repoOwner)?.textContent?.trim() || ''
+    const count = parseInt(a.querySelector(SEL.taskCount)?.textContent?.trim() || '0', 10)
     if (count > 0) {
       repos.push({ name: `${owner}/${repo}`, owner, repo, tasks: count })
     }
@@ -86,8 +86,8 @@ async function navigateToRepo(repoName) {
 async function loadAllTasks() {
   let clicks = 0
   while (true) {
-    const btns = Array.from(document.querySelectorAll("button"))
-    const viewMore = btns.filter((b) => b.textContent?.trim() === "View more")
+    const btns = Array.from(document.querySelectorAll('button'))
+    const viewMore = btns.filter((b) => b.textContent?.trim() === 'View more')
     if (viewMore.length === 0) break
     viewMore[viewMore.length - 1].click()
     clicks++
@@ -99,26 +99,24 @@ async function loadAllTasks() {
 // --- Archive a single task at a given index ---
 async function archiveTaskAt(index) {
   const btns = document.querySelectorAll(SEL.taskOptions)
-  if (index >= btns.length) return "no_btn"
+  if (index >= btns.length) return 'no_btn'
 
   btns[index].click()
   await sleep(TIMING.menuWait)
 
   const items = Array.from(document.querySelectorAll(SEL.menuItem))
-  const archiveBtn = items.find(
-    (x) => x.textContent?.includes("Archive") && !x.textContent?.includes("Unarchive"),
-  )
+  const archiveBtn = items.find((x) => x.textContent?.includes('Archive') && !x.textContent?.includes('Unarchive'))
 
   if (!archiveBtn) {
     // Close menu by pressing Escape (more reliable than body click)
-    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
     await sleep(TIMING.closeWait)
-    return "skip"
+    return 'skip'
   }
 
   archiveBtn.click()
   await sleep(TIMING.closeWait)
-  return "ok"
+  return 'ok'
 }
 
 // --- Archive one batch of tasks (up to BATCH_SIZE) ---
@@ -135,10 +133,10 @@ async function archiveBatch() {
     if (index >= btns.length) break
 
     const result = await archiveTaskAt(index)
-    if (result === "ok") {
+    if (result === 'ok') {
       archived++
       // Task disappears — next task slides into this index, so DON'T increment
-    } else if (result === "skip") {
+    } else if (result === 'skip') {
       skipped++
       index++ // This task stays in DOM, move past it
     } else {
@@ -171,13 +169,13 @@ async function archiveRepo(repoName, dryRun) {
 
   reportProgress({
     label,
-    message: `[${label}] ${initialTotal} tasks found`,
+    message: `[${label}] ${initialTotal} tasks found`
   })
 
   if (dryRun) {
     reportProgress({
       label,
-      message: `[${label}] DRY RUN - would process ${initialTotal} tasks`,
+      message: `[${label}] DRY RUN - would process ${initialTotal} tasks`
     })
     return { archived: 0, skipped: 0, total: initialTotal }
   }
@@ -197,7 +195,7 @@ async function archiveRepo(repoName, dryRun) {
       message: `[${label}] Batch ${batchNum}: ${remaining} tasks remaining`,
       archived: totalArchived,
       skipped: totalSkipped,
-      total: initialTotal,
+      total: initialTotal
     })
 
     const batch = await archiveBatch()
@@ -215,7 +213,7 @@ async function archiveRepo(repoName, dryRun) {
       message: `[${label}] Batch ${batchNum} done: +${batch.archived} archived, +${batch.skipped} skipped`,
       archived: totalArchived,
       skipped: totalSkipped,
-      total: initialTotal,
+      total: initialTotal
     })
 
     // Check if more tasks remain — if so, reload for fresh DOM
@@ -223,7 +221,7 @@ async function archiveRepo(repoName, dryRun) {
     if (afterRemaining > 0) {
       reportProgress({
         label,
-        message: `[${label}] Reloading page for fresh DOM...`,
+        message: `[${label}] Reloading page for fresh DOM...`
       })
 
       // Instead of full page reload (which kills the content script),
@@ -240,7 +238,7 @@ async function archiveRepo(repoName, dryRun) {
     archived: totalArchived,
     skipped: totalSkipped,
     total: initialTotal,
-    done: true,
+    done: true
   })
 
   return { archived: totalArchived, skipped: totalSkipped, total: initialTotal }
@@ -249,11 +247,11 @@ async function archiveRepo(repoName, dryRun) {
 // --- Message handler ---
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   switch (msg.action) {
-    case "PING":
+    case 'PING':
       sendResponse({ ok: true, account: getAccountLabel() })
       break
 
-    case "GET_REPOS": {
+    case 'GET_REPOS': {
       // Ensure sidebar is loaded before reading
       waitForSidebar().then((ready) => {
         if (ready) {
@@ -265,13 +263,13 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       return true
     }
 
-    case "ARCHIVE_REPO":
+    case 'ARCHIVE_REPO':
       archiveRepo(msg.repo, msg.dryRun).then((result) => {
         sendResponse(result)
       })
       return true
 
     default:
-      sendResponse({ error: "Unknown action" })
+      sendResponse({ error: 'Unknown action' })
   }
 })

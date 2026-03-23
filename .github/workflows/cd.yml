@@ -41,7 +41,15 @@ jobs:
         id: release
         with:
           github_token: ${{ secrets.GH_PAT }}
+          config_file: semantic-release.toml
           prerelease: ${{ inputs.release_type == 'beta' }}
+          prerelease_token: beta
+
+      - uses: python-semantic-release/publish-action@v10
+        if: steps.release.outputs.released == 'true'
+        with:
+          github_token: ${{ secrets.GH_PAT }}
+          tag: ${{ steps.release.outputs.tag }}
 
   package:
     name: Package Extension
