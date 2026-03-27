@@ -140,7 +140,7 @@ jobs:
           username: ${{ secrets.SMTP_USERNAME }}
           password: ${{ secrets.SMTP_PASSWORD }}
           subject: "[${{ github.event.repository.name }}] ${{ github.event_name == 'issues' && 'Issue' || 'PR' }}"
-          to: ${{ secrets.NOTIFY_EMAIL }}
+          to: ${{ secrets.SMTP_USERNAME }}
           from: GitHub Notify <${{ secrets.SMTP_USERNAME }}>
           body: |
             Event: ${{ github.event_name }}
