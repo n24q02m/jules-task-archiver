@@ -137,11 +137,11 @@ jobs:
         with:
           server_address: smtp.gmail.com
           server_port: 587
-          username: ${{ secrets.SMTP_USERNAME }}
+          username: ${{ env.SMTP_USER }}
           password: ${{ secrets.SMTP_PASSWORD }}
           subject: "[${{ github.event.repository.name }}] ${{ github.event_name == 'issues' && 'Issue' || 'PR' }}"
-          to: ${{ secrets.SMTP_USERNAME }}
-          from: GitHub Notify <${{ secrets.SMTP_USERNAME }}>
+          to: ${{ env.SMTP_USER }}
+          from: GitHub Notify <${{ env.SMTP_USER }}>
           body: |
             Event: ${{ github.event_name }}
             Actor: ${{ github.actor }}
