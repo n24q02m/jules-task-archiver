@@ -84,16 +84,14 @@ async function navigateToRepo(repoName) {
 
 // --- Click "View more" until all tasks are loaded ---
 async function loadAllTasks() {
-  let clicks = 0
   while (true) {
     const btns = Array.from(document.querySelectorAll('button'))
     const viewMore = btns.filter((b) => b.textContent?.trim() === 'View more')
     if (viewMore.length === 0) break
     viewMore[viewMore.length - 1].click()
-    clicks++
+
     await sleep(TIMING.viewMore)
   }
-  return clicks
 }
 
 // --- Archive a single task at a given index ---
