@@ -17,7 +17,7 @@ If you discover a security vulnerability, please report it responsibly:
 
 ## Security Considerations
 
-- **GitHub tokens** stored in `chrome.storage.sync` are synced across devices. Use a token with minimal permissions (`public_repo` scope only)
+- **GitHub tokens** are stored locally in `chrome.storage.local` to prevent syncing sensitive credentials across devices. However, you should still use a token with minimal permissions (`public_repo` scope only)
 - The extension only communicates with `jules.google.com` and `api.github.com`
 - No data is sent to any third-party servers
 - Content scripts run in an isolated world and cannot access page JavaScript variables
