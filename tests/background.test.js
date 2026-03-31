@@ -135,3 +135,155 @@ describe('background.js state management', () => {
     assert.strictEqual(sessionSetData[0].archiveState.log[0], 'Test log message')
   })
 })
+
+describe('background.js sendToTab error paths and retries', () => {
+  it('should retry and eventually throw if content script never loads', async () => {
+    let sendMessageAttempts = 0
+    let executeScriptCalls = 0
+
+    const chromeMock = {
+      storage: {
+        session: { get: async () => ({}), set: async () => {} },
+        sync: { get: async () => ({}) }
+      },
+      runtime: {
+        onMessage: { addListener: () => {} },
+        getPlatformInfo: async () => ({})
+      },
+      tabs: {
+        get: async () => ({ url: 'https://jules.google.com/u/0' }),
+        sendMessage: async () => {
+          sendMessageAttempts++
+          throw new Error('Could not establish connection')
+        }
+      },
+      scripting: {
+        executeScript: async () => {
+          executeScriptCalls++
+        }
+      }
+    }
+
+    const sandbox = {
+      chrome: chromeMock,
+      setTimeout: (cb) => cb(), // fast forward
+      setInterval: () => {},
+      console,
+      Promise: global.Promise
+    }
+
+    vm.createContext(sandbox)
+    const script = new vm.Script(`${bgScriptContent}\nglobalThis.test_sendToTab = sendToTab;`)
+    script.runInContext(sandbox)
+
+    await assert.rejects(
+      async () => {
+        await sandbox.test_sendToTab(1, { action: 'TEST' }, 3)
+      },
+      { message: 'Could not establish connection' }
+    )
+
+    // 1 (init) + 1 (PING init) + 10 (PING poll) + 1 (post ensure) + 2 (retries) = 15
+    assert.strictEqual(sendMessageAttempts, 15)
+    assert.strictEqual(executeScriptCalls, 1)
+  })
+
+  it('should recover if ensureContentScript successfully injects the script', async () => {
+    let sendMessageAttempts = 0
+    let executeScriptCalls = 0
+    let scriptInjected = false
+
+    const chromeMock = {
+      storage: {
+        session: { get: async () => ({}), set: async () => {} },
+        sync: { get: async () => ({}) }
+      },
+      runtime: {
+        onMessage: { addListener: () => {} },
+        getPlatformInfo: async () => ({})
+      },
+      tabs: {
+        get: async () => ({ url: 'https://jules.google.com/u/0' }),
+        sendMessage: async (_tabId, msg) => {
+          sendMessageAttempts++
+          if (!scriptInjected) {
+            throw new Error('Could not establish connection')
+          }
+          return { success: true, msg: msg.action }
+        }
+      },
+      scripting: {
+        executeScript: async () => {
+          executeScriptCalls++
+          scriptInjected = true
+        }
+      }
+    }
+
+    const sandbox = {
+      chrome: chromeMock,
+      setTimeout: (cb) => cb(),
+      setInterval: () => {},
+      console,
+      Promise: global.Promise
+    }
+
+    vm.createContext(sandbox)
+    const script = new vm.Script(`${bgScriptContent}\nglobalThis.test_sendToTab = sendToTab;`)
+    script.runInContext(sandbox)
+
+    const result = await sandbox.test_sendToTab(1, { action: 'TEST' }, 3)
+
+    assert.deepStrictEqual(result, { success: true, msg: 'TEST' })
+    // 1 (init) + 1 (PING after inject) + 1 (post ensure) = 3
+    assert.strictEqual(sendMessageAttempts, 4)
+    assert.strictEqual(executeScriptCalls, 1)
+  })
+
+  it('should fall back to retry loop if ensureContentScript fails completely', async () => {
+    let sendMessageAttempts = 0
+
+    const chromeMock = {
+      storage: {
+        session: { get: async () => ({}), set: async () => {} },
+        sync: { get: async () => ({}) }
+      },
+      runtime: {
+        onMessage: { addListener: () => {} },
+        getPlatformInfo: async () => ({})
+      },
+      tabs: {
+        get: async () => ({ url: 'https://invalid.com' }), // Will make ensureContentScript throw
+        sendMessage: async (_tabId, _msg) => {
+          sendMessageAttempts++
+          if (sendMessageAttempts < 3) {
+            throw new Error('Not ready yet')
+          }
+          return { success: true }
+        }
+      },
+      scripting: {
+        executeScript: async () => {
+          assert.fail('Should not execute script on non-jules tab')
+        }
+      }
+    }
+
+    const sandbox = {
+      chrome: chromeMock,
+      setTimeout: (cb) => cb(),
+      setInterval: () => {},
+      console,
+      Promise: global.Promise
+    }
+
+    vm.createContext(sandbox)
+    const script = new vm.Script(`${bgScriptContent}\nglobalThis.test_sendToTab = sendToTab;`)
+    script.runInContext(sandbox)
+
+    const result = await sandbox.test_sendToTab(1, { action: 'TEST' }, 3)
+
+    assert.deepStrictEqual(result, { success: true })
+    assert.strictEqual(sendMessageAttempts, 3)
+  })
+})
