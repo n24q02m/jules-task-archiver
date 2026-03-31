@@ -1,0 +1,24 @@
+{
+  "name": "app",
+  "version": "1.0.0",
+  "description": "**Chrome Extension to bulk-archive completed Jules tasks for repos with no open GitHub PRs.**",
+  "main": "background.js",
+  "scripts": {
+    "test": "node --test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/n24q02m/jules-task-archiver.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/n24q02m/jules-task-archiver/issues"
+  },
+  "homepage": "https://github.com/n24q02m/jules-task-archiver#readme",
+  "devDependencies": {
+    "jsdom": "^29.0.1"
+  }
+}
