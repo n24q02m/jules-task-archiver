@@ -6,6 +6,5 @@
   "scripts": {
     "test": "node --test"
   },
-  "devDependencies": {
-  }
+  "devDependencies": {}
 }
