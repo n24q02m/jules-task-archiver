@@ -7,7 +7,7 @@ const path = require('node:path')
 const bgScriptPath = path.join(__dirname, '..', 'background.js')
 const bgScriptContent = fs.readFileSync(bgScriptPath, 'utf8')
 
-function setupEnvironment(initialStorage = {}) {
+function setupEnvironment(initialStorage = {}, customFetch) {
   const sessionSetData = []
   let currentStorage = { ...initialStorage }
 
@@ -43,7 +43,7 @@ function setupEnvironment(initialStorage = {}) {
 
   const sandbox = {
     chrome: chromeMock,
-    fetch: async () => ({ ok: true, json: async () => [] }),
+    fetch: customFetch || (async () => ({ ok: true, json: async () => [] })),
     setTimeout,
     setInterval,
     clearInterval,
@@ -60,6 +60,8 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_state = () => state;
     globalThis.test_updateState = updateState;
     globalThis.test_addLog = addLog;
+    globalThis.test_getOpenPRCount = getOpenPRCount;
+    globalThis.test_prCache = prCache;
   `
 
   const script = new vm.Script(scriptContent)
@@ -133,5 +135,90 @@ describe('background.js state management', () => {
     // addLog calls updateState({}) which should trigger storage.set
     assert.strictEqual(sessionSetData.length, 1)
     assert.strictEqual(sessionSetData[0].archiveState.log[0], 'Test log message')
+  })
+})
+
+describe('getOpenPRCount GitHub API fetching', () => {
+  it('should fetch PR count correctly and update cache', async () => {
+    let calledUrl = ''
+    let calledHeaders = {}
+
+    const customFetch = async (url, options) => {
+      calledUrl = url
+      calledHeaders = options.headers
+      return {
+        ok: true,
+        json: async () => [{ id: 1 }, { id: 2 }]
+      }
+    }
+
+    const { sandbox } = setupEnvironment({}, customFetch)
+
+    const count = await sandbox.test_getOpenPRCount('testowner', 'testrepo', 'testtoken')
+
+    assert.strictEqual(count, 2)
+    assert.strictEqual(calledUrl, 'https://api.github.com/repos/testowner/testrepo/pulls?state=open&per_page=100')
+    assert.strictEqual(calledHeaders.Accept, 'application/vnd.github+json')
+    assert.strictEqual(calledHeaders.Authorization, 'token testtoken')
+
+    // Cache should be updated
+    assert.strictEqual(sandbox.test_prCache.get('testowner/testrepo'), 2)
+  })
+
+  it('should return cached value if available', async () => {
+    let fetchCalled = false
+    const customFetch = async () => {
+      fetchCalled = true
+      return { ok: true, json: async () => [] }
+    }
+
+    const { sandbox } = setupEnvironment({}, customFetch)
+
+    // Pre-populate cache
+    sandbox.test_prCache.set('testowner/cachedrepo', 5)
+
+    const count = await sandbox.test_getOpenPRCount('testowner', 'cachedrepo', 'testtoken')
+
+    assert.strictEqual(count, 5)
+    assert.strictEqual(fetchCalled, false)
+  })
+
+  it('should handle non-200 responses gracefully', async () => {
+    const customFetch = async () => {
+      return {
+        ok: false,
+        status: 404
+      }
+    }
+
+    const { sandbox } = setupEnvironment({}, customFetch)
+    await sandbox.test_stateReadyPromise
+
+    const count = await sandbox.test_getOpenPRCount('testowner', 'badrepo', 'testtoken')
+
+    assert.strictEqual(count, 0)
+    assert.strictEqual(sandbox.test_prCache.get('testowner/badrepo'), 0)
+
+    const state = sandbox.test_state()
+    assert.ok(state.log.some((log) => log.includes('WARNING: GitHub API 404 for testowner/badrepo, assuming 0')))
+  })
+
+  it('should handle fetch errors gracefully', async () => {
+    const customFetch = async () => {
+      throw new Error('Network timeout')
+    }
+
+    const { sandbox } = setupEnvironment({}, customFetch)
+    await sandbox.test_stateReadyPromise
+
+    const count = await sandbox.test_getOpenPRCount('testowner', 'errorrepo', 'testtoken')
+
+    assert.strictEqual(count, 0)
+    assert.strictEqual(sandbox.test_prCache.get('testowner/errorrepo'), 0)
+
+    const state = sandbox.test_state()
+    assert.ok(
+      state.log.some((log) => log.includes('WARNING: Could not check PRs for testowner/errorrepo: Network timeout'))
+    )
   })
 })
