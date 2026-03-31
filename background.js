@@ -109,6 +109,11 @@ function getTabLabel(tab) {
 
 // --- Ensure content script is injected into a tab ---
 async function ensureContentScript(tabId) {
+  const tab = await chrome.tabs.get(tabId)
+  if (!tab.url?.startsWith('https://jules.google.com/')) {
+    throw new Error('Security Error: Cannot inject script into non-Jules tab')
+  }
+
   try {
     await chrome.tabs.sendMessage(tabId, { action: 'PING' })
   } catch {
