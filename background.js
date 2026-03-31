@@ -123,13 +123,14 @@ async function ensureContentScript(tabId) {
       files: ['content.js']
     })
     // Wait for script to initialize via polling
-    for (let i = 0; i < 10; i++) {
+    const startTime = Date.now()
+    while (Date.now() - startTime < 5000) {
       try {
-        await new Promise((r) => setTimeout(r, 50))
         await chrome.tabs.sendMessage(tabId, { action: 'PING' })
         break
       } catch {
         // Keep waiting
+        await new Promise((r) => setTimeout(r, 50))
       }
     }
   }
