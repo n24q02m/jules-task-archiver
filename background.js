@@ -70,7 +70,14 @@ async function getOpenPRCount(owner, repo, token) {
   if (prCache.has(key)) return prCache.get(key)
 
   try {
-    const url = `https://api.github.com/repos/${owner}/${repo}/pulls?state=open&per_page=100`
+    // Prevent URL/Header Injection
+    const encodedOwner = encodeURIComponent(owner)
+    const encodedRepo = encodeURIComponent(repo)
+    if (token && /[\r\n]/.test(token)) {
+      throw new Error('Security Error: Invalid token format')
+    }
+
+    const url = `https://api.github.com/repos/${encodedOwner}/${encodedRepo}/pulls?state=open&per_page=100`
     const headers = { Accept: 'application/vnd.github+json' }
     if (token) headers.Authorization = `token ${token}`
 
