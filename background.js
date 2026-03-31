@@ -117,8 +117,16 @@ async function ensureContentScript(tabId) {
       target: { tabId },
       files: ['content.js']
     })
-    // Wait for script to initialize
-    await new Promise((r) => setTimeout(r, 500))
+    // Wait for script to initialize via polling
+    for (let i = 0; i < 10; i++) {
+      try {
+        await new Promise((r) => setTimeout(r, 50))
+        await chrome.tabs.sendMessage(tabId, { action: 'PING' })
+        break
+      } catch {
+        // Keep waiting
+      }
+    }
   }
 }
 
