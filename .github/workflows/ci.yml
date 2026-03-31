@@ -46,6 +46,12 @@ jobs:
             console.log('manifest.json valid: v' + m.version);
           "
 
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run Tests
+        run: npm test
+
   dependency-review:
     name: Dependency Review
     if: github.event_name == 'pull_request'
