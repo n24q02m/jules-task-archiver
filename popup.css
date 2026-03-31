@@ -69,11 +69,25 @@ input[type="password"] {
   color: #e2e8f0;
   font-size: 13px;
   outline: none;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 input[type="text"]:focus,
 input[type="password"]:focus {
   border-color: #4ade80;
+}
+
+input[type="text"]:focus-visible,
+input[type="password"]:focus-visible {
+  box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.3);
+}
+
+input[type="radio"]:focus-visible,
+input[type="checkbox"]:focus-visible {
+  outline: 2px solid #4ade80;
+  outline-offset: 2px;
 }
 
 .hint {
@@ -114,16 +128,32 @@ button.primary {
   font-weight: 600;
   cursor: pointer;
   margin-bottom: 12px;
+  transition:
+    background-color 0.2s ease,
+    transform 0.1s ease,
+    box-shadow 0.2s ease;
 }
 
 button.primary:hover {
   background: #22c55e;
 }
 
+button.primary:active {
+  transform: scale(0.98);
+}
+
+button.primary:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px #1a1a2e,
+    0 0 0 4px #4ade80;
+}
+
 button.primary:disabled {
   background: #334155;
   color: #64748b;
   cursor: not-allowed;
+  transform: none;
 }
 
 button.secondary {
@@ -137,11 +167,22 @@ button.secondary {
   font-size: 12px;
   cursor: pointer;
   margin-bottom: 12px;
+  transition:
+    border-color 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 button.secondary:hover {
   border-color: #64748b;
   color: #e2e8f0;
+}
+
+button.secondary:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px #1a1a2e,
+    0 0 0 4px #94a3b8;
 }
 
 .current-info {

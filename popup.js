@@ -18,6 +18,7 @@ const currentInfo = $('#currentInfo')
 const progressFill = $('#progressFill')
 const logPre = $('#log')
 const summaryDiv = $('#summary')
+const progressBar = $('.progress-bar')
 
 // --- Load saved settings ---
 chrome.storage.sync.get(['ghOwner', 'ghToken'], (syncData) => {
@@ -81,6 +82,7 @@ startBtn.addEventListener('click', async () => {
   summarySection.style.display = 'none'
   currentInfo.textContent = 'Starting...'
   progressFill.style.width = '0%'
+  progressBar.setAttribute('aria-valuenow', '0')
   logPre.textContent = ''
 
   chrome.runtime.sendMessage({ action: 'START', options })
@@ -123,6 +125,7 @@ function renderState(state) {
     if (state.progress?.total > 0) {
       const pct = Math.round(((state.progress.archived + state.progress.skipped) / state.progress.total) * 100)
       progressFill.style.width = `${pct}%`
+      progressBar.setAttribute('aria-valuenow', pct.toString())
       currentInfo.textContent += ` [${state.progress.archived + state.progress.skipped}/${state.progress.total}]`
     }
   }
@@ -136,6 +139,7 @@ function renderState(state) {
 
     if (state.status === 'done') {
       currentInfo.textContent = 'Complete'
+      progressBar.setAttribute('aria-valuenow', '100')
       renderSummary(state.results)
     } else {
       currentInfo.textContent = `Error: ${state.error}`

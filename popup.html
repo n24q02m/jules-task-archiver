@@ -12,11 +12,11 @@
 
     <section class="settings">
       <h2>Settings</h2>
-      <label>
+      <label for="ghOwner">
         GitHub Owner
         <input type="text" id="ghOwner" placeholder="your-github-username" />
       </label>
-      <label>
+      <label for="ghToken">
         GitHub Token <span class="hint">(optional, for private repos)</span>
         <input type="password" id="ghToken" placeholder="ghp_..." />
       </label>
@@ -28,7 +28,7 @@
         <label><input type="radio" name="mode" value="dry" checked /> Dry Run</label>
         <label><input type="radio" name="mode" value="archive" /> Archive</label>
       </div>
-      <label class="checkbox">
+      <label class="checkbox" for="force">
         <input type="checkbox" id="force" />
         Force (skip PR check)
       </label>
@@ -43,11 +43,11 @@
 
     <section id="progressSection" style="display: none">
       <h2>Progress</h2>
-      <div id="currentInfo" class="current-info"></div>
-      <div class="progress-bar">
+      <div id="currentInfo" class="current-info" aria-live="polite"></div>
+      <div class="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
         <div id="progressFill" class="progress-fill"></div>
       </div>
-      <pre id="log" class="log"></pre>
+      <pre id="log" class="log" aria-live="polite"></pre>
     </section>
 
     <section id="summarySection" style="display: none">
