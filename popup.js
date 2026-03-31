@@ -20,9 +20,19 @@ const logPre = $('#log')
 const summaryDiv = $('#summary')
 
 // --- Load saved settings ---
-chrome.storage.sync.get(['ghOwner', 'ghToken'], (data) => {
-  if (data.ghOwner) ghOwnerInput.value = data.ghOwner
-  if (data.ghToken) ghTokenInput.value = data.ghToken
+chrome.storage.sync.get(['ghOwner', 'ghToken'], (syncData) => {
+  if (syncData.ghOwner) ghOwnerInput.value = syncData.ghOwner
+
+  chrome.storage.local.get(['ghToken'], (localData) => {
+    if (localData.ghToken) {
+      ghTokenInput.value = localData.ghToken
+      if (syncData.ghToken) chrome.storage.sync.remove('ghToken')
+    } else if (syncData.ghToken) {
+      ghTokenInput.value = syncData.ghToken
+      chrome.storage.local.set({ ghToken: syncData.ghToken })
+      chrome.storage.sync.remove('ghToken')
+    }
+  })
 })
 
 // --- Save settings on change ---
@@ -30,14 +40,16 @@ ghOwnerInput.addEventListener('change', () => {
   chrome.storage.sync.set({ ghOwner: ghOwnerInput.value.trim() })
 })
 ghTokenInput.addEventListener('change', () => {
-  chrome.storage.sync.set({ ghToken: ghTokenInput.value.trim() })
+  chrome.storage.local.set({ ghToken: ghTokenInput.value.trim() })
 })
 
 // --- Start archive ---
 startBtn.addEventListener('click', async () => {
   // Save settings first
   chrome.storage.sync.set({
-    ghOwner: ghOwnerInput.value.trim(),
+    ghOwner: ghOwnerInput.value.trim()
+  })
+  chrome.storage.local.set({
     ghToken: ghTokenInput.value.trim()
   })
 

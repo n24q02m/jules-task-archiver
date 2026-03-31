@@ -18,7 +18,7 @@ Chrome Extension (Manifest V3) with 3 layers:
 ## Security
 
 - No `innerHTML` — all DOM construction uses `textContent` + `createElement`
-- GitHub tokens stored in `chrome.storage.sync` (user choice: convenience vs security)
+- GitHub tokens stored in `chrome.storage.local` (security over convenience)
 - Only communicates with `jules.google.com` and `api.github.com`
 - All GitHub API responses treated as untrusted data
 
