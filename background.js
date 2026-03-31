@@ -199,23 +199,33 @@ async function processTab(tab, options) {
   const toArchive = []
   const toSkip = []
 
-  for (const r of repos) {
+  const prPromises = repos.map(async (r) => {
     if (options.force) {
-      toArchive.push(r)
-      continue
+      return { r, type: 'ARCHIVE', reason: 'force' }
     }
     const owner = r.owner || ghOwner || ''
     if (!owner) {
-      addLog(`  ${r.repo}: no owner configured, skipping PR check -> ARCHIVE`)
-      toArchive.push(r)
-      continue
+      return { r, type: 'ARCHIVE', reason: 'no-owner' }
     }
     const count = await getOpenPRCount(owner, r.repo, ghToken)
-    addLog(`  ${r.repo}: ${count} open PRs ${count === 0 ? '-> ARCHIVE' : '-> SKIP'}`)
-    if (count === 0) {
-      toArchive.push(r)
+    return { r, type: count === 0 ? 'ARCHIVE' : 'SKIP', count }
+  })
+
+  const results = await Promise.all(prPromises)
+
+  for (const res of results) {
+    if (res.reason === 'force') {
+      toArchive.push(res.r)
+    } else if (res.reason === 'no-owner') {
+      addLog(`  ${res.r.repo}: no owner configured, skipping PR check -> ARCHIVE`)
+      toArchive.push(res.r)
     } else {
-      toSkip.push(r)
+      addLog(`  ${res.r.repo}: ${res.count} open PRs ${res.type === 'ARCHIVE' ? '-> ARCHIVE' : '-> SKIP'}`)
+      if (res.type === 'ARCHIVE') {
+        toArchive.push(res.r)
+      } else {
+        toSkip.push(res.r)
+      }
     }
   }
 
