@@ -333,3 +333,14 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       break
   }
 })
+
+// Export for testing
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    sendToTab,
+    ensureContentScript,
+    getOpenPRCount,
+    processTab,
+    startArchive
+  }
+}
