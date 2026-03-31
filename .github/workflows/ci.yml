@@ -97,7 +97,7 @@ jobs:
           fi
 
       - name: Authenticate to GCP (Vertex AI)
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
         with:
           workload_identity_provider: ${{ vars.VERTEX_WIF_PROVIDER }}
           service_account: ${{ vars.VERTEX_SERVICE_ACCOUNT }}
@@ -107,7 +107,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERTEXAI_PROJECT: ${{ vars.VERTEX_PROJECT }}
-          VERTEXAI_LOCATION: us-central1
+          VERTEXAI_LOCATION: global
           PR_REVIEWER__EXTRA_INSTRUCTIONS: ${{ env.CUSTOM_INSTRUCTIONS }}
           PR_CODE_SUGGESTIONS__EXTRA_INSTRUCTIONS: ${{ env.CUSTOM_INSTRUCTIONS }}
           PR_DESCRIPTION__EXTRA_INSTRUCTIONS: ${{ env.CUSTOM_INSTRUCTIONS }}
@@ -129,22 +129,27 @@ jobs:
         with:
           egress-policy: audit
 
+
+      - name: Parse SMTP credential
+        run: |
+          echo "SMTP_USER=${SMTP_CREDENTIAL%%:*}" >> $GITHUB_ENV
+          echo "SMTP_PASS=${SMTP_CREDENTIAL#*:}" >> $GITHUB_ENV
+        env:
+          SMTP_CREDENTIAL: ${{ secrets.SMTP_CREDENTIAL }}
+
       - name: Send email notification
         uses: dawidd6/action-send-mail@d38f3f7cd391cdebfe0d38efc3998b935e951c4f # v16
-        env:
-          EVENT_TITLE: ${{ github.event.issue.title || github.event.pull_request.title }}
-          EVENT_URL: ${{ github.event.issue.html_url || github.event.pull_request.html_url }}
         with:
           server_address: smtp.gmail.com
           server_port: 587
           username: ${{ env.SMTP_USER }}
-          password: ${{ secrets.SMTP_PASSWORD }}
+          password: ${{ env.SMTP_PASS }}
           subject: "[${{ github.event.repository.name }}] ${{ github.event_name == 'issues' && 'Issue' || 'PR' }}"
           to: ${{ env.SMTP_USER }}
           from: GitHub Notify <${{ env.SMTP_USER }}>
           body: |
             Event: ${{ github.event_name }}
             Actor: ${{ github.actor }}
-            Title: ${{ env.EVENT_TITLE }}
-            URL: ${{ env.EVENT_URL }}
+            Title: ${{ github.event.issue.title || github.event.pull_request.title }}
+            URL: ${{ github.event.issue.html_url || github.event.pull_request.html_url }}
             Action: ${{ github.event.action }}
