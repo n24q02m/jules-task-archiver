@@ -5,6 +5,9 @@
  * Handles GitHub API calls and state management.
  */
 
+const JULES_URL_PATTERN = 'https://jules.google.com/*'
+const JULES_URL_PREFIX = 'https://jules.google.com/'
+
 // --- PR cache (in-memory, cleared each run) ---
 const prCache = new Map()
 
@@ -92,7 +95,7 @@ async function getOpenPRCount(owner, repo, token) {
 
 // --- Tab management ---
 async function getJulesTabs() {
-  const tabs = await chrome.tabs.query({ url: 'https://jules.google.com/*' })
+  const tabs = await chrome.tabs.query({ url: JULES_URL_PATTERN })
   return tabs
     .filter((t) => !t.url.includes('accounts.google'))
     .sort((a, b) => {
@@ -110,7 +113,7 @@ function getTabLabel(tab) {
 // --- Ensure content script is injected into a tab ---
 async function ensureContentScript(tabId) {
   const tab = await chrome.tabs.get(tabId)
-  if (!tab.url?.startsWith('https://jules.google.com/')) {
+  if (!tab.url?.startsWith(JULES_URL_PREFIX)) {
     throw new Error('Security Error: Cannot inject script into non-Jules tab')
   }
 
