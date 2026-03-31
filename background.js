@@ -91,20 +91,24 @@ async function getOpenPRCount(owner, repo, token) {
 }
 
 // --- Tab management ---
+function getAccountId(url) {
+  return url.match(/\/u\/(\d+)/)?.[1]
+}
+
 async function getJulesTabs() {
   const tabs = await chrome.tabs.query({ url: 'https://jules.google.com/*' })
   return tabs
     .filter((t) => !t.url.includes('accounts.google'))
     .sort((a, b) => {
-      const na = parseInt(a.url.match(/\/u\/(\d+)/)?.[1] || '0', 10)
-      const nb = parseInt(b.url.match(/\/u\/(\d+)/)?.[1] || '0', 10)
+      const na = parseInt(getAccountId(a.url) || '0', 10)
+      const nb = parseInt(getAccountId(b.url) || '0', 10)
       return na - nb
     })
 }
 
 function getTabLabel(tab) {
-  const m = tab.url.match(/\/u\/(\d+)/)
-  return m ? `u/${m[1]}` : 'default'
+  const accountId = getAccountId(tab.url)
+  return accountId ? `u/${accountId}` : 'default'
 }
 
 // --- Ensure content script is injected into a tab ---
