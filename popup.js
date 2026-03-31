@@ -97,8 +97,9 @@ resetBtn.addEventListener('click', () => {
 })
 
 // --- Listen for state changes ---
-chrome.storage.onChanged.addListener((changes) => {
-  if (!changes.archiveState) return
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'session' || !changes.archiveState) return
+
   const state = changes.archiveState.newValue
   if (!state) return
   renderState(state)
