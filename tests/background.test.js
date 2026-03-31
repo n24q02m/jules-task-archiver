@@ -77,6 +77,25 @@ describe('background.js state management', () => {
     assert.strictEqual(state.log.length, 0)
   })
 
+  it('should restore state from storage without error if not running', async () => {
+    const existingState = {
+      status: 'done',
+      log: ['Finished']
+    }
+    const { sandbox, sessionSetData } = setupEnvironment({ archiveState: existingState })
+
+    await sandbox.test_stateReadyPromise
+    await new Promise((resolve) => setTimeout(resolve, 10))
+
+    const state = sandbox.test_state()
+
+    assert.strictEqual(state.status, 'done')
+    assert.deepStrictEqual(state.log, ['Finished'])
+
+    // It should not have called chrome.storage.session.set
+    assert.strictEqual(sessionSetData.length, 0)
+  })
+
   it('should restore state from storage and handle interrupted running state', async () => {
     const existingState = {
       status: 'running',
@@ -106,15 +125,25 @@ describe('background.js state management', () => {
     // Clear initial sets if any (none expected from normal init)
     sessionSetData.length = 0
 
-    sandbox.test_updateState({ status: 'done', currentTab: 'u/0' })
-    const state = sandbox.test_state()
+    // Set some initial state fields
+    sandbox.test_updateState({ status: 'running', currentTab: 'u/0', progress: { archived: 5 } })
+    let state = sandbox.test_state()
+
+    assert.strictEqual(state.status, 'running')
+    assert.strictEqual(state.currentTab, 'u/0')
+    assert.deepStrictEqual(state.progress, { archived: 5 })
+
+    // Partial update: changing only status, others should remain intact
+    sandbox.test_updateState({ status: 'done' })
+    state = sandbox.test_state()
 
     assert.strictEqual(state.status, 'done')
-    assert.strictEqual(state.currentTab, 'u/0')
+    assert.strictEqual(state.currentTab, 'u/0') // Retained
+    assert.deepStrictEqual(state.progress, { archived: 5 }) // Retained
 
-    assert.strictEqual(sessionSetData.length, 1)
-    assert.strictEqual(sessionSetData[0].archiveState.status, 'done')
-    assert.strictEqual(sessionSetData[0].archiveState.currentTab, 'u/0')
+    assert.strictEqual(sessionSetData.length, 2)
+    assert.strictEqual(sessionSetData[1].archiveState.status, 'done')
+    assert.strictEqual(sessionSetData[1].archiveState.currentTab, 'u/0')
   })
 
   it('should append message to log and update state in addLog()', async () => {
@@ -124,14 +153,16 @@ describe('background.js state management', () => {
 
     sessionSetData.length = 0
 
-    sandbox.test_addLog('Test log message')
+    sandbox.test_addLog('Test log message 1')
+    sandbox.test_addLog('Test log message 2')
     const state = sandbox.test_state()
 
-    assert.strictEqual(state.log.length, 1)
-    assert.strictEqual(state.log[0], 'Test log message')
+    assert.strictEqual(state.log.length, 2)
+    assert.strictEqual(state.log[0], 'Test log message 1')
+    assert.strictEqual(state.log[1], 'Test log message 2')
 
     // addLog calls updateState({}) which should trigger storage.set
-    assert.strictEqual(sessionSetData.length, 1)
-    assert.strictEqual(sessionSetData[0].archiveState.log[0], 'Test log message')
+    assert.strictEqual(sessionSetData.length, 2)
+    assert.deepEqual(sessionSetData[1].archiveState.log, ['Test log message 1', 'Test log message 2'])
   })
 })
