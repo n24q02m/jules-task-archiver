@@ -13,26 +13,46 @@
   },
   "packageRules": [
     {
+      "description": "Auto-merge non-major devDependencies",
       "matchDepTypes": ["devDependencies"],
       "matchUpdateTypes": ["minor", "patch"],
-      "automerge": true
+      "automerge": true,
+      "automergeType": "pr"
     },
     {
+      "description": "Auto-merge patch production dependencies",
       "matchDepTypes": ["dependencies"],
       "matchUpdateTypes": ["patch"],
-      "automerge": true
+      "automerge": true,
+      "automergeType": "pr"
     },
     {
+      "description": "Group all non-major updates",
       "matchUpdateTypes": ["minor", "patch"],
-      "groupName": "non-major dependencies"
+      "groupName": "non-major dependencies",
+      "groupSlug": "non-major"
     },
     {
+      "description": "Pin GitHub Actions to SHA for security",
       "matchManagers": ["github-actions"],
       "pinDigests": true
     },
     {
+      "description": "Pin PSR to v10",
       "matchPackagePatterns": ["^python-semantic-release/"],
+      "matchManagers": ["github-actions"],
       "allowedVersions": ">=10.0.0"
+    },
+    {
+      "description": "Disable runtime version updates from mise",
+      "matchManagers": ["mise"],
+      "matchDepNames": ["python", "node", "java"],
+      "enabled": false
+    },
+    {
+      "description": "Pin Node.js runtime to 24.x",
+      "matchPackageNames": ["node"],
+      "allowedVersions": ">=24.0.0 <25.0.0"
     }
   ]
 }
