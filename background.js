@@ -199,23 +199,36 @@ async function processTab(tab, options) {
   const toArchive = []
   const toSkip = []
 
-  for (const r of repos) {
+  // ⚡ Bolt: Batch GitHub API calls to check PRs concurrently instead of sequentially
+  // This reduces wait time from O(N) to O(1) network round trips when a tab has multiple repos
+  const prChecks = repos.map(async (r) => {
     if (options.force) {
-      toArchive.push(r)
-      continue
+      return { repo: r, action: 'force' }
     }
     const owner = r.owner || ghOwner || ''
     if (!owner) {
-      addLog(`  ${r.repo}: no owner configured, skipping PR check -> ARCHIVE`)
-      toArchive.push(r)
-      continue
+      return { repo: r, action: 'no_owner' }
     }
     const count = await getOpenPRCount(owner, r.repo, ghToken)
-    addLog(`  ${r.repo}: ${count} open PRs ${count === 0 ? '-> ARCHIVE' : '-> SKIP'}`)
-    if (count === 0) {
+    return { repo: r, action: 'check', count }
+  })
+
+  const checkResults = await Promise.all(prChecks)
+
+  for (const result of checkResults) {
+    const { repo: r, action, count } = result
+    if (action === 'force') {
+      toArchive.push(r)
+    } else if (action === 'no_owner') {
+      addLog(`  ${r.repo}: no owner configured, skipping PR check -> ARCHIVE`)
       toArchive.push(r)
     } else {
-      toSkip.push(r)
+      addLog(`  ${r.repo}: ${count} open PRs ${count === 0 ? '-> ARCHIVE' : '-> SKIP'}`)
+      if (count === 0) {
+        toArchive.push(r)
+      } else {
+        toSkip.push(r)
+      }
     }
   }
 
