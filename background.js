@@ -66,11 +66,21 @@ function stopKeepAlive() {
 
 // --- GitHub API ---
 async function getOpenPRCount(owner, repo, token) {
-  const key = `${owner}/${repo}`
+  // Security: prevent HTTP header injection via token
+  if (token && /[\r\n]/.test(token)) {
+    addLog(`  WARNING: GitHub API token contains invalid characters`)
+    return 0
+  }
+
+  // Security: prevent SSRF/path traversal by encoding path parameters
+  const encodedOwner = encodeURIComponent(owner)
+  const encodedRepo = encodeURIComponent(repo)
+  const key = `${encodedOwner}/${encodedRepo}`
+
   if (prCache.has(key)) return prCache.get(key)
 
   try {
-    const url = `https://api.github.com/repos/${owner}/${repo}/pulls?state=open&per_page=100`
+    const url = `https://api.github.com/repos/${encodedOwner}/${encodedRepo}/pulls?state=open&per_page=100`
     const headers = { Accept: 'application/vnd.github+json' }
     if (token) headers.Authorization = `token ${token}`
 
