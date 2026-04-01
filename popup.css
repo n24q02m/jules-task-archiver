@@ -201,3 +201,9 @@ button.secondary:hover {
 .summary .skipped {
   color: #fbbf24;
 }
+
+input:focus-visible,
+button:focus-visible {
+  outline: 2px solid #4ade80;
+  outline-offset: 2px;
+}

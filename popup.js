@@ -81,6 +81,7 @@ startBtn.addEventListener('click', async () => {
   summarySection.style.display = 'none'
   currentInfo.textContent = 'Starting...'
   progressFill.style.width = '0%'
+  progressFill.parentElement.setAttribute('aria-valuenow', '0')
   logPre.textContent = ''
 
   chrome.runtime.sendMessage({ action: 'START', options })
@@ -123,6 +124,7 @@ function renderState(state) {
     if (state.progress?.total > 0) {
       const pct = Math.round(((state.progress.archived + state.progress.skipped) / state.progress.total) * 100)
       progressFill.style.width = `${pct}%`
+      progressFill.parentElement.setAttribute('aria-valuenow', pct.toString())
       currentInfo.textContent += ` [${state.progress.archived + state.progress.skipped}/${state.progress.total}]`
     }
   }
@@ -133,6 +135,7 @@ function renderState(state) {
     startBtn.textContent = 'Start'
     resetBtn.style.display = 'block'
     progressFill.style.width = '100%'
+    progressFill.parentElement.setAttribute('aria-valuenow', '100')
 
     if (state.status === 'done') {
       currentInfo.textContent = 'Complete'
