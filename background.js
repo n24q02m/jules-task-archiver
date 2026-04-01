@@ -199,23 +199,32 @@ async function processTab(tab, options) {
   const toArchive = []
   const toSkip = []
 
-  for (const r of repos) {
+  // ⚡ Bolt: Execute PR checks concurrently to avoid O(N) sequential blocking
+  const prChecks = repos.map(async (r) => {
     if (options.force) {
-      toArchive.push(r)
-      continue
+      return { r, action: 'archive', reason: 'force mode' }
     }
     const owner = r.owner || ghOwner || ''
     if (!owner) {
-      addLog(`  ${r.repo}: no owner configured, skipping PR check -> ARCHIVE`)
-      toArchive.push(r)
-      continue
+      return { r, action: 'archive', reason: 'no owner configured, skipping PR check' }
     }
     const count = await getOpenPRCount(owner, r.repo, ghToken)
-    addLog(`  ${r.repo}: ${count} open PRs ${count === 0 ? '-> ARCHIVE' : '-> SKIP'}`)
-    if (count === 0) {
-      toArchive.push(r)
+    return { r, count, action: count === 0 ? 'archive' : 'skip' }
+  })
+
+  const results = await Promise.all(prChecks)
+
+  for (const res of results) {
+    if (res.reason) {
+      addLog(`  ${res.r.repo}: ${res.reason} -> ARCHIVE`)
     } else {
-      toSkip.push(r)
+      addLog(`  ${res.r.repo}: ${res.count} open PRs -> ${res.action === 'archive' ? 'ARCHIVE' : 'SKIP'}`)
+    }
+
+    if (res.action === 'archive') {
+      toArchive.push(res.r)
+    } else {
+      toSkip.push(res.r)
     }
   }
 
