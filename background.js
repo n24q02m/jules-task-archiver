@@ -630,9 +630,32 @@ async function ensureContentScript(tabId) {
   }
 }
 
+// --- Send message to content script with retry ---
+async function sendToTab(tabId, message, retries = 3) {
+  let lastError
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await chrome.tabs.sendMessage(tabId, message)
+    } catch (e) {
+      lastError = e
+      if (i === 0) {
+        // First failure: try injecting content script
+        try {
+          await ensureContentScript(tabId)
+          return await chrome.tabs.sendMessage(tabId, message)
+        } catch {
+          // Fall through to retry loop
+        }
+      }
+      if (i < retries - 1) {
+        await new Promise((r) => setTimeout(r, 100 * (i + 1)))
+      }
+    }
+  }
+  throw lastError
+}
 async function getTabConfig(tabId) {
-  await ensureContentScript(tabId)
-  const response = await chrome.tabs.sendMessage(tabId, { action: 'GET_CONFIG' })
+  const response = await sendToTab(tabId, { action: 'GET_CONFIG' })
   if (!response?.config?.at) {
     throw new Error('Could not extract page config (XSRF token missing). Try refreshing the Jules tab.')
   }

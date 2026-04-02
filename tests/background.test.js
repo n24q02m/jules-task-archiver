@@ -89,6 +89,9 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_SDETAIL = SDETAIL;
     globalThis.test_CATEGORY_CONFIG = CATEGORY_CONFIG;
     globalThis.test_DEFAULT_CATEGORY = DEFAULT_CATEGORY;
+    globalThis.test_sendToTab = sendToTab;
+    globalThis.test_ensureContentScript = ensureContentScript;
+    globalThis.test_getTabConfig = getTabConfig;
   `
 
   const script = new vm.Script(scriptContent)
@@ -493,5 +496,119 @@ describe('state management', () => {
     sandbox.test_updateState({ status: 'done', currentTab: 'u/0' })
     assert.strictEqual(sandbox.test_state().status, 'done')
     assert.strictEqual(sessionSetData.length, 1)
+  })
+})
+
+// =============================================================================
+// Messaging and Injection Tests
+// =============================================================================
+
+describe('sendToTab', () => {
+  it('should send message successfully on first try', async () => {
+    const { sandbox } = setupEnvironment()
+    let calls = 0
+    sandbox.chrome.tabs.sendMessage = async (_id, _msg) => {
+      calls++
+      return { ok: true }
+    }
+
+    const res = await sandbox.test_sendToTab(1, { action: 'TEST' })
+    assert.strictEqual(calls, 1)
+    assert.strictEqual(res.ok, true)
+  })
+
+  it('should retry and succeed after injection on first failure', async () => {
+    const { sandbox } = setupEnvironment()
+    let sendCalls = 0
+    let injectCalls = 0
+
+    sandbox.chrome.tabs.sendMessage = async (_id, _msg) => {
+      sendCalls++
+      if (sendCalls === 1 || sendCalls === 2) throw new Error('Not ready')
+      return { ok: true }
+    }
+
+    sandbox.chrome.scripting.executeScript = async () => {
+      injectCalls++
+    }
+
+    const res = await sandbox.test_sendToTab(1, { action: 'TEST' })
+    // sendToTab loop i=0:
+    // 1. initial send fails (sendCalls=1)
+    // 2. ensureContentScript PING fails (sendCalls=2)
+    // 3. ensureContentScript injects (injectCalls=1)
+    // 4. ensureContentScript PING retry loop succeeds (sendCalls=3)
+    // 5. initial send retry (still in i=0 catch) succeeds (sendCalls=4)
+    assert.strictEqual(sendCalls, 4)
+    assert.strictEqual(injectCalls, 1)
+    assert.strictEqual(res.ok, true)
+  })
+
+  it('should throw error after all retries fail', async () => {
+    const { sandbox } = setupEnvironment()
+    let sendCalls = 0
+    sandbox.chrome.tabs.sendMessage = async (_id, _msg) => {
+      sendCalls++
+      throw new Error('Persistent failure')
+    }
+
+    try {
+      await sandbox.test_sendToTab(1, { action: 'TEST' }, 3)
+      assert.fail('Should have thrown')
+    } catch (e) {
+      // i=0: 1 (fail) + ensure (1 PING fail + 10 loop fail) + 1 (fail) = 13
+      // i=1: 1 (fail) = 14
+      // i=2: 1 (fail) = 15
+      assert.strictEqual(sendCalls, 15)
+      assert.strictEqual(e.message, 'Persistent failure')
+    }
+  })
+})
+
+describe('ensureContentScript', () => {
+  it('should throw security error for non-Jules tabs', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.chrome.tabs.get = async () => ({ url: 'https://evil.com' })
+
+    try {
+      await sandbox.test_ensureContentScript(1)
+      assert.fail('Should have thrown')
+    } catch (e) {
+      assert.ok(e.message.includes('Security Error'))
+    }
+  })
+
+  it('should succeed if PING works', async () => {
+    const { sandbox } = setupEnvironment()
+    let calls = 0
+    sandbox.chrome.tabs.sendMessage = async (_id, msg) => {
+      if (msg.action === 'PING') {
+        calls++
+        return { ok: true }
+      }
+    }
+
+    await sandbox.test_ensureContentScript(1)
+    assert.strictEqual(calls, 1)
+  })
+
+  it('should inject and wait for PING if first PING fails', async () => {
+    const { sandbox } = setupEnvironment()
+    const sendCalls = []
+    let injectCalls = 0
+
+    sandbox.chrome.tabs.sendMessage = async (_id, msg) => {
+      sendCalls.push(msg.action)
+      if (sendCalls.length < 3) throw new Error('Not ready') // 1st PING fail, 2nd PING (after inject) fail, 3rd PING success
+      return { ok: true }
+    }
+
+    sandbox.chrome.scripting.executeScript = async () => {
+      injectCalls++
+    }
+
+    await sandbox.test_ensureContentScript(1)
+    assert.strictEqual(injectCalls, 1)
+    assert.deepStrictEqual(sendCalls, ['PING', 'PING', 'PING'])
   })
 })
