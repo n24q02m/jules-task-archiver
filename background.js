@@ -693,17 +693,7 @@ async function processTab(tab, options) {
 
   // Check PRs and decide which repos to archive
   const { ghOwner } = await chrome.storage.sync.get(['ghOwner'])
-  let { ghToken } = await chrome.storage.local.get(['ghToken'])
-
-  // Migrate token from sync to local if needed
-  if (!ghToken) {
-    const syncData = await chrome.storage.sync.get(['ghToken'])
-    if (syncData.ghToken) {
-      ghToken = syncData.ghToken
-      await chrome.storage.local.set({ ghToken })
-      await chrome.storage.sync.remove('ghToken')
-    }
-  }
+  const { ghToken } = await chrome.storage.local.get(['ghToken'])
 
   addLog(`\n[${label}] Checking open PRs...`)
   const toArchive = []
