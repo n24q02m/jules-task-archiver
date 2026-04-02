@@ -1,34 +1,42 @@
 # jules-task-archiver
 
-Chrome Extension (Manifest V3) to bulk-archive Jules tasks for repos with no open GitHub PRs.
+Chrome Extension (Manifest V3) for bulk operations on Jules tasks via batchexecute API.
 
 ## Structure
 
 - `manifest.json` -- Extension config: permissions, content_scripts, action
-- `background.js` -- Service worker: orchestrator, GitHub API, state management
-- `content.js` -- Content script: DOM automation on jules.google.com
-- `popup.html/js/css` -- Popup UI: settings, controls, progress display
+- `background.js` -- Service worker: batchexecute client, response parser, orchestrator, suggestions
+- `content.js` -- Content script: WIZ_global_data token extraction + fetch observer (MAIN world)
+- `popup.html/js/css` -- Popup UI: settings, operation mode, controls, progress display
 - `icons/` -- Extension icons (16/48/128px)
+- `tests/` -- Unit tests (node:test + vm sandbox)
 
-## Architecture
+## Architecture (v2)
 
 ```
-popup.js (UI) <-> background.js (orchestrator) <-> content.js (DOM worker)
+popup.js (UI) <-> background.js (batchexecute client) <-> content.js (token extractor)
+                        |                                        |
+                  fetch() to jules.google.com          MAIN world injection
+                  /_/Swebot/data/batchexecute          reads WIZ_global_data
                         |
                 chrome.storage.session (state)
                 chrome.storage.sync (settings)
 ```
 
-- Content script handles all DOM operations (lives in tab, no 30s timeout)
-- Background SW handles GitHub API + tab coordination (keepAlive during operations)
-- Popup is display-only — closing it doesn't interrupt operations
+Two operation modes:
+1. **Archive Tasks** -- ListTasks (p1Takd) -> check GitHub PRs -> ArchiveTask (Tjmm5c)
+2. **Start Suggestions** -- ListTasks -> discover repos -> ListSuggestions (hQP40d) -> StartSuggestion (Rja83d)
 
-## Key DOM Selectors (in content.js SEL object)
+Content script extracts auth tokens (SNlM0e, cfb2h, FdrFJe) from `WIZ_global_data` via MAIN world script injection. Also observes fetch() for Rja83d calls to capture model config and experiment IDs.
 
-- `a.source-row` -- repo links in sidebar
-- `.repo` / `.owner` / `.source-task-count` -- repo info
-- `button[aria-label="Task options"]` -- per-task menu trigger
-- `button[role="menuitem"]` -- menu items (find "Archive" text)
+Background service worker makes all API calls. No DOM automation.
+
+## Key RPC IDs
+
+- `p1Takd` -- ListTasks (filter, state)
+- `Tjmm5c` -- ArchiveTask (taskId, action)
+- `hQP40d` -- ListSuggestions (repo)
+- `Rja83d` -- StartSuggestion (prompt, model config, repo, experiment IDs)
 
 ## Development
 
@@ -36,6 +44,9 @@ popup.js (UI) <-> background.js (orchestrator) <-> content.js (DOM worker)
 # Lint + format
 npx @biomejs/biome check .
 npx @biomejs/biome check --write .
+
+# Run tests
+node --test
 
 # Load extension
 # chrome://extensions -> Developer mode -> Load unpacked -> select this folder
@@ -53,9 +64,9 @@ No Docker, no npm/pypi, no MCP registry.
 
 ## Important Notes
 
-- Zero dependencies — vanilla JS, no build step
-- Biome for linting (biome.json config)
-- DOM selectors may change when Jules updates UI — update SEL object in content.js
-- Batch archive strategy: archive N tasks -> re-navigate to repo via sidebar click -> fresh DOM
+- Zero dependencies -- vanilla JS, no build step
+- Biome for linting (biome.json config): single quotes, no semicolons, 120 line width
+- batchexecute responses have XSS prefix `)]}'` and may contain raw control chars in JSON strings
 - Service worker keepAlive: `setInterval` calling `chrome.runtime.getPlatformInfo()` every 25s
-- State persisted in `chrome.storage.session` — survives SW restart
+- State persisted in `chrome.storage.session` -- survives SW restart
+- Tests use `vm.createContext` sandbox to mock Chrome APIs

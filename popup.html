@@ -7,7 +7,7 @@
   <body>
     <header>
       <h1>Jules Task Archiver</h1>
-      <span class="version">v1.0</span>
+      <span class="version">v2.0</span>
     </header>
 
     <section class="settings">
@@ -24,9 +24,16 @@
 
     <section class="options">
       <h2>Options</h2>
+      <div class="setting-row">
+        <label>Operation</label>
+        <div class="segmented" id="opMode">
+          <button type="button" data-value="archive" class="active">Archive Tasks</button>
+          <button type="button" data-value="suggestions">Start Suggestions</button>
+        </div>
+      </div>
       <div class="radio-group">
         <label><input type="radio" name="mode" value="dry" checked /> Dry Run</label>
-        <label><input type="radio" name="mode" value="archive" /> Archive</label>
+        <label><input type="radio" name="mode" value="run" /> Run</label>
       </div>
       <label class="checkbox">
         <input type="checkbox" id="force" />

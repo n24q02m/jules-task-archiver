@@ -19,18 +19,44 @@ const progressFill = $('#progressFill')
 const logPre = $('#log')
 const summaryDiv = $('#summary')
 
+// --- Operation mode state ---
+let opMode = 'archive'
+
+// --- Operation mode selector ---
+document.querySelectorAll('#opMode button').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#opMode button').forEach((b) => {
+      b.classList.remove('active')
+    })
+    btn.classList.add('active')
+    opMode = btn.dataset.value
+    chrome.storage.sync.set({ opMode })
+  })
+})
+
 // --- Load saved settings ---
-chrome.storage.sync.get(['ghOwner', 'ghToken'], (syncData) => {
+chrome.storage.sync.get(['ghOwner', 'opMode'], (syncData) => {
   if (syncData.ghOwner) ghOwnerInput.value = syncData.ghOwner
+  if (syncData.opMode) {
+    opMode = syncData.opMode
+    document.querySelectorAll('#opMode button').forEach((b) => {
+      b.classList.remove('active')
+    })
+    const activeBtn = document.querySelector(`#opMode button[data-value="${opMode}"]`)
+    if (activeBtn) activeBtn.classList.add('active')
+  }
 
   chrome.storage.local.get(['ghToken'], (localData) => {
     if (localData.ghToken) {
       ghTokenInput.value = localData.ghToken
-      if (syncData.ghToken) chrome.storage.sync.remove('ghToken')
-    } else if (syncData.ghToken) {
-      ghTokenInput.value = syncData.ghToken
-      chrome.storage.local.set({ ghToken: syncData.ghToken })
-      chrome.storage.sync.remove('ghToken')
+    } else {
+      chrome.storage.sync.get(['ghToken'], (oldSync) => {
+        if (oldSync.ghToken) {
+          ghTokenInput.value = oldSync.ghToken
+          chrome.storage.local.set({ ghToken: oldSync.ghToken })
+          chrome.storage.sync.remove('ghToken')
+        }
+      })
     }
   })
 })
@@ -43,7 +69,7 @@ ghTokenInput.addEventListener('change', () => {
   chrome.storage.local.set({ ghToken: ghTokenInput.value.trim() })
 })
 
-// --- Start archive ---
+// --- Start operation ---
 startBtn.addEventListener('click', async () => {
   // Save settings first
   chrome.storage.sync.set({
@@ -70,7 +96,8 @@ startBtn.addEventListener('click', async () => {
     dryRun: mode === 'dry',
     force: forceCheckbox.checked,
     scope,
-    activeTabId
+    activeTabId,
+    opMode
   }
 
   // Reset UI
@@ -159,14 +186,14 @@ function renderSummary(results) {
       div.className = 'error'
       div.textContent = `${r.label}: ERROR - ${r.err}`
     } else {
-      div.textContent = `${r.label}: ${r.count} archived`
+      div.textContent = `${r.label}: ${r.count} processed`
     }
     summaryDiv.appendChild(div)
   }
 
   const totalDiv = document.createElement('div')
   totalDiv.className = 'total'
-  totalDiv.textContent = `TOTAL: ${grand} tasks archived`
+  totalDiv.textContent = `TOTAL: ${grand} processed`
   summaryDiv.appendChild(totalDiv)
 }
 
