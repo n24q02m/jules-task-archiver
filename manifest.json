@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Jules Task Archiver",
-  "version": "1.0.2",
+  "version": "2.0.0-beta.1",
   "description": "Archive completed Jules tasks for repos with no open GitHub PRs",
   "permissions": ["storage", "tabs", "scripting"],
   "host_permissions": ["https://jules.google.com/*", "https://api.github.com/*"],
