@@ -84,7 +84,11 @@ jobs:
         env:
           VERSION: ${{ needs.release.outputs.version }}
         run: |
-          jq --arg v "$VERSION" '.version = $v' manifest.json > manifest.tmp
+          # Convert semver to Chrome-compatible version (integers only)
+          # 2.0.0 -> 2.0.0 | 2.0.0-beta.1 -> 2.0.0.1 | 2.0.0-beta.3 -> 2.0.0.3
+          CHROME_VERSION=$(echo "$VERSION" | sed -E 's/-[a-z]+\.([0-9]+)$/.\1/' | sed -E 's/-[a-z]+$//')
+          echo "Semver: $VERSION -> Chrome: $CHROME_VERSION"
+          jq --arg v "$CHROME_VERSION" '.version = $v' manifest.json > manifest.tmp
           mv manifest.tmp manifest.json
 
       - name: Package extension zip
