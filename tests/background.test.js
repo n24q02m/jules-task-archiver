@@ -89,6 +89,8 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_SDETAIL = SDETAIL;
     globalThis.test_CATEGORY_CONFIG = CATEGORY_CONFIG;
     globalThis.test_DEFAULT_CATEGORY = DEFAULT_CATEGORY;
+    globalThis.test_getOpenPRCount = getOpenPRCount;
+    globalThis.test_prCache = prCache;
   `
 
   const script = new vm.Script(scriptContent)
@@ -493,5 +495,83 @@ describe('state management', () => {
     sandbox.test_updateState({ status: 'done', currentTab: 'u/0' })
     assert.strictEqual(sandbox.test_state().status, 'done')
     assert.strictEqual(sessionSetData.length, 1)
+  })
+})
+
+// =============================================================================
+// GitHub API Tests
+// =============================================================================
+
+describe('getOpenPRCount', () => {
+  it('should fetch PR count and cache it on success', async () => {
+    const { sandbox } = setupEnvironment()
+    let fetchCalled = 0
+    sandbox.fetch = async (url, _options) => {
+      fetchCalled++
+      assert.strictEqual(url, 'https://api.github.com/repos/owner/repo/pulls?state=open&per_page=100')
+      return {
+        ok: true,
+        json: async () => [{}, {}] // 2 PRs
+      }
+    }
+
+    const count = await sandbox.test_getOpenPRCount('owner', 'repo', null)
+    assert.strictEqual(count, 2)
+    assert.strictEqual(fetchCalled, 1)
+    assert.strictEqual(sandbox.test_prCache.get('owner/repo'), 2)
+  })
+
+  it('should return cached value and not fetch again', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.test_prCache.set('owner/repo', 5)
+    let fetchCalled = 0
+    sandbox.fetch = async () => {
+      fetchCalled++
+      return { ok: true, json: async () => [] }
+    }
+
+    const count = await sandbox.test_getOpenPRCount('owner', 'repo', null)
+    assert.strictEqual(count, 5)
+    assert.strictEqual(fetchCalled, 0)
+  })
+
+  it('should return 0 and cache it on API error (e.g. 404)', async () => {
+    const { sandbox } = setupEnvironment()
+    let fetchCalled = 0
+    sandbox.fetch = async () => {
+      fetchCalled++
+      return { ok: false, status: 404 }
+    }
+
+    const count = await sandbox.test_getOpenPRCount('owner', 'repo', null)
+    assert.strictEqual(count, 0)
+    assert.strictEqual(fetchCalled, 1)
+    assert.strictEqual(sandbox.test_prCache.get('owner/repo'), 0)
+  })
+
+  it('should return 0 and cache it on network error', async () => {
+    const { sandbox } = setupEnvironment()
+    let fetchCalled = 0
+    sandbox.fetch = async () => {
+      fetchCalled++
+      throw new Error('Network error')
+    }
+
+    const count = await sandbox.test_getOpenPRCount('owner', 'repo', null)
+    assert.strictEqual(count, 0)
+    assert.strictEqual(fetchCalled, 1)
+    assert.strictEqual(sandbox.test_prCache.get('owner/repo'), 0)
+  })
+
+  it('should include Authorization header when token is provided', async () => {
+    const { sandbox } = setupEnvironment()
+    let capturedHeaders = null
+    sandbox.fetch = async (_url, options) => {
+      capturedHeaders = options.headers
+      return { ok: true, json: async () => [] }
+    }
+
+    await sandbox.test_getOpenPRCount('owner', 'repo', 'secret-token')
+    assert.strictEqual(capturedHeaders.Authorization, 'token secret-token')
   })
 })
