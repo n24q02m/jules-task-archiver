@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Jules Task Archiver",
-  "version": "2.0.0",
+  "version": "1.0.2",
   "description": "Archive completed Jules tasks for repos with no open GitHub PRs",
   "permissions": ["storage", "tabs", "scripting"],
   "host_permissions": ["https://jules.google.com/*", "https://api.github.com/*"],
@@ -9,12 +9,6 @@
     "service_worker": "background.js"
   },
   "content_scripts": [
-    {
-      "matches": ["https://jules.google.com/*"],
-      "js": ["main-world.js"],
-      "run_at": "document_idle",
-      "world": "MAIN"
-    },
     {
       "matches": ["https://jules.google.com/*"],
       "js": ["content.js"],
