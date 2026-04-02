@@ -503,14 +503,13 @@ async function processSuggestionsForTab(tab, options) {
 const prCache = new Map()
 
 async function getOpenPRCount(owner, repo, token) {
-  const key = `${owner}/${repo}`
+  const key = `${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`
   if (prCache.has(key)) return prCache.get(key)
 
   try {
-    const url = `https://api.github.com/repos/${owner}/${repo}/pulls?state=open&per_page=100`
+    const url = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls?state=open&per_page=100`
     const headers = { Accept: 'application/vnd.github+json' }
-    if (token) headers.Authorization = `token ${token}`
-
+    if (token && !/[\r\n]/.test(token)) headers.Authorization = `token ${token}`
     const res = await fetch(url, { headers })
     if (!res.ok) {
       addLog(`  WARNING: GitHub API ${res.status} for ${key}, assuming 0`)
