@@ -97,6 +97,7 @@ jobs:
             manifest.json \
             background.js \
             content.js \
+            main-world.js \
             popup.html \
             popup.js \
             popup.css \

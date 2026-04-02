@@ -11,6 +11,12 @@
   "content_scripts": [
     {
       "matches": ["https://jules.google.com/*"],
+      "js": ["main-world.js"],
+      "run_at": "document_idle",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://jules.google.com/*"],
       "js": ["content.js"],
       "run_at": "document_idle"
     }
