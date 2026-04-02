@@ -202,6 +202,301 @@ async function archiveTask(taskId, config) {
 }
 
 // =============================================================================
+// Suggestion Operations
+// =============================================================================
+
+const SUGGESTION = {
+  ID: 0,
+  DETAILS: 1,
+  STATUS: 2,
+  RELATED: 3,
+  CATEGORY_TAB: 4
+}
+
+const SDETAIL = {
+  TITLE: 0,
+  DESCRIPTION: 1,
+  GITHUB_URL: 2,
+  FILE_PATH: 3,
+  LINE: 4,
+  CONFIDENCE: 5,
+  RATIONALE: 6,
+  CODE_SNIPPET: 7,
+  LANGUAGE: 8,
+  CATEGORY_SLUG: 9,
+  PRIORITY: 10
+}
+
+function parseSuggestion(raw) {
+  if (!raw || !Array.isArray(raw)) return null
+  const d = raw[SUGGESTION.DETAILS]
+  if (!d) return null
+  return {
+    id: raw[SUGGESTION.ID],
+    title: d[SDETAIL.TITLE],
+    description: d[SDETAIL.DESCRIPTION],
+    githubUrl: d[SDETAIL.GITHUB_URL],
+    filePath: d[SDETAIL.FILE_PATH],
+    line: d[SDETAIL.LINE],
+    confidence: d[SDETAIL.CONFIDENCE],
+    rationale: d[SDETAIL.RATIONALE],
+    codeSnippet: d[SDETAIL.CODE_SNIPPET],
+    language: d[SDETAIL.LANGUAGE],
+    categorySlug: d[SDETAIL.CATEGORY_SLUG],
+    priority: d[SDETAIL.PRIORITY],
+    status: raw[SUGGESTION.STATUS],
+    categoryTab: raw[SUGGESTION.CATEGORY_TAB]
+  }
+}
+
+async function listSuggestions(repo, config) {
+  const result = await callBatchExecute('hQP40d', [repo], config)
+  if (!result || !Array.isArray(result) || !Array.isArray(result[0])) return []
+  return result[0].map(parseSuggestion).filter(Boolean)
+}
+
+// =============================================================================
+// Prompt Builder
+// =============================================================================
+
+const CATEGORY_CONFIG = {
+  'input-validation': {
+    icon: '[SECURITY]',
+    name: 'Security Vulnerability Fix',
+    role: 'security-focused',
+    codeLabel: 'Vulnerable Code'
+  },
+  'insecure-config': {
+    icon: '[SECURITY]',
+    name: 'Security Vulnerability Fix',
+    role: 'security-focused',
+    codeLabel: 'Vulnerable Code'
+  },
+  injection: {
+    icon: '[SECURITY]',
+    name: 'Security Vulnerability Fix',
+    role: 'security-focused',
+    codeLabel: 'Vulnerable Code'
+  },
+  'async-io': {
+    icon: '[PERF]',
+    name: 'Performance Optimization',
+    role: 'performance-focused',
+    codeLabel: 'Inefficient Code'
+  },
+  'loop-optimization': {
+    icon: '[PERF]',
+    name: 'Performance Optimization',
+    role: 'performance-focused',
+    codeLabel: 'Inefficient Code'
+  },
+  'data-structure': {
+    icon: '[PERF]',
+    name: 'Performance Optimization',
+    role: 'performance-focused',
+    codeLabel: 'Inefficient Code'
+  },
+  'dead-code': { icon: '[CLEANUP]', name: 'Code Cleanup', role: 'code-quality-focused', codeLabel: 'Code to Clean' },
+  other: { icon: '[CLEANUP]', name: 'Code Cleanup', role: 'code-quality-focused', codeLabel: 'Code to Clean' },
+  'untested-function': { icon: '[TEST]', name: 'Test Coverage', role: 'testing-focused', codeLabel: 'Untested Code' },
+  'missing-error-test': { icon: '[TEST]', name: 'Test Coverage', role: 'testing-focused', codeLabel: 'Untested Code' },
+  'missing-edge-case': { icon: '[TEST]', name: 'Test Coverage', role: 'testing-focused', codeLabel: 'Untested Code' },
+  'missing-test-file': { icon: '[TEST]', name: 'Test Coverage', role: 'testing-focused', codeLabel: 'Untested Code' }
+}
+
+const DEFAULT_CATEGORY = { icon: '[FIX]', name: 'Code Improvement', role: 'engineering-focused', codeLabel: 'Code' }
+
+function buildSuggestionPrompt(suggestion) {
+  const cat = CATEGORY_CONFIG[suggestion.categorySlug] || DEFAULT_CATEGORY
+
+  return `# ${cat.icon} ${cat.name} Task
+
+You are a ${cat.role} agent. Your mission is to analyze and fix the following issue.
+
+## Task Details
+
+**File:** \`${suggestion.filePath}:${suggestion.line}\`
+**Issue:** ${suggestion.title}
+
+**Language:** ${suggestion.language}
+
+**${cat.codeLabel}:**
+\`\`\`${suggestion.language}
+${suggestion.codeSnippet}
+\`\`\`
+
+**Rationale:** ${suggestion.rationale}
+
+## Your Process
+
+### 1. UNDERSTAND - Analyze the Issue
+* Review the surrounding code and understand the context
+* Identify the specific problem and its potential impact
+
+### 2. IMPLEMENT - Fix the Issue
+* Write a fix that addresses the root cause
+* Follow best practices for this type of issue
+* Ensure the fix doesn't introduce new problems
+* Preserve existing functionality
+
+### 3. VERIFY - Validate the Fix
+- Run format and lint checks
+- Run the full test suite
+- Ensure no functionality is broken
+- For non-trivial fixes, write simple tests that validate your fix
+
+### 4. DOCUMENT - Create a PR
+Create a PR with:
+- Title: "${cat.icon} ${suggestion.title}"
+- Description explaining what was fixed and why
+`
+}
+
+// =============================================================================
+// StartSuggestion RPC
+// =============================================================================
+
+const DEFAULT_FEATURE_FLAGS = [
+  ['enable_bash_session_tool', 1],
+  ['enable_thinking', 1],
+  ['use_gemini_api', 1],
+  ['use_simple_agent_context', 1],
+  ['enable_memory', 1],
+  ['enable_jules_cheatsheet', 1],
+  ['enable_messages_every_turn', 1]
+]
+
+function buildStartPayload(suggestion, repo, config, startConfig) {
+  const prompt = buildSuggestionPrompt(suggestion)
+  const modelId = config.modelId || startConfig?.modelConfig?.[1] || null
+  const featureFlags = startConfig?.featureFlags || DEFAULT_FEATURE_FLAGS
+  const experimentIds = startConfig?.experimentIds || []
+
+  return [
+    prompt,
+    null,
+    [null, modelId, null, [], 1, null, null, null, null, [360], featureFlags],
+    null,
+    repo,
+    null,
+    null,
+    null,
+    null,
+    [9, null, null, null, experimentIds, [null, [1, 1]], null, null, null, null, null, [null, suggestion.id]],
+    null,
+    null,
+    null,
+    null,
+    1
+  ]
+}
+
+async function startSuggestion(suggestion, repo, config, startConfig) {
+  const payload = buildStartPayload(suggestion, repo, config, startConfig)
+  return callBatchExecute('Rja83d', payload, config)
+}
+
+async function getStartConfig() {
+  const { startConfig } = await chrome.storage.session.get('startConfig')
+  return startConfig || null
+}
+
+// =============================================================================
+// Suggestions Orchestrator
+// =============================================================================
+
+async function processSuggestionsForTab(tab, options) {
+  const label = getTabLabel(tab)
+  updateState({ currentTab: label })
+  addLog(`\n${'='.repeat(50)}`)
+  addLog(`${label}: ${tab.url}`)
+  addLog(`${'='.repeat(50)}`)
+
+  let config
+  try {
+    config = await getTabConfig(tab.id)
+    addLog(`[${label}] Config extracted (bl: ${config.bl.split('_').pop()})`)
+  } catch (e) {
+    addLog(`[${label}] ERROR: ${e.message}`)
+    return 0
+  }
+
+  const startConfig = await getStartConfig()
+  if (!startConfig) {
+    addLog(`[${label}] No StartSuggestion config cached. Using defaults.`)
+    addLog(`[${label}] Tip: Click Start on any suggestion in Jules UI to capture config.`)
+  }
+
+  // Get repos from existing tasks
+  addLog(`[${label}] Fetching task list to discover repos...`)
+  let tasks
+  try {
+    tasks = await listTasks('', config)
+  } catch (e) {
+    addLog(`[${label}] ERROR listing tasks: ${e.message}`)
+    return 0
+  }
+
+  const repos = [...new Set(tasks.map((t) => t.source).filter(Boolean))]
+  if (repos.length === 0) {
+    addLog(`[${label}] No repos found from tasks.`)
+    return 0
+  }
+
+  addLog(`[${label}] Found ${repos.length} repos: ${repos.join(', ')}`)
+
+  let totalStarted = 0
+  for (const repo of repos) {
+    if (state.status === 'cancelled') break
+
+    addLog(`\n[${label}] Fetching suggestions for ${repo}...`)
+    let suggestions
+    try {
+      suggestions = await listSuggestions(repo, config)
+    } catch (e) {
+      addLog(`  ERROR listing suggestions: ${e.message}`)
+      continue
+    }
+
+    if (suggestions.length === 0) {
+      addLog('  No suggestions found')
+      continue
+    }
+
+    addLog(`  Found ${suggestions.length} suggestions`)
+    updateState({ currentRepo: repo.replace(/^github\//, '') })
+
+    for (const s of suggestions) {
+      if (state.status === 'cancelled') break
+
+      if (options.dryRun) {
+        addLog(`  [DRY] Would start: ${s.title} (${s.categorySlug})`)
+      } else {
+        addLog(`  Starting: ${s.title}...`)
+        try {
+          await startSuggestion(s, repo, config, startConfig)
+          addLog(`  Started: ${s.title}`)
+          totalStarted++
+        } catch (err) {
+          addLog(`  [!] Failed to start "${s.title}": ${err.message}`)
+        }
+      }
+
+      updateState({
+        progress: {
+          archived: totalStarted,
+          skipped: state.progress.skipped,
+          total: state.progress.total + 1
+        }
+      })
+    }
+  }
+
+  addLog(`\n[${label}] TOTAL: ${totalStarted} suggestions started`)
+  return totalStarted
+}
+
+// =============================================================================
 // GitHub PR Check (unchanged from v1)
 // =============================================================================
 
@@ -490,7 +785,7 @@ async function processTab(tab, options) {
   return grandTotal
 }
 
-async function startArchive(options) {
+async function startOperation(options) {
   prCache.clear()
   reqCounter = Math.floor(Math.random() * 900000) + 100000
   startKeepAlive()
@@ -504,7 +799,8 @@ async function startArchive(options) {
     error: null
   })
 
-  addLog(options.dryRun ? '=== DRY RUN MODE ===' : '=== ARCHIVE MODE ===')
+  const isSuggestions = options.opMode === 'suggestions'
+  addLog(options.dryRun ? '=== DRY RUN MODE ===' : isSuggestions ? '=== SUGGESTIONS MODE ===' : '=== ARCHIVE MODE ===')
   if (options.force) addLog('=== FORCE MODE (skip PR check) ===')
   addLog('=== v2: batchexecute API ===')
 
@@ -527,7 +823,7 @@ async function startArchive(options) {
     for (const tab of tabs) {
       const label = getTabLabel(tab)
       try {
-        const count = await processTab(tab, options)
+        const count = isSuggestions ? await processSuggestionsForTab(tab, options) : await processTab(tab, options)
         results.push({ label, count })
       } catch (e) {
         addLog(`ERROR [${label}]: ${e.message}`)
@@ -536,15 +832,16 @@ async function startArchive(options) {
     }
 
     // Summary
+    const verb = isSuggestions ? 'started' : 'archived'
     addLog(`\n${'='.repeat(50)}`)
     addLog('SUMMARY')
     addLog(`${'='.repeat(50)}`)
     let grand = 0
     results.forEach((r) => {
       grand += r.count
-      addLog(`  ${r.label}: ${r.err ? `ERROR: ${r.err}` : `${r.count} archived`}`)
+      addLog(`  ${r.label}: ${r.err ? `ERROR: ${r.err}` : `${r.count} ${verb}`}`)
     })
-    addLog(`\n  GRAND TOTAL: ${grand} tasks archived`)
+    addLog(`\n  GRAND TOTAL: ${grand} tasks ${verb}`)
 
     updateState({ status: 'done', results })
   } catch (e) {
@@ -562,13 +859,18 @@ async function startArchive(options) {
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   switch (msg.action) {
     case 'START':
-      startArchive(msg.options)
+      startOperation(msg.options)
       sendResponse({ ok: true })
       break
 
     case 'GET_STATE':
       stateReadyPromise.then(() => sendResponse(state))
       return true
+
+    case 'CACHE_START_CONFIG':
+      chrome.storage.session.set({ startConfig: msg.config })
+      sendResponse({ ok: true })
+      break
 
     case 'RESET':
       prCache.clear()
