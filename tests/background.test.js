@@ -149,7 +149,7 @@ describe('findJsonEnd', () => {
 describe('parseResponse', () => {
   it('should extract payload from batchexecute response', () => {
     const { sandbox } = setupEnvironment()
-    const response = ")]}'\n\n100\n[[\"wrb.fr\",\"p1Takd\",\"[[\\\"task1\\\",\\\"task2\\\"]]\",null,null,null,\"generic\"]]"
+    const response = ')]}\'\n\n100\n[["wrb.fr","p1Takd","[[\\"task1\\",\\"task2\\"]]",null,null,null,"generic"]]'
     const result = sandbox.test_parseResponse(response, 'p1Takd')
     assert.deepStrictEqual(result, [['task1', 'task2']])
   })
