@@ -89,6 +89,8 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_SDETAIL = SDETAIL;
     globalThis.test_CATEGORY_CONFIG = CATEGORY_CONFIG;
     globalThis.test_DEFAULT_CATEGORY = DEFAULT_CATEGORY;
+    globalThis.test_getOpenPRCount = getOpenPRCount;
+    globalThis.test_prCache = prCache;
   `
 
   const script = new vm.Script(scriptContent)
@@ -493,5 +495,75 @@ describe('state management', () => {
     sandbox.test_updateState({ status: 'done', currentTab: 'u/0' })
     assert.strictEqual(sandbox.test_state().status, 'done')
     assert.strictEqual(sessionSetData.length, 1)
+  })
+})
+
+// =============================================================================
+// GitHub API Tests
+// =============================================================================
+
+describe('getOpenPRCount', () => {
+  it('should fetch PR count and cache the result', async () => {
+    const { sandbox } = setupEnvironment()
+    let fetchCalled = 0
+    sandbox.fetch = async (url, options) => {
+      fetchCalled++
+      assert.strictEqual(url, 'https://api.github.com/repos/owner/repo/pulls?state=open&per_page=100')
+      assert.strictEqual(options.headers.Accept, 'application/vnd.github+json')
+      assert.strictEqual(options.headers.Authorization, 'token secret-token')
+      return {
+        ok: true,
+        json: async () => [{}, {}] // 2 PRs
+      }
+    }
+
+    const count = await sandbox.test_getOpenPRCount('owner', 'repo', 'secret-token')
+    assert.strictEqual(count, 2)
+    assert.strictEqual(fetchCalled, 1)
+
+    // Second call should use cache
+    const cachedCount = await sandbox.test_getOpenPRCount('owner', 'repo', 'secret-token')
+    assert.strictEqual(cachedCount, 2)
+    assert.strictEqual(fetchCalled, 1)
+    assert.strictEqual(sandbox.test_prCache.get('owner/repo'), 2)
+  })
+
+  it('should return 0 and log warning on non-OK response', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.fetch = async () => ({
+      ok: false,
+      status: 404
+    })
+
+    const count = await sandbox.test_getOpenPRCount('owner', 'not-found', 'token')
+    assert.strictEqual(count, 0)
+    const state = sandbox.test_state()
+    assert.ok(state.log.some((m) => m.includes('WARNING: GitHub API 404')))
+  })
+
+  it('should return 0 and log warning on fetch error', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.fetch = async () => {
+      throw new Error('Network error')
+    }
+
+    const count = await sandbox.test_getOpenPRCount('owner', 'repo', 'token')
+    assert.strictEqual(count, 0)
+    const state = sandbox.test_state()
+    assert.ok(state.log.some((m) => m.includes('WARNING: Could not check PRs for owner/repo: Network error')))
+  })
+
+  it('should handle missing token', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.fetch = async (_url, options) => {
+      assert.strictEqual(options.headers.Authorization, undefined)
+      return {
+        ok: true,
+        json: async () => []
+      }
+    }
+
+    const count = await sandbox.test_getOpenPRCount('owner', 'repo', null)
+    assert.strictEqual(count, 0)
   })
 })
