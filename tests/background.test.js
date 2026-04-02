@@ -89,6 +89,8 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_SDETAIL = SDETAIL;
     globalThis.test_CATEGORY_CONFIG = CATEGORY_CONFIG;
     globalThis.test_DEFAULT_CATEGORY = DEFAULT_CATEGORY;
+    globalThis.test_getTabLabel = getTabLabel;
+    globalThis.test_getJulesTabs = getJulesTabs;
   `
 
   const script = new vm.Script(scriptContent)
@@ -493,5 +495,56 @@ describe('state management', () => {
     sandbox.test_updateState({ status: 'done', currentTab: 'u/0' })
     assert.strictEqual(sandbox.test_state().status, 'done')
     assert.strictEqual(sessionSetData.length, 1)
+  })
+})
+
+// =============================================================================
+// Tab Management Tests
+// =============================================================================
+
+describe('Tab Management', () => {
+  describe('getTabLabel', () => {
+    it('should extract account index from URL', () => {
+      const { sandbox } = setupEnvironment()
+      const tab = { url: 'https://jules.google.com/u/1/session' }
+      assert.strictEqual(sandbox.test_getTabLabel(tab), 'u/1')
+    })
+
+    it('should extract multi-digit account index', () => {
+      const { sandbox } = setupEnvironment()
+      const tab = { url: 'https://jules.google.com/u/12/session' }
+      assert.strictEqual(sandbox.test_getTabLabel(tab), 'u/12')
+    })
+
+    it('should return default for URLs without account index', () => {
+      const { sandbox } = setupEnvironment()
+      const tab = { url: 'https://jules.google.com/session' }
+      assert.strictEqual(sandbox.test_getTabLabel(tab), 'default')
+    })
+  })
+
+  describe('getJulesTabs', () => {
+    it('should filter out accounts.google tabs and sort by account index', async () => {
+      const tabs = [
+        { id: 1, url: 'https://jules.google.com/u/2/session' },
+        { id: 2, url: 'https://accounts.google.com/ServiceLogin' },
+        { id: 3, url: 'https://jules.google.com/u/0/session' },
+        { id: 4, url: 'https://jules.google.com/u/1/session' },
+        { id: 5, url: 'https://jules.google.com/session' }
+      ]
+
+      const { sandbox } = setupEnvironment()
+      sandbox.chrome.tabs.query = async () => tabs
+
+      const result = await sandbox.test_getJulesTabs()
+
+      assert.strictEqual(result.length, 4)
+      // Sorted by account index: 0 (id 3, 5), 1 (id 4), 2 (id 1)
+      const indices = result.map((t) => parseInt(t.url.match(/\/u\/(\d+)/)?.[1] || '0', 10))
+      assert.deepStrictEqual(indices, [0, 0, 1, 2])
+
+      // Verify accounts.google was filtered
+      assert.ok(!result.find((t) => t.id === 2))
+    })
   })
 })
