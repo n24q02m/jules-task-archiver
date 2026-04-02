@@ -614,19 +614,33 @@ async function ensureContentScript(tabId) {
   try {
     await chrome.tabs.sendMessage(tabId, { action: 'PING' })
   } catch {
+    // Content script not responding - inject and wait for READY
+    const readyPromise = new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        chrome.runtime.onMessage.removeListener(handler)
+        // Fallback: try one last PING before giving up
+        chrome.tabs
+          .sendMessage(tabId, { action: 'PING' })
+          .then(() => resolve())
+          .catch(() => reject(new Error('Content script injection timed out')))
+      }, 5000)
+
+      const handler = (msg, sender) => {
+        if (msg.action === 'READY' && sender.tab?.id === tabId) {
+          chrome.runtime.onMessage.removeListener(handler)
+          clearTimeout(timeout)
+          resolve()
+        }
+      }
+      chrome.runtime.onMessage.addListener(handler)
+    })
+
     await chrome.scripting.executeScript({
       target: { tabId },
       files: ['content.js']
     })
-    for (let i = 0; i < 10; i++) {
-      try {
-        await new Promise((r) => setTimeout(r, 50))
-        await chrome.tabs.sendMessage(tabId, { action: 'PING' })
-        break
-      } catch {
-        // Keep waiting
-      }
-    }
+
+    await readyPromise
   }
 }
 
