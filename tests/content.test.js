@@ -59,4 +59,55 @@ describe('content.js config extraction logic', () => {
     assert.strictEqual(getAccountNum('https://jules.google.com/u/0/repo/github/foo/bar'), '0')
     assert.strictEqual(getAccountNum('https://jules.google.com/session'), '0')
   })
+
+  it('should extract config with modelId from TSDtV', () => {
+    // Simulate the updated extraction logic that includes modelId
+    const mockWizData = {
+      SNlM0e: 'token123',
+      cfb2h: 'build-label',
+      FdrFJe: '-123',
+      TSDtV: '%.@.[[null,[[45755236,null,null,null,"beyond:models/gemini-v4p1m-rev24-snowball",null,"RZYmC"]]]]'
+    }
+
+    const modelMatch = mockWizData.TSDtV ? String(mockWizData.TSDtV).match(/beyond:models\/[\w-]+/) : null
+    const config = {
+      at: mockWizData.SNlM0e || null,
+      bl: mockWizData.cfb2h || null,
+      fsid: mockWizData.FdrFJe || null,
+      modelId: modelMatch ? modelMatch[0] : null
+    }
+
+    assert.strictEqual(config.modelId, 'beyond:models/gemini-v4p1m-rev24-snowball')
+  })
+
+  it('should return null modelId when TSDtV has no model', () => {
+    const mockWizData = {
+      SNlM0e: 'token123',
+      cfb2h: 'build-label',
+      FdrFJe: '-123',
+      TSDtV: '%.@.[[null,[[45724102,null,true]]]]'
+    }
+
+    const modelMatch = mockWizData.TSDtV ? String(mockWizData.TSDtV).match(/beyond:models\/[\w-]+/) : null
+    const config = {
+      modelId: modelMatch ? modelMatch[0] : null
+    }
+
+    assert.strictEqual(config.modelId, null)
+  })
+
+  it('should return null modelId when TSDtV is missing', () => {
+    const mockWizData = {
+      SNlM0e: 'token123',
+      cfb2h: 'build-label',
+      FdrFJe: '-123'
+    }
+
+    const modelMatch = mockWizData.TSDtV ? String(mockWizData.TSDtV).match(/beyond:models\/[\w-]+/) : null
+    const config = {
+      modelId: modelMatch ? modelMatch[0] : null
+    }
+
+    assert.strictEqual(config.modelId, null)
+  })
 })

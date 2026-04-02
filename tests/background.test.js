@@ -82,6 +82,13 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_parseResponse = parseResponse;
     globalThis.test_parseTask = parseTask;
     globalThis.test_TASK = TASK;
+    globalThis.test_parseSuggestion = parseSuggestion;
+    globalThis.test_buildSuggestionPrompt = buildSuggestionPrompt;
+    globalThis.test_buildStartPayload = buildStartPayload;
+    globalThis.test_SUGGESTION = SUGGESTION;
+    globalThis.test_SDETAIL = SDETAIL;
+    globalThis.test_CATEGORY_CONFIG = CATEGORY_CONFIG;
+    globalThis.test_DEFAULT_CATEGORY = DEFAULT_CATEGORY;
   `
 
   const script = new vm.Script(scriptContent)
@@ -89,6 +96,10 @@ function setupEnvironment(initialStorage = {}) {
 
   return { sandbox, sessionSetData }
 }
+
+// =============================================================================
+// batchexecute Client Tests
+// =============================================================================
 
 describe('buildBatchRequest', () => {
   it('should format correct URL and body', () => {
@@ -105,6 +116,10 @@ describe('buildBatchRequest', () => {
     assert.ok(result.body.includes('Tjmm5c'))
   })
 })
+
+// =============================================================================
+// Response Parser Tests
+// =============================================================================
 
 describe('fixJsonControlChars', () => {
   it('should escape CR/LF inside JSON strings', () => {
@@ -155,6 +170,10 @@ describe('parseResponse', () => {
   })
 })
 
+// =============================================================================
+// Task Parser Tests
+// =============================================================================
+
 describe('parseTask', () => {
   it('should map array indices to named fields', () => {
     const { sandbox } = setupEnvironment()
@@ -198,6 +217,251 @@ describe('parseTask', () => {
     assert.strictEqual(task.title, '(untitled)')
   })
 })
+
+// =============================================================================
+// Suggestion Parser Tests
+// =============================================================================
+
+describe('parseSuggestion', () => {
+  it('should parse suggestion from hQP40d response', () => {
+    const { sandbox } = setupEnvironment()
+    const raw = [
+      '8729015370503451291',
+      [
+        'Potential Regex Denial of Service (ReDoS)',
+        'The regex contains nested quantifiers...',
+        'https://github.com/n24q02m/better-godot-mcp/blob/...',
+        'src/godot/detector.ts',
+        18,
+        1,
+        'The regex can be simplified...',
+        'export function parseGodotVersion...',
+        'typescript',
+        'input-validation',
+        3
+      ],
+      1,
+      ['16668581076813822918'],
+      3
+    ]
+
+    const result = sandbox.test_parseSuggestion(raw)
+    assert.strictEqual(result.id, '8729015370503451291')
+    assert.strictEqual(result.title, 'Potential Regex Denial of Service (ReDoS)')
+    assert.strictEqual(result.description, 'The regex contains nested quantifiers...')
+    assert.strictEqual(result.filePath, 'src/godot/detector.ts')
+    assert.strictEqual(result.line, 18)
+    assert.strictEqual(result.confidence, 1)
+    assert.strictEqual(result.rationale, 'The regex can be simplified...')
+    assert.strictEqual(result.codeSnippet, 'export function parseGodotVersion...')
+    assert.strictEqual(result.language, 'typescript')
+    assert.strictEqual(result.categorySlug, 'input-validation')
+    assert.strictEqual(result.priority, 3)
+    assert.strictEqual(result.status, 1)
+    assert.strictEqual(result.categoryTab, 3)
+  })
+
+  it('should return null for null input', () => {
+    const { sandbox } = setupEnvironment()
+    assert.strictEqual(sandbox.test_parseSuggestion(null), null)
+  })
+
+  it('should return null for empty array', () => {
+    const { sandbox } = setupEnvironment()
+    assert.strictEqual(sandbox.test_parseSuggestion([]), null)
+  })
+
+  it('should return null when details array is missing', () => {
+    const { sandbox } = setupEnvironment()
+    assert.strictEqual(sandbox.test_parseSuggestion(['id-123']), null)
+  })
+})
+
+// =============================================================================
+// Prompt Builder Tests
+// =============================================================================
+
+describe('buildSuggestionPrompt', () => {
+  it('should build security prompt for input-validation category', () => {
+    const { sandbox } = setupEnvironment()
+    const suggestion = {
+      title: 'Potential ReDoS',
+      filePath: 'src/detector.ts',
+      line: 18,
+      language: 'typescript',
+      codeSnippet: 'const match = str.match(/regex/)',
+      rationale: 'Simplify the regex',
+      categorySlug: 'input-validation'
+    }
+
+    const prompt = sandbox.test_buildSuggestionPrompt(suggestion)
+    assert.ok(prompt.includes('[SECURITY] Security Vulnerability Fix Task'))
+    assert.ok(prompt.includes('src/detector.ts:18'))
+    assert.ok(prompt.includes('Potential ReDoS'))
+    assert.ok(prompt.includes('const match = str.match(/regex/)'))
+    assert.ok(prompt.includes('security-focused'))
+    assert.ok(prompt.includes('Vulnerable Code'))
+  })
+
+  it('should build testing prompt for untested-function category', () => {
+    const { sandbox } = setupEnvironment()
+    const suggestion = {
+      title: 'Untested function: foo',
+      filePath: 'src/utils.ts',
+      line: 42,
+      language: 'typescript',
+      codeSnippet: 'export function foo() {}',
+      rationale: 'Easy to test',
+      categorySlug: 'untested-function'
+    }
+
+    const prompt = sandbox.test_buildSuggestionPrompt(suggestion)
+    assert.ok(prompt.includes('[TEST] Test Coverage Task'))
+    assert.ok(prompt.includes('Untested Code'))
+    assert.ok(prompt.includes('testing-focused'))
+  })
+
+  it('should build performance prompt for async-io category', () => {
+    const { sandbox } = setupEnvironment()
+    const suggestion = {
+      title: 'Sequential awaits',
+      filePath: 'src/api.ts',
+      line: 10,
+      language: 'typescript',
+      codeSnippet: 'await a(); await b()',
+      rationale: 'Use Promise.all',
+      categorySlug: 'async-io'
+    }
+
+    const prompt = sandbox.test_buildSuggestionPrompt(suggestion)
+    assert.ok(prompt.includes('[PERF] Performance Optimization Task'))
+    assert.ok(prompt.includes('Inefficient Code'))
+  })
+
+  it('should build cleanup prompt for dead-code category', () => {
+    const { sandbox } = setupEnvironment()
+    const suggestion = {
+      title: 'Unused import',
+      filePath: 'src/main.ts',
+      line: 1,
+      language: 'typescript',
+      codeSnippet: 'import { unused } from "lib"',
+      rationale: 'Remove unused',
+      categorySlug: 'dead-code'
+    }
+
+    const prompt = sandbox.test_buildSuggestionPrompt(suggestion)
+    assert.ok(prompt.includes('[CLEANUP] Code Cleanup Task'))
+    assert.ok(prompt.includes('Code to Clean'))
+  })
+
+  it('should use default config for unknown category', () => {
+    const { sandbox } = setupEnvironment()
+    const suggestion = {
+      title: 'Some issue',
+      filePath: 'src/main.ts',
+      line: 1,
+      language: 'typescript',
+      codeSnippet: '// code',
+      rationale: 'Fix it',
+      categorySlug: 'unknown-category'
+    }
+
+    const prompt = sandbox.test_buildSuggestionPrompt(suggestion)
+    assert.ok(prompt.includes('[FIX] Code Improvement Task'))
+    assert.ok(prompt.includes('engineering-focused'))
+  })
+})
+
+// =============================================================================
+// StartSuggestion Payload Tests
+// =============================================================================
+
+describe('buildStartPayload', () => {
+  it('should build correct Rja83d payload structure', () => {
+    const { sandbox } = setupEnvironment()
+    const suggestion = {
+      id: 'test-123',
+      title: 'Fix bug',
+      filePath: 'src/a.ts',
+      line: 1,
+      language: 'typescript',
+      codeSnippet: 'code',
+      rationale: 'reason',
+      categorySlug: 'dead-code'
+    }
+    const repo = 'github/owner/repo'
+    const config = { modelId: null }
+    const startConfig = {
+      modelConfig: [null, 'beyond:models/test-model'],
+      experimentIds: [12345],
+      featureFlags: [['flag1', 1]]
+    }
+
+    const payload = sandbox.test_buildStartPayload(suggestion, repo, config, startConfig)
+
+    // payload[0] is the prompt
+    assert.ok(payload[0].includes('Fix bug'))
+    assert.ok(payload[0].includes('[CLEANUP] Code Cleanup Task'))
+
+    // payload[2] is model config
+    assert.strictEqual(payload[2][1], 'beyond:models/test-model')
+
+    // payload[4] is repo
+    assert.strictEqual(payload[4], 'github/owner/repo')
+
+    // payload[9] is experiment/suggestion metadata
+    assert.deepStrictEqual(payload[9][4], [12345])
+    assert.strictEqual(payload[9][11][1], 'test-123')
+
+    // payload[14] = 1 (start flag)
+    assert.strictEqual(payload[14], 1)
+  })
+
+  it('should use config.modelId over startConfig when available', () => {
+    const { sandbox } = setupEnvironment()
+    const suggestion = {
+      id: 's1',
+      title: 'T',
+      filePath: 'f',
+      line: 1,
+      language: 'ts',
+      codeSnippet: 'c',
+      rationale: 'r',
+      categorySlug: 'other'
+    }
+    const config = { modelId: 'beyond:models/direct-model' }
+    const startConfig = { modelConfig: [null, 'beyond:models/fallback-model'] }
+
+    const payload = sandbox.test_buildStartPayload(suggestion, 'repo', config, startConfig)
+    assert.strictEqual(payload[2][1], 'beyond:models/direct-model')
+  })
+
+  it('should use default feature flags when startConfig is null', () => {
+    const { sandbox } = setupEnvironment()
+    const suggestion = {
+      id: 's1',
+      title: 'T',
+      filePath: 'f',
+      line: 1,
+      language: 'ts',
+      codeSnippet: 'c',
+      rationale: 'r',
+      categorySlug: 'other'
+    }
+
+    const payload = sandbox.test_buildStartPayload(suggestion, 'repo', {}, null)
+    // Should have default feature flags
+    const flags = payload[2][10]
+    assert.ok(flags.length > 0)
+    // Compare via JSON to avoid cross-VM reference issues
+    assert.strictEqual(JSON.stringify(flags[0]), JSON.stringify(['enable_bash_session_tool', 1]))
+  })
+})
+
+// =============================================================================
+// State Management Tests
+// =============================================================================
 
 describe('state management', () => {
   it('should initialize cleanly without existing state', async () => {
