@@ -7,7 +7,7 @@
   <body>
     <header>
       <h1>Jules Task Archiver</h1>
-      <span class="version">v2.0</span>
+      <span class="version">v1.0</span>
     </header>
 
     <section class="settings">
@@ -24,16 +24,9 @@
 
     <section class="options">
       <h2>Options</h2>
-      <div class="setting-row">
-        <label>Operation</label>
-        <div class="segmented" id="opMode">
-          <button type="button" data-value="archive" class="active">Archive Tasks</button>
-          <button type="button" data-value="suggestions">Start Suggestions</button>
-        </div>
-      </div>
       <div class="radio-group">
         <label><input type="radio" name="mode" value="dry" checked /> Dry Run</label>
-        <label><input type="radio" name="mode" value="run" /> Run</label>
+        <label><input type="radio" name="mode" value="archive" /> Archive</label>
       </div>
       <label class="checkbox">
         <input type="checkbox" id="force" />
@@ -48,10 +41,10 @@
     <button type="button" id="startBtn" class="primary">Start</button>
     <button type="button" id="resetBtn" class="secondary" style="display: none">Reset</button>
 
-    <section id="progressSection" style="display: none">
+    <section id="progressSection" style="display: none" aria-live="polite">
       <h2>Progress</h2>
       <div id="currentInfo" class="current-info"></div>
-      <div class="progress-bar">
+      <div class="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
         <div id="progressFill" class="progress-fill"></div>
       </div>
       <pre id="log" class="log"></pre>
