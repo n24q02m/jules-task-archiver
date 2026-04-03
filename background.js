@@ -118,6 +118,10 @@ async function ensureContentScript(tabId) {
     await chrome.tabs.sendMessage(tabId, { action: 'PING' })
   } catch {
     // Content script not loaded — inject it programmatically
+    const currentTab = await chrome.tabs.get(tabId)
+    if (!currentTab.url?.startsWith('https://jules.google.com/')) {
+      throw new Error('Security Error: Tab navigated away from Jules before injection')
+    }
     await chrome.scripting.executeScript({
       target: { tabId },
       files: ['content.js']
