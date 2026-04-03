@@ -643,15 +643,17 @@ async function ensureContentScript(tabId) {
       target: { tabId },
       files: ['content.js']
     })
-    for (let i = 0; i < 10; i++) {
+    const deadline = Date.now() + 3000
+    while (Date.now() < deadline) {
       try {
-        await new Promise((r) => setTimeout(r, 50))
+        await new Promise((r) => setTimeout(r, 100))
         await chrome.tabs.sendMessage(tabId, { action: 'PING' })
-        break
+        return
       } catch {
         // Keep waiting
       }
     }
+    throw new Error('Content script failed to initialize within 3s')
   }
 }
 
@@ -742,14 +744,18 @@ async function processTab(tab, options) {
     }
 
     addLog(`\n[${label}] Open PRs (info only, archive uses task state):`)
-    for (const [_repo, repoTasks] of byRepo) {
-      const owner = repoTasks[0]?.owner || ghOwner || ''
-      const repoName = repoTasks[0]?.repoName || ''
-      if (owner && repoName) {
-        const count = await getOpenPRCount(owner, repoName, ghToken)
-        if (count > 0) addLog(`  ${owner}/${repoName}: ${count} open PRs`)
-      }
-    }
+    const prChecks = [...byRepo.entries()]
+      .map(([_repo, repoTasks]) => {
+        const owner = repoTasks[0]?.owner || ghOwner || ''
+        const repoName = repoTasks[0]?.repoName || ''
+        return owner && repoName ? { owner, repoName } : null
+      })
+      .filter(Boolean)
+
+    const prResults = await Promise.all(prChecks.map((r) => getOpenPRCount(r.owner, r.repoName, ghToken)))
+    prChecks.forEach((r, i) => {
+      if (prResults[i] > 0) addLog(`  ${r.owner}/${r.repoName}: ${prResults[i]} open PRs`)
+    })
   }
 
   // Archive
