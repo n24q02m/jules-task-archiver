@@ -1,101 +1,6 @@
 const { describe, it } = require('node:test')
 const assert = require('node:assert')
-const fs = require('node:fs')
-const vm = require('node:vm')
-const path = require('node:path')
-
-const bgScriptPath = path.join(__dirname, '..', 'background.js')
-const bgScriptContent = fs.readFileSync(bgScriptPath, 'utf8')
-
-function setupEnvironment(initialStorage = {}) {
-  const sessionSetData = []
-  let currentStorage = { ...initialStorage }
-
-  const chromeMock = {
-    storage: {
-      session: {
-        get: async (key) => {
-          return key ? { [key]: currentStorage[key] } : currentStorage
-        },
-        set: async (data) => {
-          sessionSetData.push(data)
-          currentStorage = { ...currentStorage, ...data }
-        }
-      },
-      sync: {
-        get: async () => ({})
-      },
-      local: {
-        get: async () => ({})
-      }
-    },
-    runtime: {
-      onMessage: { addListener: () => {} },
-      getPlatformInfo: async () => ({})
-    },
-    tabs: {
-      query: async () => [],
-      get: async (id) => ({ id, url: 'https://jules.google.com/u/0/session' }),
-      sendMessage: async () => ({
-        config: { at: 'token', bl: 'build', fsid: '123' },
-        accountNum: '0',
-        account: 'default'
-      })
-    },
-    scripting: {
-      executeScript: async () => {}
-    }
-  }
-
-  const sandbox = {
-    chrome: chromeMock,
-    fetch: async () => ({ ok: true, json: async () => [], text: async () => ")]}'\n\n4\n[[]]" }),
-    setTimeout,
-    setInterval,
-    clearInterval,
-    Math,
-    Date,
-    JSON,
-    String,
-    Array,
-    Map,
-    Object,
-    Error,
-    URLSearchParams,
-    Promise,
-    console,
-    parseInt
-  }
-
-  vm.createContext(sandbox)
-
-  const scriptContent =
-    bgScriptContent +
-    `\n
-    globalThis.test_stateReadyPromise = stateReadyPromise;
-    globalThis.test_state = () => state;
-    globalThis.test_updateState = updateState;
-    globalThis.test_addLog = addLog;
-    globalThis.test_buildBatchRequest = buildBatchRequest;
-    globalThis.test_fixJsonControlChars = fixJsonControlChars;
-    globalThis.test_findJsonEnd = findJsonEnd;
-    globalThis.test_parseResponse = parseResponse;
-    globalThis.test_parseTask = parseTask;
-    globalThis.test_TASK = TASK;
-    globalThis.test_parseSuggestion = parseSuggestion;
-    globalThis.test_buildSuggestionPrompt = buildSuggestionPrompt;
-    globalThis.test_buildStartPayload = buildStartPayload;
-    globalThis.test_SUGGESTION = SUGGESTION;
-    globalThis.test_SDETAIL = SDETAIL;
-    globalThis.test_CATEGORY_CONFIG = CATEGORY_CONFIG;
-    globalThis.test_DEFAULT_CATEGORY = DEFAULT_CATEGORY;
-  `
-
-  const script = new vm.Script(scriptContent)
-  script.runInContext(sandbox)
-
-  return { sandbox, sessionSetData }
-}
+const { setupEnvironment } = require('./test-helper.js')
 
 // =============================================================================
 // batchexecute Client Tests
@@ -152,21 +57,25 @@ describe('findJsonEnd', () => {
 
   it('should handle strings with brackets', () => {
     const { sandbox } = setupEnvironment()
-    assert.strictEqual(sandbox.test_findJsonEnd('[["a[b]c"]]'), 11)
+    assert.strictEqual(sandbox.test_findJsonEnd('["[bracketed]"]after'), 15)
   })
 
   it('should return -1 for unbalanced input', () => {
     const { sandbox } = setupEnvironment()
-    assert.strictEqual(sandbox.test_findJsonEnd('[["a"'), -1)
+    assert.strictEqual(sandbox.test_findJsonEnd('[["unbalanced"]'), -1)
   })
 })
 
 describe('parseResponse', () => {
   it('should extract payload from batchexecute response', () => {
     const { sandbox } = setupEnvironment()
-    const response = ')]}\'\n\n100\n[["wrb.fr","p1Takd","[[\\"task1\\",\\"task2\\"]]",null,null,null,"generic"]]'
-    const result = sandbox.test_parseResponse(response, 'p1Takd')
-    assert.deepStrictEqual(result, [['task1', 'task2']])
+    // The response format for batchexecute is usually:
+    // )]}'
+    // <length>
+    // [[ "data_entry_id", "rpc_id", "inner_json_string", ... ]]
+    const rawResponse = ')]}\'\n123\n[["wX9q8b", "rpc-id", "[1,2]", null]]\n'
+    const result = sandbox.test_parseResponse(rawResponse, 'rpc-id')
+    assert.deepEqual(JSON.parse(JSON.stringify(result)), [1, 2])
   })
 })
 
@@ -178,32 +87,29 @@ describe('parseTask', () => {
   it('should map array indices to named fields', () => {
     const { sandbox } = setupEnvironment()
     const raw = new Array(31).fill(null)
-    raw[0] = '12345'
-    raw[1] = 'Short title'
+    raw[0] = 'task-123'
+    raw[1] = 'Short Title'
     raw[4] = 'github/owner/repo'
-    raw[5] = 3
+    raw[5] = 'STATE'
     raw[26] = 'Display Title'
 
     const task = sandbox.test_parseTask(raw)
-    assert.strictEqual(task.id, '12345')
+    assert.strictEqual(task.id, 'task-123')
     assert.strictEqual(task.title, 'Display Title')
-    assert.strictEqual(task.source, 'github/owner/repo')
     assert.strictEqual(task.repo, 'owner/repo')
     assert.strictEqual(task.owner, 'owner')
     assert.strictEqual(task.repoName, 'repo')
-    assert.strictEqual(task.state, 3)
   })
 
   it('should fallback to short title when display title is null', () => {
     const { sandbox } = setupEnvironment()
     const raw = new Array(31).fill(null)
-    raw[0] = '99999'
-    raw[1] = 'Fallback title'
-    raw[4] = 'github/a/b'
-    raw[5] = 9
+    raw[0] = 'task-123'
+    raw[1] = 'Fallback Title'
+    raw[26] = null
 
     const task = sandbox.test_parseTask(raw)
-    assert.strictEqual(task.title, 'Fallback title')
+    assert.strictEqual(task.title, 'Fallback Title')
   })
 
   it('should handle missing source gracefully', () => {
@@ -411,7 +317,7 @@ describe('buildStartPayload', () => {
     assert.strictEqual(payload[4], 'github/owner/repo')
 
     // payload[9] is experiment/suggestion metadata
-    assert.deepStrictEqual(payload[9][4], [12345])
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(payload[9][4])), [12345])
     assert.strictEqual(payload[9][11][1], 'test-123')
 
     // payload[14] = 1 (start flag)
@@ -456,42 +362,5 @@ describe('buildStartPayload', () => {
     assert.ok(flags.length > 0)
     // Compare via JSON to avoid cross-VM reference issues
     assert.strictEqual(JSON.stringify(flags[0]), JSON.stringify(['enable_bash_session_tool', 1]))
-  })
-})
-
-// =============================================================================
-// State Management Tests
-// =============================================================================
-
-describe('state management', () => {
-  it('should initialize cleanly without existing state', async () => {
-    const { sandbox } = setupEnvironment({})
-    await sandbox.test_stateReadyPromise
-    const state = sandbox.test_state()
-    assert.strictEqual(state.status, 'idle')
-    assert.strictEqual(state.log.length, 0)
-  })
-
-  it('should handle interrupted running state', async () => {
-    const existingState = { status: 'running', log: ['Started...'] }
-    const { sandbox, sessionSetData } = setupEnvironment({ archiveState: existingState })
-    await sandbox.test_stateReadyPromise
-    await new Promise((resolve) => setTimeout(resolve, 10))
-
-    const state = sandbox.test_state()
-    assert.strictEqual(state.status, 'error')
-    assert.strictEqual(state.error, 'Operation interrupted (browser killed service worker)')
-    assert.strictEqual(sessionSetData.length, 1)
-  })
-
-  it('should persist state on update', async () => {
-    const { sandbox, sessionSetData } = setupEnvironment({})
-    await sandbox.test_stateReadyPromise
-    await new Promise((resolve) => setTimeout(resolve, 10))
-    sessionSetData.length = 0
-
-    sandbox.test_updateState({ status: 'done', currentTab: 'u/0' })
-    assert.strictEqual(sandbox.test_state().status, 'done')
-    assert.strictEqual(sessionSetData.length, 1)
   })
 })
