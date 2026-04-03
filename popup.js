@@ -47,17 +47,7 @@ chrome.storage.sync.get(['ghOwner', 'opMode'], (syncData) => {
   }
 
   chrome.storage.local.get(['ghToken'], (localData) => {
-    if (localData.ghToken) {
-      ghTokenInput.value = localData.ghToken
-    } else {
-      chrome.storage.sync.get(['ghToken'], (oldSync) => {
-        if (oldSync.ghToken) {
-          ghTokenInput.value = oldSync.ghToken
-          chrome.storage.local.set({ ghToken: oldSync.ghToken })
-          chrome.storage.sync.remove('ghToken')
-        }
-      })
-    }
+    if (localData.ghToken) ghTokenInput.value = localData.ghToken
   })
 })
 

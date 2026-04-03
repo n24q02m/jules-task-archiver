@@ -732,16 +732,7 @@ async function processTab(tab, options) {
   // PR check: informational context (not a blocker)
   if (!options.force) {
     const { ghOwner } = await chrome.storage.sync.get(['ghOwner'])
-    let { ghToken } = await chrome.storage.local.get(['ghToken'])
-
-    if (!ghToken) {
-      const syncData = await chrome.storage.sync.get(['ghToken'])
-      if (syncData.ghToken) {
-        ghToken = syncData.ghToken
-        await chrome.storage.local.set({ ghToken })
-        await chrome.storage.sync.remove('ghToken')
-      }
-    }
+    const { ghToken } = await chrome.storage.local.get(['ghToken'])
 
     addLog(`\n[${label}] Open PRs (info only, archive uses task state):`)
     const prChecks = [...byRepo.entries()]
