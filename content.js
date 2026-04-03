@@ -48,11 +48,10 @@ function extractConfig() {
 }
 
 // Detect account from URL
-const ACCOUNT_RE = /\/u\/(\d+)/
-
 function getAccountNum() {
-  const m = location.href.match(ACCOUNT_RE)
-  return m ? m[1] : '0'
+  const parts = new URL(location.href).pathname.split('/')
+  const uIdx = parts.indexOf('u')
+  return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
 }
 
 function getAccountLabel() {
