@@ -77,6 +77,9 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_updateState = updateState;
     globalThis.test_addLog = addLog;
     globalThis.test_buildBatchRequest = buildBatchRequest;
+    globalThis.test_extractAccountNum = extractAccountNum;
+    globalThis.test_getJulesTabs = getJulesTabs;
+    globalThis.test_getTabLabel = getTabLabel;
     globalThis.test_fixJsonControlChars = fixJsonControlChars;
     globalThis.test_findJsonEnd = findJsonEnd;
     globalThis.test_parseResponse = parseResponse;
@@ -493,5 +496,45 @@ describe('state management', () => {
     sandbox.test_updateState({ status: 'done', currentTab: 'u/0' })
     assert.strictEqual(sandbox.test_state().status, 'done')
     assert.strictEqual(sessionSetData.length, 1)
+  })
+})
+
+// =============================================================================
+// URL Parser Tests
+// =============================================================================
+
+describe('URL parsing logic', () => {
+  it('should extract account number from URL', () => {
+    const { sandbox } = setupEnvironment()
+    assert.strictEqual(sandbox.test_extractAccountNum('https://jules.google.com/u/0/session'), '0')
+    assert.strictEqual(sandbox.test_extractAccountNum('https://jules.google.com/u/15/some/path'), '15')
+  })
+
+  it('should return null when account number is missing', () => {
+    const { sandbox } = setupEnvironment()
+    assert.strictEqual(sandbox.test_extractAccountNum('https://jules.google.com/session'), null)
+    assert.strictEqual(sandbox.test_extractAccountNum('https://other.google.com/u/0'), '0')
+  })
+
+  it('should return correct tab label', () => {
+    const { sandbox } = setupEnvironment()
+    assert.strictEqual(sandbox.test_getTabLabel({ url: 'https://jules.google.com/u/2/chat' }), 'u/2')
+    assert.strictEqual(sandbox.test_getTabLabel({ url: 'https://jules.google.com/session' }), 'default')
+  })
+
+  it('should sort tabs by account number in getJulesTabs', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.chrome.tabs.query = async () => [
+      { url: 'https://jules.google.com/u/10/x' },
+      { url: 'https://jules.google.com/u/2/x' },
+      { url: 'https://jules.google.com/u/0/x' },
+      { url: 'https://jules.google.com/accounts.google/x' }
+    ]
+
+    const tabs = await sandbox.test_getJulesTabs()
+    assert.strictEqual(tabs.length, 3)
+    assert.strictEqual(sandbox.test_extractAccountNum(tabs[0].url), '0')
+    assert.strictEqual(sandbox.test_extractAccountNum(tabs[1].url), '2')
+    assert.strictEqual(sandbox.test_extractAccountNum(tabs[2].url), '10')
   })
 })

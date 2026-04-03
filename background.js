@@ -589,22 +589,25 @@ function stopKeepAlive() {
 // Tab Management
 // =============================================================================
 
+function extractAccountNum(url) {
+  return url.match(/\/u\/(\d+)/)?.[1] || null
+}
+
 async function getJulesTabs() {
   const tabs = await chrome.tabs.query({ url: 'https://jules.google.com/*' })
   return tabs
     .filter((t) => !t.url.includes('accounts.google'))
     .sort((a, b) => {
-      const na = parseInt(a.url.match(/\/u\/(\d+)/)?.[1] || '0', 10)
-      const nb = parseInt(b.url.match(/\/u\/(\d+)/)?.[1] || '0', 10)
+      const na = parseInt(extractAccountNum(a.url) || '0', 10)
+      const nb = parseInt(extractAccountNum(b.url) || '0', 10)
       return na - nb
     })
 }
 
 function getTabLabel(tab) {
-  const m = tab.url.match(/\/u\/(\d+)/)
-  return m ? `u/${m[1]}` : 'default'
+  const account = extractAccountNum(tab.url)
+  return account ? `u/${account}` : 'default'
 }
-
 async function ensureContentScript(tabId) {
   const tab = await chrome.tabs.get(tabId)
   if (!tab.url?.startsWith('https://jules.google.com/')) {
