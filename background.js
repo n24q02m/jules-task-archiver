@@ -10,9 +10,10 @@
 // =============================================================================
 
 const JULES_ORIGIN = 'https://jules.google.com'
+const ACCOUNT_RE = /\/u\/(\d+)/
 
 function extractAccountNum(url) {
-  const m = url.match(/\/u\/(\d+)/)
+  const m = new URL(url).pathname.match(ACCOUNT_RE)
   return m ? m[1] : '0'
 }
 
