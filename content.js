@@ -35,8 +35,19 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 // --- Detect account label from URL ---
 function getAccountLabel() {
-  const m = location.href.match(/\/u\/(\d+)/)
-  return m ? `u/${m[1]}` : 'default'
+  try {
+    const path = new URL(location.href).pathname
+    const parts = path.split('/u/')
+    for (let i = 1; i < parts.length; i++) {
+      const id = parts[i].split('/')[0]
+      if (id && /^\d+$/.test(id)) {
+        return `u/${id}`
+      }
+    }
+  } catch (_e) {
+    // Fallback if URL parsing fails
+  }
+  return 'default'
 }
 
 // --- Send progress to background ---
