@@ -708,6 +708,7 @@ async function processTab(tab, options) {
   addLog(`\n[${label}] Checking open PRs...`)
   const toArchive = []
   const toSkip = []
+  const pendingChecks = []
 
   for (const [repo, repoTasks] of byRepo) {
     if (options.force) {
@@ -723,7 +724,17 @@ async function processTab(tab, options) {
       continue
     }
 
-    const count = await getOpenPRCount(owner, repoName, ghToken)
+    pendingChecks.push(
+      getOpenPRCount(owner, repoName, ghToken).then((count) => ({
+        repo,
+        repoTasks,
+        count
+      }))
+    )
+  }
+
+  const results = await Promise.all(pendingChecks)
+  for (const { repo, repoTasks, count } of results) {
     addLog(`  ${repo}: ${count} open PRs ${count === 0 ? '-> ARCHIVE' : '-> SKIP'}`)
     if (count === 0) {
       toArchive.push({ repo, tasks: repoTasks })
