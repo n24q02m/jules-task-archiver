@@ -639,18 +639,34 @@ function getTabLabel(tab) {
 }
 
 async function ensureContentScript(tabId) {
-  const tab = await chrome.tabs.get(tabId)
-  if (!tab.url?.startsWith(`${JULES_ORIGIN}/`)) {
+  const checkOrigin = async () => {
+    const tab = await chrome.tabs.get(tabId)
+    if (!tab.url) return false
+    try {
+      const url = new URL(tab.url)
+      return url.origin === JULES_ORIGIN
+    } catch {
+      return false
+    }
+  }
+
+  if (!(await checkOrigin())) {
     throw new Error('Security Error: Cannot inject script into non-Jules tab')
   }
 
   try {
     await chrome.tabs.sendMessage(tabId, { action: 'PING' })
   } catch {
+    // Re-verify immediately before injection to prevent TOCTOU
+    if (!(await checkOrigin())) {
+      throw new Error('Security Error: Cannot inject script into non-Jules tab')
+    }
+
     await chrome.scripting.executeScript({
       target: { tabId },
       files: ['content.js']
     })
+
     const deadline = Date.now() + 3000
     while (Date.now() < deadline) {
       try {
