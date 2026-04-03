@@ -47,15 +47,17 @@ function extractConfig() {
   })
 }
 
-// Detect account number from URL
+// Detect account from URL
+const ACCOUNT_RE = /\/u\/(\d+)/
+
 function getAccountNum() {
-  const m = location.href.match(/\/u\/(\d+)/)
+  const m = location.href.match(ACCOUNT_RE)
   return m ? m[1] : '0'
 }
 
 function getAccountLabel() {
-  const m = location.href.match(/\/u\/(\d+)/)
-  return m ? `u/${m[1]}` : 'default'
+  const num = getAccountNum()
+  return num !== '0' ? `u/${num}` : 'default'
 }
 
 // Message handler

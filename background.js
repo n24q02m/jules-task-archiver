@@ -6,6 +6,17 @@
  */
 
 // =============================================================================
+// Constants
+// =============================================================================
+
+const JULES_ORIGIN = 'https://jules.google.com'
+
+function extractAccountNum(url) {
+  const m = url.match(/\/u\/(\d+)/)
+  return m ? m[1] : '0'
+}
+
+// =============================================================================
 // batchexecute Client
 // =============================================================================
 
@@ -26,7 +37,7 @@ function buildBatchRequest(rpcId, payload, config) {
   })
 
   return {
-    url: `https://jules.google.com/u/${config.accountNum}/_/Swebot/data/batchexecute?${params}`,
+    url: `${JULES_ORIGIN}/u/${config.accountNum}/_/Swebot/data/batchexecute?${params}`,
     body: body.toString()
   }
 }
@@ -516,9 +527,14 @@ async function getOpenPRCount(owner, repo, token) {
   if (prCache.has(key)) return prCache.get(key)
 
   try {
-    const url = `https://api.github.com/repos/${owner}/${repo}/pulls?state=open&per_page=100`
+    const safeOwner = encodeURIComponent(owner)
+    const safeRepo = encodeURIComponent(repo)
+    const url = `https://api.github.com/repos/${safeOwner}/${safeRepo}/pulls?state=open&per_page=100`
     const headers = { Accept: 'application/vnd.github+json' }
-    if (token) headers.Authorization = `token ${token}`
+    if (token) {
+      if (/[\r\n]/.test(token)) throw new Error('Invalid token: contains newline')
+      headers.Authorization = `token ${token}`
+    }
 
     const res = await fetch(url, { headers })
     if (!res.ok) {
@@ -599,24 +615,24 @@ function stopKeepAlive() {
 // =============================================================================
 
 async function getJulesTabs() {
-  const tabs = await chrome.tabs.query({ url: 'https://jules.google.com/*' })
+  const tabs = await chrome.tabs.query({ url: `${JULES_ORIGIN}/*` })
   return tabs
     .filter((t) => !t.url.includes('accounts.google'))
     .sort((a, b) => {
-      const na = parseInt(a.url.match(/\/u\/(\d+)/)?.[1] || '0', 10)
-      const nb = parseInt(b.url.match(/\/u\/(\d+)/)?.[1] || '0', 10)
+      const na = parseInt(extractAccountNum(a.url), 10)
+      const nb = parseInt(extractAccountNum(b.url), 10)
       return na - nb
     })
 }
 
 function getTabLabel(tab) {
-  const m = tab.url.match(/\/u\/(\d+)/)
-  return m ? `u/${m[1]}` : 'default'
+  const num = extractAccountNum(tab.url)
+  return num !== '0' ? `u/${num}` : 'default'
 }
 
 async function ensureContentScript(tabId) {
   const tab = await chrome.tabs.get(tabId)
-  if (!tab.url?.startsWith('https://jules.google.com/')) {
+  if (!tab.url?.startsWith(`${JULES_ORIGIN}/`)) {
     throw new Error('Security Error: Cannot inject script into non-Jules tab')
   }
 
