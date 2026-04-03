@@ -88,6 +88,7 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_extractAccountNum = extractAccountNum;
     globalThis.test_getTabLabel = getTabLabel;
     globalThis.test_getOpenPRs = getOpenPRs;
+    globalThis.test_prCache = prCache;
     globalThis.test_taskHasOpenPR = taskHasOpenPR;
     globalThis.test_parseSuggestion = parseSuggestion;
     globalThis.test_buildSuggestionPrompt = buildSuggestionPrompt;
@@ -372,6 +373,38 @@ describe('getOpenPRs', () => {
     sandbox.fetch = async () => ({ ok: true, json: async () => [] })
     const prs = await sandbox.test_getOpenPRs('own5', 'rep5', 'token\r\nEvil: header')
     assert.strictEqual(prs.length, 0)
+  })
+
+  it('should use Authorization header when token is provided', async () => {
+    const { sandbox } = setupEnvironment()
+    let capturedHeaders = {}
+    sandbox.fetch = async (_url, options) => {
+      capturedHeaders = options.headers
+      return { ok: true, json: async () => [] }
+    }
+    await sandbox.test_getOpenPRs('own', 'rep', 'secret-token')
+    assert.strictEqual(capturedHeaders.Authorization, 'token secret-token')
+  })
+
+  it('should handle prCache correctly (integration check)', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.fetch = async () => ({
+      ok: true,
+      json: async () => [{ title: 'PR', head: { ref: 'b' } }]
+    })
+
+    // Clear cache first just in case
+    sandbox.test_prCache.clear()
+
+    const key = 'own/rep'
+    assert.strictEqual(sandbox.test_prCache.has(key), false)
+
+    await sandbox.test_getOpenPRs('own', 'rep', null)
+
+    assert.strictEqual(sandbox.test_prCache.has(key), true)
+    const cached = sandbox.test_prCache.get(key)
+    assert.strictEqual(cached.length, 1)
+    assert.strictEqual(cached[0].title, 'PR')
   })
 })
 
