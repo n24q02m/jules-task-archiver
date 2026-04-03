@@ -647,6 +647,11 @@ async function ensureContentScript(tabId) {
   try {
     await chrome.tabs.sendMessage(tabId, { action: 'PING' })
   } catch {
+    // Double check origin immediately before injection to prevent TOCTOU
+    const currentTab = await chrome.tabs.get(tabId)
+    if (!currentTab.url || new URL(currentTab.url).origin !== JULES_ORIGIN) {
+      throw new Error('Security Error: Tab navigated away from Jules before script injection')
+    }
     await chrome.scripting.executeScript({
       target: { tabId },
       files: ['content.js']
