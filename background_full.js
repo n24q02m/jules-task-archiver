@@ -10,7 +10,6 @@
 // =============================================================================
 
 const JULES_ORIGIN = 'https://jules.google.com'
-const JULES_URL_PATTERN = `${JULES_ORIGIN}/*`
 
 function extractAccountNum(url) {
   const m = url.match(/\/u\/(\d+)/)
@@ -624,7 +623,7 @@ function stopKeepAlive() {
 // =============================================================================
 
 async function getJulesTabs() {
-  const tabs = await chrome.tabs.query({ url: JULES_URL_PATTERN })
+  const tabs = await chrome.tabs.query({ url: `${JULES_ORIGIN}/*` })
   return tabs
     .filter((t) => !t.url.includes('accounts.google'))
     .sort((a, b) => {
