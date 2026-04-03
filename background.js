@@ -175,8 +175,12 @@ const TASK = {
   STATE: 5,
   CREATE_TIME: 6,
   UPDATE_TIME: 7,
+  STATUS_CODE: 25,
   DISPLAY_TITLE: 26
 }
+
+// Task states that indicate the task is finished and safe to archive
+const ARCHIVABLE_STATES = new Set([3, 9]) // 3=completed, 9=failed
 
 function parseTask(raw) {
   return {
@@ -184,10 +188,15 @@ function parseTask(raw) {
     title: raw[TASK.DISPLAY_TITLE] || raw[TASK.SHORT_TITLE] || '(untitled)',
     source: raw[TASK.SOURCE] || '',
     state: raw[TASK.STATE],
+    statusCode: raw[TASK.STATUS_CODE],
     repo: (raw[TASK.SOURCE] || '').replace(/^github\//, ''),
     owner: (raw[TASK.SOURCE] || '').split('/')[1] || '',
     repoName: (raw[TASK.SOURCE] || '').split('/')[2] || ''
   }
+}
+
+function isArchivable(task) {
+  return ARCHIVABLE_STATES.has(task.state)
 }
 
 async function listTasks(filter, config) {
@@ -678,79 +687,65 @@ async function processTab(tab, options) {
     return 0
   }
 
-  // Group tasks by repo
+  // Filter to archivable tasks (completed/failed) vs active
+  const archivable = tasks.filter(isArchivable)
+  const active = tasks.filter((t) => !isArchivable(t))
+
+  addLog(`[${label}] ${tasks.length} total tasks: ${archivable.length} completed/failed, ${active.length} active`)
+
+  if (archivable.length === 0) {
+    addLog(`[${label}] No completed/failed tasks to archive.`)
+    return 0
+  }
+
+  // Group archivable tasks by repo
   const byRepo = new Map()
-  for (const task of tasks) {
+  for (const task of archivable) {
     const key = task.repo || '(no repo)'
     if (!byRepo.has(key)) byRepo.set(key, [])
     byRepo.get(key).push(task)
   }
 
-  addLog(`[${label}] ${tasks.length} tasks across ${byRepo.size} repos:`)
+  addLog(`[${label}] Archivable tasks across ${byRepo.size} repos:`)
   for (const [repo, repoTasks] of byRepo) {
     addLog(`  ${repo}: ${repoTasks.length} tasks`)
   }
 
-  // Check PRs and decide which repos to archive
-  const { ghOwner } = await chrome.storage.sync.get(['ghOwner'])
-  let { ghToken } = await chrome.storage.local.get(['ghToken'])
+  // PR check: informational context (not a blocker)
+  if (!options.force) {
+    const { ghOwner } = await chrome.storage.sync.get(['ghOwner'])
+    let { ghToken } = await chrome.storage.local.get(['ghToken'])
 
-  // Migrate token from sync to local if needed
-  if (!ghToken) {
-    const syncData = await chrome.storage.sync.get(['ghToken'])
-    if (syncData.ghToken) {
-      ghToken = syncData.ghToken
-      await chrome.storage.local.set({ ghToken })
-      await chrome.storage.sync.remove('ghToken')
+    if (!ghToken) {
+      const syncData = await chrome.storage.sync.get(['ghToken'])
+      if (syncData.ghToken) {
+        ghToken = syncData.ghToken
+        await chrome.storage.local.set({ ghToken })
+        await chrome.storage.sync.remove('ghToken')
+      }
+    }
+
+    addLog(`\n[${label}] Open PRs (info only, archive uses task state):`)
+    for (const [_repo, repoTasks] of byRepo) {
+      const owner = repoTasks[0]?.owner || ghOwner || ''
+      const repoName = repoTasks[0]?.repoName || ''
+      if (owner && repoName) {
+        const count = await getOpenPRCount(owner, repoName, ghToken)
+        if (count > 0) addLog(`  ${owner}/${repoName}: ${count} open PRs`)
+      }
     }
   }
 
-  addLog(`\n[${label}] Checking open PRs...`)
-  const toArchive = []
-  const toSkip = []
-
-  for (const [repo, repoTasks] of byRepo) {
-    if (options.force) {
-      toArchive.push({ repo, tasks: repoTasks })
-      continue
-    }
-
-    const owner = repoTasks[0]?.owner || ghOwner || ''
-    const repoName = repoTasks[0]?.repoName || ''
-    if (!owner || !repoName) {
-      addLog(`  ${repo}: no owner/repo, skipping PR check -> ARCHIVE`)
-      toArchive.push({ repo, tasks: repoTasks })
-      continue
-    }
-
-    const count = await getOpenPRCount(owner, repoName, ghToken)
-    addLog(`  ${repo}: ${count} open PRs ${count === 0 ? '-> ARCHIVE' : '-> SKIP'}`)
-    if (count === 0) {
-      toArchive.push({ repo, tasks: repoTasks })
-    } else {
-      toSkip.push({ repo, tasks: repoTasks })
-    }
-  }
-
-  if (toSkip.length > 0) {
-    addLog(`\n[${label}] SKIPPING (has open PRs): ${toSkip.map((r) => `${r.repo} (${r.tasks.length})`).join(', ')}`)
-  }
-
-  if (toArchive.length === 0) {
-    addLog(`\n[${label}] Nothing to archive.`)
-    return 0
-  }
-
-  // Archive tasks
-  const totalTasks = toArchive.reduce((sum, r) => sum + r.tasks.length, 0)
-  addLog(`\n[${label}] Archiving ${totalTasks} tasks across ${toArchive.length} repos`)
+  // Archive
+  const totalTasks = archivable.length
+  addLog(`\n[${label}] Archiving ${totalTasks} completed/failed tasks across ${byRepo.size} repos`)
 
   if (options.dryRun) {
     addLog(`[${label}] DRY RUN - would archive ${totalTasks} tasks`)
-    for (const { repo, tasks: repoTasks } of toArchive) {
+    for (const [repo, repoTasks] of byRepo) {
       addLog(`  ${repo}: ${repoTasks.length} tasks`)
       for (const t of repoTasks) {
-        addLog(`    [${t.id}] ${t.title}`)
+        addLog(`    [${t.id}] ${t.title} (state=${t.state})`)
       }
     }
     return 0
@@ -758,7 +753,7 @@ async function processTab(tab, options) {
 
   let grandTotal = 0
 
-  for (const { repo, tasks: repoTasks } of toArchive) {
+  for (const [repo, repoTasks] of byRepo) {
     updateState({ currentRepo: repo })
     addLog(`\n[${label}] -> ${repo} (${repoTasks.length} tasks)`)
 

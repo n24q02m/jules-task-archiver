@@ -51,8 +51,10 @@ describe('content.js config extraction logic', () => {
 
   it('should parse account number from URL paths', () => {
     function getAccountNum(url) {
-      const m = url.match(/\/u\/(\d+)/)
-      return m ? m[1] : '0'
+      const path = new URL(url).pathname
+      const parts = path.split('/')
+      const uIdx = parts.indexOf('u')
+      return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
     }
 
     assert.strictEqual(getAccountNum('https://jules.google.com/u/3/session'), '3')

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Jules Task Archiver",
   "version": "2.0.0",
-  "description": "Archive completed Jules tasks for repos with no open GitHub PRs",
+  "description": "Bulk archive Jules tasks and start code suggestions via batchexecute API",
   "permissions": ["storage", "tabs", "scripting"],
   "host_permissions": ["https://jules.google.com/*", "https://api.github.com/*"],
   "background": {

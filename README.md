@@ -1,6 +1,6 @@
 # Jules Task Archiver
 
-**Chrome Extension to bulk-archive completed Jules tasks for repos with no open GitHub PRs.**
+**Chrome Extension for bulk operations on Jules tasks via batchexecute API -- archive tasks and start code suggestions at scale.**
 
 [![CI](https://github.com/n24q02m/jules-task-archiver/actions/workflows/ci.yml/badge.svg)](https://github.com/n24q02m/jules-task-archiver/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -9,20 +9,31 @@
 
 ## Features
 
-- **Bulk archive** — archive all tasks for repos with zero open PRs in one click
-- **Multi-account** — processes all Jules tabs (`/u/0`, `/u/1`, etc.) automatically
-- **GitHub PR check** — skips repos with open PRs to avoid archiving active work
-- **Dry run mode** — preview which repos would be archived without making changes
-- **Force mode** — skip PR check and archive everything
-- **Batch processing** — archives in batches with DOM refresh between batches for reliability
-- **Live progress** — real-time log and progress bar in popup UI
-- **State persistence** — operation continues even if popup is closed; progress restored on reopen
+### Archive Tasks
+
+- **Bulk archive** -- archive all completed tasks for repos with zero open PRs in one click
+- **GitHub PR check** -- skips repos with open PRs to avoid archiving active work
+- **Force mode** -- skip PR check and archive everything
+
+### Start Suggestions
+
+- **Bulk start** -- start all recommended code suggestions (security, performance, testing, cleanup) across repos
+- **Category-aware prompts** -- generates tailored prompts per suggestion category (security fix, performance optimization, test coverage, code cleanup)
+- **Config capture** -- observes Jules UI to capture model config and experiment IDs for accurate reproduction
+
+### General
+
+- **Multi-account** -- processes all Jules tabs (`/u/0`, `/u/1`, etc.) automatically
+- **Dry run mode** -- preview what would happen without making changes
+- **batchexecute API** -- direct HTTP calls, no DOM automation, 10x faster than UI clicks
+- **Live progress** -- real-time log and progress bar in popup UI
+- **State persistence** -- operation continues even if popup is closed; progress restored on reopen
 
 ## Installation
 
 1. Download the latest `jules-task-archiver.zip` from [Releases](../../releases)
 2. Extract the zip
-3. Open `chrome://extensions` in Chrome or Brave
+3. Open `chrome://extensions` in Chrome
 4. Enable **Developer mode** (top right toggle)
 5. Click **Load unpacked** and select the extracted folder
 
@@ -31,30 +42,52 @@
 1. Open one or more `jules.google.com` tabs (supports multiple accounts)
 2. Click the extension icon in the toolbar
 3. Configure:
-   - **GitHub Owner** — your GitHub username (for PR checks)
-   - **GitHub Token** — optional, for private repos (public repos work without it)
-   - **Mode** — Dry Run (preview) or Archive (execute)
-   - **Force** — skip PR check
-   - **Scope** — current tab only or all Jules tabs
+   - **Operation** -- Archive Tasks or Start Suggestions
+   - **GitHub Owner** -- your GitHub username (for PR checks in archive mode)
+   - **GitHub Token** -- optional, for private repos
+   - **Mode** -- Dry Run (preview) or Run (execute)
+   - **Force** -- skip PR check (archive mode only)
+   - **Scope** -- current tab only or all Jules tabs
 4. Click **Start**
+
+### Start Suggestions tips
+
+- For best results, manually click "Start" on any suggestion in the Jules UI first -- the extension captures the model config and experiment IDs from that request
+- Without this capture, the extension uses sensible defaults that may differ from Jules' current configuration
 
 ## How It Works
 
-1. Finds all open Jules tabs and sorts by account number
-2. For each tab, reads the sidebar to find repos with tasks
-3. Checks GitHub API for open PRs on each repo
-4. For repos with 0 open PRs: clicks into each repo and archives tasks in batches
-5. After each batch, re-navigates to the repo to refresh the DOM
-6. Reports progress in real-time via the popup UI
+### v2 Architecture
+
+```
+popup.js (UI) <-> background.js (batchexecute client) <-> content.js (message relay)
+                        |                                        |
+                  fetch() to jules.google.com          main-world.js (MAIN world)
+                  /_/Swebot/data/batchexecute          reads WIZ_global_data tokens
+```
+
+1. `main-world.js` runs in the page's MAIN world, reads auth tokens from `WIZ_global_data`, and observes fetch calls for StartSuggestion config
+2. `content.js` relays tokens and config to the background service worker
+3. `background.js` makes direct HTTP calls to Jules' batchexecute API endpoint
+4. `popup.js` displays real-time progress and manages settings
+
+### RPC IDs
+
+| RPC | ID | Purpose |
+|-----|-----|---------|
+| ListTasks | `p1Takd` | Fetch all active tasks |
+| ArchiveTask | `Tjmm5c` | Archive a single task |
+| ListSuggestions | `hQP40d` | Fetch code suggestions for a repo |
+| StartSuggestion | `Rja83d` | Start a suggestion as a new task |
 
 ## Permissions
 
 | Permission | Why |
 |-----------|-----|
-| `storage` | Save settings (GitHub owner, token) and operation state |
+| `storage` | Save settings and operation state |
 | `tabs` | Query all Jules tabs for multi-account support |
 | `scripting` | Inject content script into pre-existing tabs |
-| `jules.google.com` | Content script for DOM automation |
+| `jules.google.com` | Content script for token extraction |
 | `api.github.com` | Check open PRs via GitHub REST API |
 
 ## Development
@@ -64,18 +97,21 @@
 npx @biomejs/biome check .
 npx @biomejs/biome check --write .
 
+# Run tests
+node --test
+
 # Load unpacked in chrome://extensions for testing
 ```
 
-No build step, no dependencies. Pure vanilla JavaScript.
+No build step, no dependencies. Pure vanilla JavaScript with `node:test` for unit tests.
 
 ## Related Projects
 
 Check out these MCP servers for AI-powered development:
 
-- [wet-mcp](https://github.com/n24q02m/wet-mcp) — Web search, extract, and media MCP server
-- [better-notion-mcp](https://github.com/n24q02m/better-notion-mcp) — Notion API MCP server
-- [mnemo-mcp](https://github.com/n24q02m/mnemo-mcp) — Persistent AI memory MCP server
+- [wet-mcp](https://github.com/n24q02m/wet-mcp) -- Web search, extract, and media MCP server
+- [better-notion-mcp](https://github.com/n24q02m/better-notion-mcp) -- Notion API MCP server
+- [mnemo-mcp](https://github.com/n24q02m/mnemo-mcp) -- Persistent AI memory MCP server
 
 ## Contributing
 

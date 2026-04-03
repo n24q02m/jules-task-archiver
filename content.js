@@ -49,13 +49,15 @@ function extractConfig() {
 
 // Detect account number from URL
 function getAccountNum() {
-  const m = location.href.match(/\/u\/(\d+)/)
-  return m ? m[1] : '0'
+  const path = new URL(location.href).pathname
+  const parts = path.split('/')
+  const uIdx = parts.indexOf('u')
+  return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
 }
 
 function getAccountLabel() {
-  const m = location.href.match(/\/u\/(\d+)/)
-  return m ? `u/${m[1]}` : 'default'
+  const num = getAccountNum()
+  return num !== '0' ? `u/${num}` : 'default'
 }
 
 // Message handler

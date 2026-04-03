@@ -81,7 +81,9 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_findJsonEnd = findJsonEnd;
     globalThis.test_parseResponse = parseResponse;
     globalThis.test_parseTask = parseTask;
+    globalThis.test_isArchivable = isArchivable;
     globalThis.test_TASK = TASK;
+    globalThis.test_ARCHIVABLE_STATES = ARCHIVABLE_STATES;
     globalThis.test_parseSuggestion = parseSuggestion;
     globalThis.test_buildSuggestionPrompt = buildSuggestionPrompt;
     globalThis.test_buildStartPayload = buildStartPayload;
@@ -215,6 +217,36 @@ describe('parseTask', () => {
     assert.strictEqual(task.repo, '')
     assert.strictEqual(task.owner, '')
     assert.strictEqual(task.title, '(untitled)')
+  })
+
+  it('should include statusCode from index 25', () => {
+    const { sandbox } = setupEnvironment()
+    const raw = new Array(31).fill(null)
+    raw[0] = '55555'
+    raw[5] = 3
+    raw[25] = 6
+
+    const task = sandbox.test_parseTask(raw)
+    assert.strictEqual(task.statusCode, 6)
+  })
+})
+
+describe('isArchivable', () => {
+  it('should return true for completed tasks (state=3)', () => {
+    const { sandbox } = setupEnvironment()
+    assert.strictEqual(sandbox.test_isArchivable({ state: 3 }), true)
+  })
+
+  it('should return true for failed tasks (state=9)', () => {
+    const { sandbox } = setupEnvironment()
+    assert.strictEqual(sandbox.test_isArchivable({ state: 9 }), true)
+  })
+
+  it('should return false for active/in-progress tasks', () => {
+    const { sandbox } = setupEnvironment()
+    assert.strictEqual(sandbox.test_isArchivable({ state: 1 }), false)
+    assert.strictEqual(sandbox.test_isArchivable({ state: 5 }), false)
+    assert.strictEqual(sandbox.test_isArchivable({ state: 0 }), false)
   })
 })
 
