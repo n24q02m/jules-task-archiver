@@ -113,9 +113,9 @@ resetBtn.addEventListener('click', () => {
   summarySection.style.display = 'none'
 })
 
-// --- Listen for state changes ---
-chrome.storage.onChanged.addListener((changes) => {
-  if (!changes.archiveState) return
+// --- Listen for state updates from background ---
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'session' || !changes.archiveState) return
   const state = changes.archiveState.newValue
   if (!state) return
   renderState(state)
@@ -123,11 +123,14 @@ chrome.storage.onChanged.addListener((changes) => {
 
 // --- Render state ---
 function renderState(state) {
+  if (state.status && state.status !== 'idle') {
+    progressSection.style.display = 'block'
+  }
+
   // Log
   if (state.log?.length > 0) {
     logPre.textContent = state.log.join('\n')
     logPre.scrollTop = logPre.scrollHeight
-    progressSection.style.display = 'block'
   }
 
   // Current info
