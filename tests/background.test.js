@@ -89,6 +89,7 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_SDETAIL = SDETAIL;
     globalThis.test_CATEGORY_CONFIG = CATEGORY_CONFIG;
     globalThis.test_DEFAULT_CATEGORY = DEFAULT_CATEGORY;
+    globalThis.ensureContentScript = ensureContentScript;
   `
 
   const script = new vm.Script(scriptContent)
@@ -493,5 +494,37 @@ describe('state management', () => {
     sandbox.test_updateState({ status: 'done', currentTab: 'u/0' })
     assert.strictEqual(sandbox.test_state().status, 'done')
     assert.strictEqual(sessionSetData.length, 1)
+  })
+})
+
+// =============================================================================
+// Security Tests
+// =============================================================================
+
+describe('ensureContentScript security', () => {
+  it('should allow injection for valid Jules URL', async () => {
+    const { sandbox } = setupEnvironment()
+    // Default setupEnvironment mocks chrome.tabs.get to return a Jules URL
+    await sandbox.chrome.tabs.get(123)
+    await assert.doesNotReject(sandbox.ensureContentScript(123))
+  })
+
+  it('should throw Security Error for non-Jules URL', async () => {
+    const { sandbox } = setupEnvironment()
+    // Override mock for this test
+    sandbox.chrome.tabs.get = async () => ({ id: 999, url: 'https://evil.com/session' })
+
+    await assert.rejects(sandbox.ensureContentScript(999), {
+      message: 'Security Error: Cannot inject script into non-Jules tab'
+    })
+  })
+
+  it('should throw Security Error for subdomain spoofing', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.chrome.tabs.get = async () => ({ id: 888, url: 'https://jules.google.com.evil.com/' })
+
+    await assert.rejects(sandbox.ensureContentScript(888), {
+      message: 'Security Error: Cannot inject script into non-Jules tab'
+    })
   })
 })

@@ -4,6 +4,7 @@
  * Orchestrates bulk archive via Jules batchexecute RPC API.
  * No DOM automation — all operations are HTTP fetch calls.
  */
+const JULES_URL_PREFIX = 'https://jules.google.com/'
 
 // =============================================================================
 // batchexecute Client
@@ -26,7 +27,7 @@ function buildBatchRequest(rpcId, payload, config) {
   })
 
   return {
-    url: `https://jules.google.com/u/${config.accountNum}/_/Swebot/data/batchexecute?${params}`,
+    url: `${JULES_URL_PREFIX}u/${config.accountNum}/_/Swebot/data/batchexecute?${params}`,
     body: body.toString()
   }
 }
@@ -590,7 +591,7 @@ function stopKeepAlive() {
 // =============================================================================
 
 async function getJulesTabs() {
-  const tabs = await chrome.tabs.query({ url: 'https://jules.google.com/*' })
+  const tabs = await chrome.tabs.query({ url: `${JULES_URL_PREFIX}*` })
   return tabs
     .filter((t) => !t.url.includes('accounts.google'))
     .sort((a, b) => {
@@ -607,7 +608,7 @@ function getTabLabel(tab) {
 
 async function ensureContentScript(tabId) {
   const tab = await chrome.tabs.get(tabId)
-  if (!tab.url?.startsWith('https://jules.google.com/')) {
+  if (!tab.url?.startsWith(JULES_URL_PREFIX)) {
     throw new Error('Security Error: Cannot inject script into non-Jules tab')
   }
 
