@@ -70,9 +70,13 @@ async function getOpenPRCount(owner, repo, token) {
   if (prCache.has(key)) return prCache.get(key)
 
   try {
-    const url = `https://api.github.com/repos/${owner}/${repo}/pulls?state=open&per_page=100`
+    const safeOwner = encodeURIComponent(owner)
+    const safeRepo = encodeURIComponent(repo)
+    const url = `https://api.github.com/repos/${safeOwner}/${safeRepo}/pulls?state=open&per_page=100`
     const headers = { Accept: 'application/vnd.github+json' }
-    if (token) headers.Authorization = `token ${token}`
+    if (token) {
+      headers.Authorization = `token ${token.replace(/[\r\n]/g, '')}`
+    }
 
     const res = await fetch(url, { headers })
     if (!res.ok) {

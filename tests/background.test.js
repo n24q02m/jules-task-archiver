@@ -60,6 +60,7 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_state = () => state;
     globalThis.test_updateState = updateState;
     globalThis.test_addLog = addLog;
+    globalThis.test_getOpenPRCount = getOpenPRCount;
   `
 
   const script = new vm.Script(scriptContent)
@@ -133,5 +134,32 @@ describe('background.js state management', () => {
     // addLog calls updateState({}) which should trigger storage.set
     assert.strictEqual(sessionSetData.length, 1)
     assert.strictEqual(sessionSetData[0].archiveState.log[0], 'Test log message')
+  })
+})
+
+describe('background.js GitHub API checks', () => {
+  it('should securely encode owner and repo and sanitize token in getOpenPRCount()', async () => {
+    const { sandbox } = setupEnvironment({})
+
+    let fetchUrl = ''
+    let fetchHeaders = {}
+
+    sandbox.fetch = async (url, options) => {
+      fetchUrl = url
+      fetchHeaders = options.headers
+      return { ok: true, json: async () => [] }
+    }
+
+    const evilOwner = 'test"owner'
+    const evilRepo = 'test/repo?x=1'
+    const evilToken = 'abc\r\ndef'
+
+    await sandbox.test_getOpenPRCount(evilOwner, evilRepo, evilToken)
+
+    assert.strictEqual(
+      fetchUrl,
+      'https://api.github.com/repos/test%22owner/test%2Frepo%3Fx%3D1/pulls?state=open&per_page=100'
+    )
+    assert.strictEqual(fetchHeaders.Authorization, 'token abcdef')
   })
 })
