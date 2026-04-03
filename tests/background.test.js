@@ -84,6 +84,10 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_isArchivable = isArchivable;
     globalThis.test_TASK = TASK;
     globalThis.test_ARCHIVABLE_STATES = ARCHIVABLE_STATES;
+    globalThis.test_JULES_ORIGIN = JULES_ORIGIN;
+    globalThis.test_extractAccountNum = extractAccountNum;
+    globalThis.test_getTabLabel = getTabLabel;
+    globalThis.test_getOpenPRCount = getOpenPRCount;
     globalThis.test_parseSuggestion = parseSuggestion;
     globalThis.test_buildSuggestionPrompt = buildSuggestionPrompt;
     globalThis.test_buildStartPayload = buildStartPayload;
@@ -247,6 +251,110 @@ describe('isArchivable', () => {
     assert.strictEqual(sandbox.test_isArchivable({ state: 1 }), false)
     assert.strictEqual(sandbox.test_isArchivable({ state: 5 }), false)
     assert.strictEqual(sandbox.test_isArchivable({ state: 0 }), false)
+  })
+})
+
+// =============================================================================
+// Suggestion Parser Tests
+// =============================================================================
+
+// =============================================================================
+// Constants + Helpers Tests (#50, #52)
+// =============================================================================
+
+describe('JULES_ORIGIN', () => {
+  it('should be the Jules base URL', () => {
+    const { sandbox } = setupEnvironment()
+    assert.strictEqual(sandbox.test_JULES_ORIGIN, 'https://jules.google.com')
+  })
+})
+
+describe('extractAccountNum', () => {
+  it('should extract account number from /u/N paths', () => {
+    const { sandbox } = setupEnvironment()
+    assert.strictEqual(sandbox.test_extractAccountNum('https://jules.google.com/u/3/session'), '3')
+    assert.strictEqual(sandbox.test_extractAccountNum('https://jules.google.com/u/0/repo'), '0')
+    assert.strictEqual(sandbox.test_extractAccountNum('https://jules.google.com/u/12/session'), '12')
+  })
+
+  it('should return 0 for URLs without /u/N', () => {
+    const { sandbox } = setupEnvironment()
+    assert.strictEqual(sandbox.test_extractAccountNum('https://jules.google.com/session'), '0')
+    assert.strictEqual(sandbox.test_extractAccountNum('https://example.com'), '0')
+  })
+})
+
+// =============================================================================
+// Tab Management Tests (#53)
+// =============================================================================
+
+describe('getTabLabel', () => {
+  it('should return u/N for account tabs', () => {
+    const { sandbox } = setupEnvironment()
+    assert.strictEqual(sandbox.test_getTabLabel({ url: 'https://jules.google.com/u/1/session' }), 'u/1')
+    assert.strictEqual(sandbox.test_getTabLabel({ url: 'https://jules.google.com/u/4/session?pageId=none' }), 'u/4')
+  })
+
+  it('should return default for tabs without account number', () => {
+    const { sandbox } = setupEnvironment()
+    assert.strictEqual(sandbox.test_getTabLabel({ url: 'https://jules.google.com/session' }), 'default')
+  })
+})
+
+// =============================================================================
+// GitHub PR Check Tests (#54)
+// =============================================================================
+
+describe('getOpenPRCount', () => {
+  it('should return cached value on cache hit', async () => {
+    const { sandbox } = setupEnvironment()
+    // First call: fetch returns 5 PRs
+    sandbox.fetch = async () => ({ ok: true, json: async () => [1, 2, 3, 4, 5] })
+    const first = await sandbox.test_getOpenPRCount('owner', 'repo', null)
+    assert.strictEqual(first, 5)
+
+    // Second call: should use cache (change fetch to verify)
+    sandbox.fetch = async () => {
+      throw new Error('should not be called')
+    }
+    const second = await sandbox.test_getOpenPRCount('owner', 'repo', null)
+    assert.strictEqual(second, 5)
+  })
+
+  it('should return 0 on HTTP error', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.fetch = async () => ({ ok: false, status: 404 })
+    const count = await sandbox.test_getOpenPRCount('owner2', 'repo2', null)
+    assert.strictEqual(count, 0)
+  })
+
+  it('should return 0 on network error', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.fetch = async () => {
+      throw new Error('network error')
+    }
+    const count = await sandbox.test_getOpenPRCount('owner3', 'repo3', null)
+    assert.strictEqual(count, 0)
+  })
+
+  it('should encode owner and repo in URL', async () => {
+    const { sandbox } = setupEnvironment()
+    let capturedUrl = ''
+    sandbox.fetch = async (url) => {
+      capturedUrl = url
+      return { ok: true, json: async () => [] }
+    }
+    await sandbox.test_getOpenPRCount('owner/evil', 'repo name', null)
+    assert.ok(capturedUrl.includes('owner%2Fevil'))
+    assert.ok(capturedUrl.includes('repo%20name'))
+  })
+
+  it('should reject tokens with newlines', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.fetch = async () => ({ ok: true, json: async () => [] })
+    const count = await sandbox.test_getOpenPRCount('own5', 'rep5', 'token\r\nEvil: header')
+    // Should return 0 (error caught) due to newline validation
+    assert.strictEqual(count, 0)
   })
 })
 
