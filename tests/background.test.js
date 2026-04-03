@@ -60,6 +60,7 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_state = () => state;
     globalThis.test_updateState = updateState;
     globalThis.test_addLog = addLog;
+    globalThis.test_getTabLabel = getTabLabel;
   `
 
   const script = new vm.Script(scriptContent)
@@ -133,5 +134,37 @@ describe('background.js state management', () => {
     // addLog calls updateState({}) which should trigger storage.set
     assert.strictEqual(sessionSetData.length, 1)
     assert.strictEqual(sessionSetData[0].archiveState.log[0], 'Test log message')
+  })
+})
+
+describe('getTabLabel', () => {
+  it('should extract single-digit account ID from URL', () => {
+    const { sandbox } = setupEnvironment({})
+    const tab = { url: 'https://jules.google.com/u/1/tasks' }
+    assert.strictEqual(sandbox.test_getTabLabel(tab), 'u/1')
+  })
+
+  it('should extract multi-digit account ID from URL', () => {
+    const { sandbox } = setupEnvironment({})
+    const tab = { url: 'https://jules.google.com/u/12/tasks' }
+    assert.strictEqual(sandbox.test_getTabLabel(tab), 'u/12')
+  })
+
+  it('should return default if no account ID is in URL', () => {
+    const { sandbox } = setupEnvironment({})
+    const tab = { url: 'https://jules.google.com/tasks' }
+    assert.strictEqual(sandbox.test_getTabLabel(tab), 'default')
+  })
+
+  it('should handle URLs with query parameters correctly', () => {
+    const { sandbox } = setupEnvironment({})
+    const tab = { url: 'https://jules.google.com/u/3/tasks?query=hello' }
+    assert.strictEqual(sandbox.test_getTabLabel(tab), 'u/3')
+  })
+
+  it('should return default for URLs with invalid account ID format', () => {
+    const { sandbox } = setupEnvironment({})
+    const tab = { url: 'https://jules.google.com/u/abc/tasks' }
+    assert.strictEqual(sandbox.test_getTabLabel(tab), 'default')
   })
 })
