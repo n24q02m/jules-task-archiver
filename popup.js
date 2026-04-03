@@ -29,6 +29,7 @@ chrome.storage.sync.get(['ghOwner', 'ghToken'], (syncData) => {
       if (syncData.ghToken) chrome.storage.sync.remove('ghToken')
     } else if (syncData.ghToken) {
       ghTokenInput.value = syncData.ghToken
+      // 🔒 SECURITY FIX: Store sensitive token in local storage instead of sync
       chrome.storage.local.set({ ghToken: syncData.ghToken })
       chrome.storage.sync.remove('ghToken')
     }
@@ -40,6 +41,7 @@ ghOwnerInput.addEventListener('change', () => {
   chrome.storage.sync.set({ ghOwner: ghOwnerInput.value.trim() })
 })
 ghTokenInput.addEventListener('change', () => {
+  // 🔒 SECURITY FIX: Store sensitive token in local storage instead of sync
   chrome.storage.local.set({ ghToken: ghTokenInput.value.trim() })
 })
 
@@ -49,6 +51,7 @@ startBtn.addEventListener('click', async () => {
   chrome.storage.sync.set({
     ghOwner: ghOwnerInput.value.trim()
   })
+  // 🔒 SECURITY FIX: Store sensitive token in local storage instead of sync
   chrome.storage.local.set({
     ghToken: ghTokenInput.value.trim()
   })
