@@ -23,13 +23,18 @@ const summaryDiv = $('#summary')
 let opMode = 'archive'
 
 // --- Operation mode selector ---
+function setActiveOpMode(value) {
+  document.querySelectorAll('#opMode button').forEach((b) => {
+    const isActive = b.dataset.value === value
+    b.classList.toggle('active', isActive)
+    b.setAttribute('aria-pressed', String(isActive))
+  })
+  opMode = value
+}
+
 document.querySelectorAll('#opMode button').forEach((btn) => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('#opMode button').forEach((b) => {
-      b.classList.remove('active')
-    })
-    btn.classList.add('active')
-    opMode = btn.dataset.value
+    setActiveOpMode(btn.dataset.value)
     chrome.storage.sync.set({ opMode })
   })
 })
@@ -38,12 +43,7 @@ document.querySelectorAll('#opMode button').forEach((btn) => {
 chrome.storage.sync.get(['ghOwner', 'opMode'], (syncData) => {
   if (syncData.ghOwner) ghOwnerInput.value = syncData.ghOwner
   if (syncData.opMode) {
-    opMode = syncData.opMode
-    document.querySelectorAll('#opMode button').forEach((b) => {
-      b.classList.remove('active')
-    })
-    const activeBtn = document.querySelector(`#opMode button[data-value="${opMode}"]`)
-    if (activeBtn) activeBtn.classList.add('active')
+    setActiveOpMode(syncData.opMode)
   }
 
   chrome.storage.local.get(['ghToken'], (localData) => {
@@ -150,6 +150,7 @@ function renderState(state) {
     if (state.progress?.total > 0) {
       const pct = Math.round(((state.progress.archived + state.progress.skipped) / state.progress.total) * 100)
       progressFill.style.width = `${pct}%`
+      progressFill.parentElement.setAttribute('aria-valuenow', String(pct))
       currentInfo.textContent += ` [${state.progress.archived + state.progress.skipped}/${state.progress.total}]`
     }
   }
@@ -160,6 +161,7 @@ function renderState(state) {
     startBtn.textContent = 'Start'
     resetBtn.style.display = 'block'
     progressFill.style.width = '100%'
+    progressFill.parentElement.setAttribute('aria-valuenow', '100')
 
     if (state.status === 'done') {
       currentInfo.textContent = 'Complete'
