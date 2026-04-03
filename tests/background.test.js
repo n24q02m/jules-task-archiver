@@ -62,6 +62,7 @@ function setupEnvironment(initialStorage = {}) {
     Object,
     Error,
     URLSearchParams,
+    URL,
     Promise,
     console,
     parseInt
