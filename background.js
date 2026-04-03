@@ -517,12 +517,12 @@ async function processSuggestionsForTab(tab, options) {
 }
 
 // =============================================================================
-// GitHub PR Check (unchanged from v1)
+// GitHub PR Check — task-level matching
 // =============================================================================
 
 const prCache = new Map()
 
-async function getOpenPRCount(owner, repo, token) {
+async function getOpenPRs(owner, repo, token) {
   const key = `${owner}/${repo}`
   if (prCache.has(key)) return prCache.get(key)
 
@@ -539,17 +539,25 @@ async function getOpenPRCount(owner, repo, token) {
     const res = await fetch(url, { headers })
     if (!res.ok) {
       addLog(`  WARNING: GitHub API ${res.status} for ${key}, assuming 0`)
-      prCache.set(key, 0)
-      return 0
+      prCache.set(key, [])
+      return []
     }
     const prs = await res.json()
-    prCache.set(key, prs.length)
-    return prs.length
+    const mapped = prs.map((pr) => ({ title: pr.title || '', branch: pr.head?.ref || '' }))
+    prCache.set(key, mapped)
+    return mapped
   } catch (e) {
     addLog(`  WARNING: Could not check PRs for ${key}: ${e.message}`)
-    prCache.set(key, 0)
-    return 0
+    prCache.set(key, [])
+    return []
   }
+}
+
+function taskHasOpenPR(task, openPRs) {
+  if (openPRs.length === 0) return false
+  const taskTitle = (task.title || '').toLowerCase()
+  if (!taskTitle || taskTitle === '(untitled)') return false
+  return openPRs.some((pr) => pr.title.toLowerCase().includes(taskTitle) || taskTitle.includes(pr.title.toLowerCase()))
 }
 
 // =============================================================================
@@ -705,57 +713,87 @@ async function processTab(tab, options) {
     return 0
   }
 
-  // Filter to archivable tasks (completed/failed) vs active
-  const archivable = tasks.filter(isArchivable)
+  // Filter by task state: only completed/failed are candidates
+  const candidates = tasks.filter(isArchivable)
   const active = tasks.filter((t) => !isArchivable(t))
 
-  addLog(`[${label}] ${tasks.length} total tasks: ${archivable.length} completed/failed, ${active.length} active`)
+  addLog(`[${label}] ${tasks.length} total: ${candidates.length} completed/failed, ${active.length} active`)
 
-  if (archivable.length === 0) {
+  if (candidates.length === 0) {
     addLog(`[${label}] No completed/failed tasks to archive.`)
     return 0
   }
 
-  // Group archivable tasks by repo
+  // Group candidates by repo
   const byRepo = new Map()
-  for (const task of archivable) {
+  for (const task of candidates) {
     const key = task.repo || '(no repo)'
     if (!byRepo.has(key)) byRepo.set(key, [])
     byRepo.get(key).push(task)
   }
 
-  addLog(`[${label}] Archivable tasks across ${byRepo.size} repos:`)
-  for (const [repo, repoTasks] of byRepo) {
-    addLog(`  ${repo}: ${repoTasks.length} tasks`)
+  // PR check: task-level matching (skip tasks with open matching PRs)
+  const toArchive = []
+  const toSkip = []
+
+  const { ghOwner } = await chrome.storage.sync.get(['ghOwner'])
+  const { ghToken } = await chrome.storage.local.get(['ghToken'])
+
+  if (options.force) {
+    addLog(`[${label}] FORCE: skipping PR check`)
+    for (const task of candidates) toArchive.push(task)
+  } else {
+    addLog(`\n[${label}] Checking open PRs per task...`)
+    // Fetch open PRs concurrently for all repos
+    const repoEntries = [...byRepo.entries()]
+    const prFetches = repoEntries.map(([_repo, repoTasks]) => {
+      const owner = repoTasks[0]?.owner || ghOwner || ''
+      const repoName = repoTasks[0]?.repoName || ''
+      return owner && repoName ? getOpenPRs(owner, repoName, ghToken) : Promise.resolve([])
+    })
+    const allPRs = await Promise.all(prFetches)
+
+    for (let i = 0; i < repoEntries.length; i++) {
+      const [repo, repoTasks] = repoEntries[i]
+      const openPRs = allPRs[i]
+      addLog(`  ${repo}: ${repoTasks.length} tasks, ${openPRs.length} open PRs`)
+
+      for (const task of repoTasks) {
+        if (task.state === 9) {
+          // Failed tasks: always archive (no PR created)
+          toArchive.push(task)
+        } else if (taskHasOpenPR(task, openPRs)) {
+          toSkip.push(task)
+          addLog(`    SKIP [${task.id}] ${task.title} (matching open PR)`)
+        } else {
+          toArchive.push(task)
+        }
+      }
+    }
   }
 
-  // PR check: informational context (not a blocker)
-  if (!options.force) {
-    const { ghOwner } = await chrome.storage.sync.get(['ghOwner'])
-    const { ghToken } = await chrome.storage.local.get(['ghToken'])
+  if (toSkip.length > 0) {
+    addLog(`\n[${label}] ${toSkip.length} tasks skipped (open PRs matching)`)
+  }
 
-    addLog(`\n[${label}] Open PRs (info only, archive uses task state):`)
-    const prChecks = [...byRepo.entries()]
-      .map(([_repo, repoTasks]) => {
-        const owner = repoTasks[0]?.owner || ghOwner || ''
-        const repoName = repoTasks[0]?.repoName || ''
-        return owner && repoName ? { owner, repoName } : null
-      })
-      .filter(Boolean)
-
-    const prResults = await Promise.all(prChecks.map((r) => getOpenPRCount(r.owner, r.repoName, ghToken)))
-    prChecks.forEach((r, i) => {
-      if (prResults[i] > 0) addLog(`  ${r.owner}/${r.repoName}: ${prResults[i]} open PRs`)
-    })
+  if (toArchive.length === 0) {
+    addLog(`[${label}] Nothing to archive (all tasks have matching open PRs).`)
+    return 0
   }
 
   // Archive
-  const totalTasks = archivable.length
-  addLog(`\n[${label}] Archiving ${totalTasks} completed/failed tasks across ${byRepo.size} repos`)
+  const totalTasks = toArchive.length
+  addLog(`\n[${label}] Archiving ${totalTasks} tasks`)
 
   if (options.dryRun) {
     addLog(`[${label}] DRY RUN - would archive ${totalTasks} tasks`)
-    for (const [repo, repoTasks] of byRepo) {
+    const archiveByRepo = new Map()
+    for (const t of toArchive) {
+      const key = t.repo || '(no repo)'
+      if (!archiveByRepo.has(key)) archiveByRepo.set(key, [])
+      archiveByRepo.get(key).push(t)
+    }
+    for (const [repo, repoTasks] of archiveByRepo) {
       addLog(`  ${repo}: ${repoTasks.length} tasks`)
       for (const t of repoTasks) {
         addLog(`    [${t.id}] ${t.title} (state=${t.state})`)
@@ -766,7 +804,15 @@ async function processTab(tab, options) {
 
   let grandTotal = 0
 
-  for (const [repo, repoTasks] of byRepo) {
+  // Group toArchive by repo for organized logging
+  const archiveByRepo = new Map()
+  for (const t of toArchive) {
+    const key = t.repo || '(no repo)'
+    if (!archiveByRepo.has(key)) archiveByRepo.set(key, [])
+    archiveByRepo.get(key).push(t)
+  }
+
+  for (const [repo, repoTasks] of archiveByRepo) {
     updateState({ currentRepo: repo })
     addLog(`\n[${label}] -> ${repo} (${repoTasks.length} tasks)`)
 

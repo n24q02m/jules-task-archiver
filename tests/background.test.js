@@ -87,7 +87,8 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_JULES_ORIGIN = JULES_ORIGIN;
     globalThis.test_extractAccountNum = extractAccountNum;
     globalThis.test_getTabLabel = getTabLabel;
-    globalThis.test_getOpenPRCount = getOpenPRCount;
+    globalThis.test_getOpenPRs = getOpenPRs;
+    globalThis.test_taskHasOpenPR = taskHasOpenPR;
     globalThis.test_parseSuggestion = parseSuggestion;
     globalThis.test_buildSuggestionPrompt = buildSuggestionPrompt;
     globalThis.test_buildStartPayload = buildStartPayload;
@@ -305,36 +306,53 @@ describe('getTabLabel', () => {
 // GitHub PR Check Tests (#54)
 // =============================================================================
 
-describe('getOpenPRCount', () => {
+describe('getOpenPRs', () => {
+  it('should return mapped PR titles and branches', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.fetch = async () => ({
+      ok: true,
+      json: async () => [
+        { title: 'Fix bug', head: { ref: 'fix/bug-123' } },
+        { title: 'Add feature', head: { ref: 'feat/feature-456' } }
+      ]
+    })
+    const prs = await sandbox.test_getOpenPRs('owner', 'repo', null)
+    assert.strictEqual(prs.length, 2)
+    assert.strictEqual(prs[0].title, 'Fix bug')
+    assert.strictEqual(prs[0].branch, 'fix/bug-123')
+    assert.strictEqual(prs[1].title, 'Add feature')
+  })
+
   it('should return cached value on cache hit', async () => {
     const { sandbox } = setupEnvironment()
-    // First call: fetch returns 5 PRs
-    sandbox.fetch = async () => ({ ok: true, json: async () => [1, 2, 3, 4, 5] })
-    const first = await sandbox.test_getOpenPRCount('owner', 'repo', null)
-    assert.strictEqual(first, 5)
+    sandbox.fetch = async () => ({
+      ok: true,
+      json: async () => [{ title: 'PR1', head: { ref: 'branch1' } }]
+    })
+    const first = await sandbox.test_getOpenPRs('cacheOwner', 'cacheRepo', null)
+    assert.strictEqual(first.length, 1)
 
-    // Second call: should use cache (change fetch to verify)
     sandbox.fetch = async () => {
       throw new Error('should not be called')
     }
-    const second = await sandbox.test_getOpenPRCount('owner', 'repo', null)
-    assert.strictEqual(second, 5)
+    const second = await sandbox.test_getOpenPRs('cacheOwner', 'cacheRepo', null)
+    assert.strictEqual(second.length, 1)
   })
 
-  it('should return 0 on HTTP error', async () => {
+  it('should return empty array on HTTP error', async () => {
     const { sandbox } = setupEnvironment()
     sandbox.fetch = async () => ({ ok: false, status: 404 })
-    const count = await sandbox.test_getOpenPRCount('owner2', 'repo2', null)
-    assert.strictEqual(count, 0)
+    const prs = await sandbox.test_getOpenPRs('err1', 'err1', null)
+    assert.strictEqual(prs.length, 0)
   })
 
-  it('should return 0 on network error', async () => {
+  it('should return empty array on network error', async () => {
     const { sandbox } = setupEnvironment()
     sandbox.fetch = async () => {
       throw new Error('network error')
     }
-    const count = await sandbox.test_getOpenPRCount('owner3', 'repo3', null)
-    assert.strictEqual(count, 0)
+    const prs = await sandbox.test_getOpenPRs('err2', 'err2', null)
+    assert.strictEqual(prs.length, 0)
   })
 
   it('should encode owner and repo in URL', async () => {
@@ -344,7 +362,7 @@ describe('getOpenPRCount', () => {
       capturedUrl = url
       return { ok: true, json: async () => [] }
     }
-    await sandbox.test_getOpenPRCount('owner/evil', 'repo name', null)
+    await sandbox.test_getOpenPRs('owner/evil', 'repo name', null)
     assert.ok(capturedUrl.includes('owner%2Fevil'))
     assert.ok(capturedUrl.includes('repo%20name'))
   })
@@ -352,9 +370,53 @@ describe('getOpenPRCount', () => {
   it('should reject tokens with newlines', async () => {
     const { sandbox } = setupEnvironment()
     sandbox.fetch = async () => ({ ok: true, json: async () => [] })
-    const count = await sandbox.test_getOpenPRCount('own5', 'rep5', 'token\r\nEvil: header')
-    // Should return 0 (error caught) due to newline validation
-    assert.strictEqual(count, 0)
+    const prs = await sandbox.test_getOpenPRs('own5', 'rep5', 'token\r\nEvil: header')
+    assert.strictEqual(prs.length, 0)
+  })
+})
+
+describe('taskHasOpenPR', () => {
+  it('should match when PR title contains task title', () => {
+    const { sandbox } = setupEnvironment()
+    const task = { title: 'Fix ReDoS vulnerability' }
+    const prs = [{ title: '[SECURITY] Fix ReDoS vulnerability', branch: 'fix/redos-123' }]
+    assert.strictEqual(sandbox.test_taskHasOpenPR(task, prs), true)
+  })
+
+  it('should match when task title contains PR title', () => {
+    const { sandbox } = setupEnvironment()
+    const task = { title: 'Unused return value from loadAllTasks' }
+    const prs = [{ title: 'Unused return value from loadAllTasks', branch: 'fix-unused-123' }]
+    assert.strictEqual(sandbox.test_taskHasOpenPR(task, prs), true)
+  })
+
+  it('should not match unrelated PR titles', () => {
+    const { sandbox } = setupEnvironment()
+    const task = { title: 'Fix SQL injection' }
+    const prs = [
+      { title: 'Add unit tests', branch: 'test/unit' },
+      { title: 'Update README', branch: 'docs/readme' }
+    ]
+    assert.strictEqual(sandbox.test_taskHasOpenPR(task, prs), false)
+  })
+
+  it('should return false for empty PR list', () => {
+    const { sandbox } = setupEnvironment()
+    assert.strictEqual(sandbox.test_taskHasOpenPR({ title: 'Any task' }, []), false)
+  })
+
+  it('should return false for untitled tasks', () => {
+    const { sandbox } = setupEnvironment()
+    const prs = [{ title: 'Some PR', branch: 'branch' }]
+    assert.strictEqual(sandbox.test_taskHasOpenPR({ title: '(untitled)' }, prs), false)
+    assert.strictEqual(sandbox.test_taskHasOpenPR({ title: '' }, prs), false)
+  })
+
+  it('should be case-insensitive', () => {
+    const { sandbox } = setupEnvironment()
+    const task = { title: 'fix REDOS Vulnerability' }
+    const prs = [{ title: '[Security] Fix ReDoS vulnerability', branch: 'fix-123' }]
+    assert.strictEqual(sandbox.test_taskHasOpenPR(task, prs), true)
   })
 })
 
