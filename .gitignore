@@ -24,3 +24,6 @@ JULES.md
 # Environment
 .env
 .env.*
+
+# Test results
+test-results/
