@@ -64,7 +64,8 @@ function setupEnvironment(initialStorage = {}) {
     URLSearchParams,
     Promise,
     console,
-    parseInt
+    parseInt,
+    URL
   }
 
   vm.createContext(sandbox)
