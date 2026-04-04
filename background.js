@@ -475,25 +475,29 @@ async function processSuggestionsForTab(tab, options) {
 
   addLog(`[${label}] Found ${repos.length} repos: ${repos.join(', ')}`)
 
+  addLog(`\n[${label}] Fetching suggestions for ${repos.length} repos concurrently...`)
+  const suggestionFetches = repos.map((repo) =>
+    listSuggestions(repo, config)
+      .then((suggestions) => ({ repo, suggestions }))
+      .catch((e) => ({ repo, error: e.message }))
+  )
+  const allSuggestions = await Promise.all(suggestionFetches)
+
   let totalStarted = 0
-  for (const repo of repos) {
+  for (const { repo, suggestions, error } of allSuggestions) {
     if (state.status === 'cancelled') break
 
-    addLog(`\n[${label}] Fetching suggestions for ${repo}...`)
-    let suggestions
-    try {
-      suggestions = await listSuggestions(repo, config)
-    } catch (e) {
-      addLog(`  ERROR listing suggestions: ${e.message}`)
+    if (error) {
+      addLog(`\n[${label}] ERROR fetching suggestions for ${repo}: ${error}`)
       continue
     }
 
     if (suggestions.length === 0) {
-      addLog('  No suggestions found')
+      addLog(`\n[${label}] ${repo}: No suggestions found`)
       continue
     }
 
-    addLog(`  Found ${suggestions.length} suggestions`)
+    addLog(`\n[${label}] ${repo}: Found ${suggestions.length} suggestions`)
     updateState({ currentRepo: repo.replace(/^github\//, '') })
 
     for (const s of suggestions) {
