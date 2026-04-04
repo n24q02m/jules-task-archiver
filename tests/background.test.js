@@ -87,6 +87,7 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_TASK = TASK;
     globalThis.test_ARCHIVABLE_STATES = ARCHIVABLE_STATES;
     globalThis.test_JULES_ORIGIN = JULES_ORIGIN;
+    globalThis.test_getJulesTabs = getJulesTabs;
     globalThis.test_extractAccountNum = extractAccountNum;
     globalThis.test_getTabLabel = getTabLabel;
     globalThis.test_getOpenPRs = getOpenPRs;
@@ -730,5 +731,71 @@ describe('state management', () => {
     sandbox.test_updateState({ status: 'done', currentTab: 'u/0' })
     assert.strictEqual(sandbox.test_state().status, 'done')
     assert.strictEqual(sessionSetData.length, 1)
+  })
+})
+
+// =============================================================================
+// Tab Label Parsing & Management Tests
+// =============================================================================
+
+describe('extractAccountNum', () => {
+  it('should extract account number from /u/X/ format', () => {
+    const { sandbox } = setupEnvironment()
+    assert.strictEqual(sandbox.test_extractAccountNum('https://jules.google.com/u/1/session'), '1')
+    assert.strictEqual(sandbox.test_extractAccountNum('https://jules.google.com/u/123/tasks'), '123')
+  })
+
+  it('should return "0" for URLs without /u/X/ segment', () => {
+    const { sandbox } = setupEnvironment()
+    assert.strictEqual(sandbox.test_extractAccountNum('https://jules.google.com/tasks'), '0')
+    assert.strictEqual(sandbox.test_extractAccountNum('https://google.com'), '0')
+    assert.strictEqual(sandbox.test_extractAccountNum(''), '0')
+  })
+})
+
+describe('getTabLabel', () => {
+  it('should return "default" for account 0', () => {
+    const { sandbox } = setupEnvironment()
+    assert.strictEqual(sandbox.test_getTabLabel({ url: 'https://jules.google.com/u/0/session' }), 'default')
+    assert.strictEqual(sandbox.test_getTabLabel({ url: 'https://jules.google.com/tasks' }), 'default')
+  })
+
+  it('should return "u/X" for other account numbers', () => {
+    const { sandbox } = setupEnvironment()
+    assert.strictEqual(sandbox.test_getTabLabel({ url: 'https://jules.google.com/u/1/session' }), 'u/1')
+    assert.strictEqual(sandbox.test_getTabLabel({ url: 'https://jules.google.com/u/42/tasks' }), 'u/42')
+  })
+})
+
+describe('getJulesTabs', () => {
+  it('should filter out accounts.google tabs and sort by account number', async () => {
+    const { sandbox } = setupEnvironment()
+    const mockTabs = [
+      { id: 1, url: 'https://jules.google.com/u/2/session' },
+      { id: 2, url: 'https://jules.google.com/u/0/session' },
+      { id: 3, url: 'https://accounts.google.com/ServiceLogin' },
+      { id: 4, url: 'https://jules.google.com/u/1/session' }
+    ]
+    sandbox.chrome.tabs.query = async () => mockTabs
+
+    const tabs = await sandbox.test_getJulesTabs()
+    assert.strictEqual(tabs.length, 3)
+    assert.strictEqual(sandbox.test_extractAccountNum(tabs[0].url), '0')
+    assert.strictEqual(sandbox.test_extractAccountNum(tabs[1].url), '1')
+    assert.strictEqual(sandbox.test_extractAccountNum(tabs[2].url), '2')
+  })
+
+  it('should handle tabs without account segments correctly (as 0)', async () => {
+    const { sandbox } = setupEnvironment()
+    const mockTabs = [
+      { id: 1, url: 'https://jules.google.com/u/1/session' },
+      { id: 2, url: 'https://jules.google.com/tasks' }
+    ]
+    sandbox.chrome.tabs.query = async () => mockTabs
+
+    const tabs = await sandbox.test_getJulesTabs()
+    assert.strictEqual(tabs.length, 2)
+    assert.strictEqual(sandbox.test_extractAccountNum(tabs[0].url), '0')
+    assert.strictEqual(sandbox.test_extractAccountNum(tabs[1].url), '1')
   })
 })
