@@ -1,0 +1,4 @@
+## 2026-04-04 - Unhandled Exceptions as DoS Vectors in Service Workers
+**Vulnerability:** The `extractAccountNum(url)` function in `background.js` used the native `URL` API to parse URLs without wrapping it in a try/catch block. If an invalid URL was provided (e.g. `""` from an uninitialized tab), it would throw `TypeError: ERR_INVALID_URL`.
+**Learning:** In Chrome Extension service workers, unhandled exceptions can crash the worker or prematurely terminate background processes, leading to Denial of Service for the extension's core functionalities.
+**Prevention:** Always wrap parsing logic, especially native APIs like `URL`, `JSON.parse`, and `decodeURIComponent`, in try/catch blocks. Fail securely by providing safe fallback values that allow the rest of the execution to continue without exposing stack traces or crashing the host process.
