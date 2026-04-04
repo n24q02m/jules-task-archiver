@@ -51,7 +51,7 @@ describe('content.js config extraction logic', () => {
 
   it('should parse account number from URL paths', () => {
     function getAccountNum(url) {
-      const m = url.match(/\/u\/(\d+)/)
+      const m = new URL(url).pathname.match(/\/u\/(\d+)/)
       return m ? m[1] : '0'
     }
 

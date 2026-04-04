@@ -51,7 +51,7 @@ function extractConfig() {
 const ACCOUNT_RE = /\/u\/(\d+)/
 
 function getAccountNum() {
-  const m = location.href.match(ACCOUNT_RE)
+  const m = new URL(location.href).pathname.match(ACCOUNT_RE)
   return m ? m[1] : '0'
 }
 
