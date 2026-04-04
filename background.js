@@ -12,9 +12,13 @@
 const JULES_ORIGIN = 'https://jules.google.com'
 
 function extractAccountNum(url) {
-  const parts = new URL(url).pathname.split('/')
-  const uIdx = parts.indexOf('u')
-  return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  try {
+    const parts = new URL(url).pathname.split('/')
+    const uIdx = parts.indexOf('u')
+    return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  } catch (_e) {
+    return '0'
+  }
 }
 
 // =============================================================================
@@ -158,13 +162,23 @@ function findJsonEnd(str) {
 }
 
 function parseResponse(text, rpcId) {
-  // Strip XSS protection prefix: )]}'
-  const cleaned = text.replace(/^\)\]\}'\s*/, '')
+  // ⚡ Bolt Optimization: Avoid running a regex replace over the entire multi-megabyte
+  // response string just to strip a short prefix. This avoids a massive V8 string allocation.
+  let startIdx = 0
+  if (text.startsWith(")]}'")) {
+    startIdx = 4
+  }
+
+  // Skip whitespace after the prefix
+  while (startIdx < text.length && text.charCodeAt(startIdx) <= 32) {
+    startIdx++
+  }
 
   // Skip byte-length line
-  const firstNewline = cleaned.indexOf('\n')
+  const firstNewline = text.indexOf('\n', startIdx)
   if (firstNewline === -1) throw new Error('Invalid batchexecute response')
-  const data = cleaned.substring(firstNewline + 1)
+
+  const data = text.substring(firstNewline + 1)
 
   // Find valid JSON boundary
   const jsonEnd = findJsonEnd(data)
