@@ -12,9 +12,13 @@
 const JULES_ORIGIN = 'https://jules.google.com'
 
 function extractAccountNum(url) {
-  const parts = new URL(url).pathname.split('/')
-  const uIdx = parts.indexOf('u')
-  return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  try {
+    const parts = new URL(url).pathname.split('/')
+    const uIdx = parts.indexOf('u')
+    return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  } catch (_e) {
+    return '0'
+  }
 }
 
 // =============================================================================
@@ -126,12 +130,12 @@ function fixJsonControlChars(str) {
  * Find the end of the outermost JSON array using bracket balancing.
  * Handles control chars inside strings by skipping them.
  */
-function findJsonEnd(str) {
+function findJsonEnd(str, startIndex = 0) {
   let depth = 0
   let inStr = false
   let esc = false
 
-  for (let i = 0; i < str.length; i++) {
+  for (let i = startIndex; i < str.length; i++) {
     const ch = str[i]
 
     if (esc) {
@@ -158,19 +162,29 @@ function findJsonEnd(str) {
 }
 
 function parseResponse(text, rpcId) {
-  // Strip XSS protection prefix: )]}'
-  const cleaned = text.replace(/^\)\]\}'\s*/, '')
+  // ⚡ Bolt Optimization: Compute payload start index dynamically instead of using regex .replace()
+  // and multiple .substring() calls. This avoids creating large string copies in memory.
+  let startIdx = 0
+  if (text.startsWith(")]}'")) {
+    startIdx = 4
+  }
+
+  // Skip whitespace
+  while (startIdx < text.length && text.charCodeAt(startIdx) <= 32) {
+    startIdx++
+  }
 
   // Skip byte-length line
-  const firstNewline = cleaned.indexOf('\n')
+  const firstNewline = text.indexOf('\n', startIdx)
   if (firstNewline === -1) throw new Error('Invalid batchexecute response')
-  const data = cleaned.substring(firstNewline + 1)
+
+  const dataStart = firstNewline + 1
 
   // Find valid JSON boundary
-  const jsonEnd = findJsonEnd(data)
+  const jsonEnd = findJsonEnd(text, dataStart)
   if (jsonEnd === -1) throw new Error('Could not find JSON boundary in response')
 
-  const jsonStr = data.substring(0, jsonEnd)
+  const jsonStr = text.substring(dataStart, jsonEnd)
   const fixed = fixJsonControlChars(jsonStr)
   const outer = JSON.parse(fixed)
 
