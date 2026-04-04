@@ -1,0 +1,3 @@
+## 2025-04-03 - Avoid `String.prototype.replace()` on massive JSON payload strings
+**Learning:** In V8, performing `String.prototype.replace()` with a global regular expression or on the prefix of a very large string (like multi-megabyte `batchexecute` JSON responses) can cause significant string allocation and CPU overhead.
+**Action:** Instead of `text.replace(/^\)\]\}'\s*/, '')` to strip an XSS protection prefix from a batched JSON response, use string character access/iteration (`charCodeAt`, `indexOf`, etc.) to find the boundary of the prefix and whitespace, then slice the string exactly once.
