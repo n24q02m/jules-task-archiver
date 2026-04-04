@@ -17,8 +17,8 @@
         <input type="text" id="ghOwner" placeholder="your-github-username" />
       </label>
       <label for="ghToken">
-        GitHub Token <span class="hint">(optional, for private repos)</span>
-        <input type="password" id="ghToken" placeholder="ghp_..." />
+        GitHub Token <span class="hint" id="ghTokenHint">(optional, for private repos)</span>
+        <input type="password" id="ghToken" placeholder="ghp_..." aria-describedby="ghTokenHint" />
       </label>
     </section>
 
@@ -35,7 +35,7 @@
         <label><input type="radio" name="mode" value="dry" checked /> Dry Run</label>
         <label><input type="radio" name="mode" value="run" /> Run</label>
       </div>
-      <label class="checkbox">
+      <label class="checkbox" for="force">
         <input type="checkbox" id="force" />
         Force (skip PR check)
       </label>
