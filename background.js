@@ -542,16 +542,22 @@ async function getOpenPRs(owner, repo, token) {
   if (prCache.has(key)) return prCache.get(key)
 
   try {
-    const safeOwner = encodeURIComponent(owner)
-    const safeRepo = encodeURIComponent(repo)
-    const url = `https://api.github.com/repos/${safeOwner}/${safeRepo}/pulls?state=open&per_page=100`
+    if (typeof owner !== 'string' || typeof repo !== 'string') {
+      throw new Error('Owner and repo must be strings')
+    }
+
+    const url = new URL(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls`)
+    url.searchParams.set('state', 'open')
+    url.searchParams.set('per_page', '100')
+
     const headers = { Accept: 'application/vnd.github+json' }
     if (token) {
+      if (typeof token !== 'string') throw new Error('Token must be a string')
       if (/[\r\n]/.test(token)) throw new Error('Invalid token: contains newline')
       headers.Authorization = `token ${token}`
     }
 
-    const res = await fetch(url, { headers })
+    const res = await fetch(url.toString(), { headers })
     if (!res.ok) {
       addLog(`  WARNING: GitHub API ${res.status} for ${key}, assuming 0`)
       prCache.set(key, [])
