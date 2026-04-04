@@ -64,9 +64,9 @@ function setupEnvironment(initialStorage = {}) {
     URLSearchParams,
     Promise,
     console,
-    parseInt
+    parseInt,
+    URL
   }
-
   vm.createContext(sandbox)
 
   const scriptContent =
@@ -85,9 +85,11 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_TASK = TASK;
     globalThis.test_ARCHIVABLE_STATES = ARCHIVABLE_STATES;
     globalThis.test_JULES_ORIGIN = JULES_ORIGIN;
+    globalThis.test_getJulesTabs = getJulesTabs;
     globalThis.test_extractAccountNum = extractAccountNum;
     globalThis.test_getTabLabel = getTabLabel;
     globalThis.test_getOpenPRs = getOpenPRs;
+    globalThis.test_prCache = prCache;
     globalThis.test_taskHasOpenPR = taskHasOpenPR;
     globalThis.test_parseSuggestion = parseSuggestion;
     globalThis.test_buildSuggestionPrompt = buildSuggestionPrompt;
@@ -372,6 +374,38 @@ describe('getOpenPRs', () => {
     sandbox.fetch = async () => ({ ok: true, json: async () => [] })
     const prs = await sandbox.test_getOpenPRs('own5', 'rep5', 'token\r\nEvil: header')
     assert.strictEqual(prs.length, 0)
+  })
+
+  it('should use Authorization header when token is provided', async () => {
+    const { sandbox } = setupEnvironment()
+    let capturedHeaders = {}
+    sandbox.fetch = async (_url, options) => {
+      capturedHeaders = options.headers
+      return { ok: true, json: async () => [] }
+    }
+    await sandbox.test_getOpenPRs('own', 'rep', 'secret-token')
+    assert.strictEqual(capturedHeaders.Authorization, 'token secret-token')
+  })
+
+  it('should handle prCache correctly (integration check)', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.fetch = async () => ({
+      ok: true,
+      json: async () => [{ title: 'PR', head: { ref: 'b' } }]
+    })
+
+    // Clear cache first just in case
+    sandbox.test_prCache.clear()
+
+    const key = 'own/rep'
+    assert.strictEqual(sandbox.test_prCache.has(key), false)
+
+    await sandbox.test_getOpenPRs('own', 'rep', null)
+
+    assert.strictEqual(sandbox.test_prCache.has(key), true)
+    const cached = sandbox.test_prCache.get(key)
+    assert.strictEqual(cached.length, 1)
+    assert.strictEqual(cached[0].title, 'PR')
   })
 })
 
@@ -695,5 +729,71 @@ describe('state management', () => {
     sandbox.test_updateState({ status: 'done', currentTab: 'u/0' })
     assert.strictEqual(sandbox.test_state().status, 'done')
     assert.strictEqual(sessionSetData.length, 1)
+  })
+})
+
+// =============================================================================
+// Tab Label Parsing & Management Tests
+// =============================================================================
+
+describe('extractAccountNum', () => {
+  it('should extract account number from /u/X/ format', () => {
+    const { sandbox } = setupEnvironment()
+    assert.strictEqual(sandbox.test_extractAccountNum('https://jules.google.com/u/1/session'), '1')
+    assert.strictEqual(sandbox.test_extractAccountNum('https://jules.google.com/u/123/tasks'), '123')
+  })
+
+  it('should return "0" for URLs without /u/X/ segment', () => {
+    const { sandbox } = setupEnvironment()
+    assert.strictEqual(sandbox.test_extractAccountNum('https://jules.google.com/tasks'), '0')
+    assert.strictEqual(sandbox.test_extractAccountNum('https://google.com'), '0')
+    assert.strictEqual(sandbox.test_extractAccountNum(''), '0')
+  })
+})
+
+describe('getTabLabel', () => {
+  it('should return "default" for account 0', () => {
+    const { sandbox } = setupEnvironment()
+    assert.strictEqual(sandbox.test_getTabLabel({ url: 'https://jules.google.com/u/0/session' }), 'default')
+    assert.strictEqual(sandbox.test_getTabLabel({ url: 'https://jules.google.com/tasks' }), 'default')
+  })
+
+  it('should return "u/X" for other account numbers', () => {
+    const { sandbox } = setupEnvironment()
+    assert.strictEqual(sandbox.test_getTabLabel({ url: 'https://jules.google.com/u/1/session' }), 'u/1')
+    assert.strictEqual(sandbox.test_getTabLabel({ url: 'https://jules.google.com/u/42/tasks' }), 'u/42')
+  })
+})
+
+describe('getJulesTabs', () => {
+  it('should filter out accounts.google tabs and sort by account number', async () => {
+    const { sandbox } = setupEnvironment()
+    const mockTabs = [
+      { id: 1, url: 'https://jules.google.com/u/2/session' },
+      { id: 2, url: 'https://jules.google.com/u/0/session' },
+      { id: 3, url: 'https://accounts.google.com/ServiceLogin' },
+      { id: 4, url: 'https://jules.google.com/u/1/session' }
+    ]
+    sandbox.chrome.tabs.query = async () => mockTabs
+
+    const tabs = await sandbox.test_getJulesTabs()
+    assert.strictEqual(tabs.length, 3)
+    assert.strictEqual(sandbox.test_extractAccountNum(tabs[0].url), '0')
+    assert.strictEqual(sandbox.test_extractAccountNum(tabs[1].url), '1')
+    assert.strictEqual(sandbox.test_extractAccountNum(tabs[2].url), '2')
+  })
+
+  it('should handle tabs without account segments correctly (as 0)', async () => {
+    const { sandbox } = setupEnvironment()
+    const mockTabs = [
+      { id: 1, url: 'https://jules.google.com/u/1/session' },
+      { id: 2, url: 'https://jules.google.com/tasks' }
+    ]
+    sandbox.chrome.tabs.query = async () => mockTabs
+
+    const tabs = await sandbox.test_getJulesTabs()
+    assert.strictEqual(tabs.length, 2)
+    assert.strictEqual(sandbox.test_extractAccountNum(tabs[0].url), '0')
+    assert.strictEqual(sandbox.test_extractAccountNum(tabs[1].url), '1')
   })
 })
