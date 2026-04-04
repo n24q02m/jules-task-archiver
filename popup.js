@@ -30,6 +30,18 @@ function setActiveOpMode(value) {
     b.setAttribute('aria-pressed', String(isActive))
   })
   opMode = value
+
+  // Progressive disclosure: hide archive-specific settings
+  const isArchive = value === 'archive'
+  const settingsSection = document.querySelector('.settings')
+  const forceCheckboxContainer = forceCheckbox.parentElement
+
+  if (settingsSection) {
+    settingsSection.style.display = isArchive ? 'block' : 'none'
+  }
+  if (forceCheckboxContainer) {
+    forceCheckboxContainer.style.display = isArchive ? 'flex' : 'none'
+  }
 }
 
 document.querySelectorAll('#opMode button').forEach((btn) => {

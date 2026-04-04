@@ -1,0 +1,71 @@
+<<<<<<< SEARCH
+async function ensureContentScript(tabId) {
+  const tab = await chrome.tabs.get(tabId)
+  if (!tab.url?.startsWith(`${JULES_ORIGIN}/`)) {
+    throw new Error('Security Error: Cannot inject script into non-Jules tab')
+  }
+
+  try {
+    await chrome.tabs.sendMessage(tabId, { action: 'PING' })
+  } catch {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ['content.js']
+    })
+    const deadline = Date.now() + 3000
+    while (Date.now() < deadline) {
+      try {
+        await new Promise((r) => setTimeout(r, 100))
+        await chrome.tabs.sendMessage(tabId, { action: 'PING' })
+        return
+      } catch {
+        // Keep waiting
+      }
+    }
+    throw new Error('Content script failed to initialize within 3s')
+  }
+}
+=======
+async function ensureContentScript(tabId) {
+  const checkOrigin = async () => {
+    const tab = await chrome.tabs.get(tabId)
+    if (!tab.url) return false
+    try {
+      const url = new URL(tab.url)
+      return url.origin === JULES_ORIGIN
+    } catch {
+      return false
+    }
+  }
+
+  if (!(await checkOrigin())) {
+    throw new Error('Security Error: Cannot inject script into non-Jules tab')
+  }
+
+  try {
+    await chrome.tabs.sendMessage(tabId, { action: 'PING' })
+  } catch {
+    // Re-verify immediately before injection to prevent TOCTOU
+    if (!(await checkOrigin())) {
+      throw new Error('Security Error: Cannot inject script into non-Jules tab')
+    }
+
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ['content.js']
+    })
+
+    const deadline = Date.now() + 3000
+    while (Date.now() < deadline) {
+      try {
+        await new Promise((r) => setTimeout(r, 100))
+        await chrome.tabs.sendMessage(tabId, { action: 'PING' })
+        return
+      } catch {
+        // Keep waiting
+      }
+    }
+    throw new Error('Content script failed to initialize within 3s')
+  }
+}
+>>>>>>> REPLACE
