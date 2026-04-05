@@ -12,9 +12,14 @@
 const JULES_ORIGIN = 'https://jules.google.com'
 
 function extractAccountNum(url) {
-  const parts = new URL(url).pathname.split('/')
-  const uIdx = parts.indexOf('u')
-  return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  if (!url) return '0'
+  try {
+    const parts = new URL(url).pathname.split('/')
+    const uIdx = parts.indexOf('u')
+    return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  } catch {
+    return '0'
+  }
 }
 
 // =============================================================================
@@ -538,12 +543,24 @@ async function processSuggestionsForTab(tab, options) {
 const prCache = new Map()
 
 async function getOpenPRs(owner, repo, token) {
-  const key = `${owner}/${repo}`
+  // 🛡️ Sentinel: Use a delimited key to prevent cache collision/poisoning (e.g., a/bc vs ab/c)
+  const key = `owner:${owner}|repo:${repo}`
   if (prCache.has(key)) return prCache.get(key)
 
   try {
     if (typeof owner !== 'string' || typeof repo !== 'string') {
       throw new Error('Owner and repo must be strings')
+    }
+
+    // 🛡️ Sentinel: Stricter validation for owner/repo to prevent path traversal
+    // encodeURIComponent("..") is still "..", so we must explicitly block it.
+    // GitHub handles are alphanumeric plus hyphens (and sometimes dots/underscores).
+    const slugRegex = /^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$/i
+    if (!slugRegex.test(owner) || !slugRegex.test(repo)) {
+      throw new Error(`Invalid owner or repo format: ${owner}/${repo}`)
+    }
+    if (owner === '.' || owner === '..' || repo === '.' || repo === '..') {
+      throw new Error('Reserved name used as owner or repo')
     }
 
     const url = new URL(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls`)
@@ -553,8 +570,13 @@ async function getOpenPRs(owner, repo, token) {
     const headers = { Accept: 'application/vnd.github+json' }
     if (token) {
       if (typeof token !== 'string') throw new Error('Token must be a string')
-      if (/[\r\n]/.test(token)) throw new Error('Invalid token: contains newline')
-      headers.Authorization = `token ${token}`
+      // 🛡️ Sentinel: Enhanced token validation (CRLF + basic format)
+      // GitHub tokens are typically alphanumeric with some symbols (ghp_, github_pat_, etc.)
+      if (/[\r\n\t]/.test(token)) throw new Error('Invalid token: contains control characters')
+      if (token.length > 255) throw new Error('Invalid token: too long')
+
+      // 🛡️ Sentinel: Use 'Bearer' prefix (modern GitHub API standard)
+      headers.Authorization = `Bearer ${token}`
     }
 
     const res = await fetch(url.toString(), { headers })
