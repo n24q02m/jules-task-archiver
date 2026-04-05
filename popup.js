@@ -58,18 +58,20 @@ chrome.storage.sync.get(['ghOwner', 'opMode', 'ghToken'], (syncData) => {
     setActiveOpMode(syncData.opMode)
   }
 
-  // Cleanup legacy insecure storage of token in sync
+  // Migrate legacy insecure storage of token in sync to local
   if (syncData.ghToken) {
     chrome.storage.local.set({ ghToken: syncData.ghToken }, () => {
       chrome.storage.sync.remove('ghToken')
     })
     ghTokenInput.value = syncData.ghToken
+  } else {
+    // Only load from local if not found in sync (migration case)
+    chrome.storage.local.get(['ghToken'], (localData) => {
+      if (localData.ghToken) ghTokenInput.value = localData.ghToken
+    })
   }
-
-  chrome.storage.local.get(['ghToken'], (localData) => {
-    if (localData.ghToken) ghTokenInput.value = localData.ghToken
-  })
 })
+
 // --- Save settings on change ---
 ghOwnerInput.addEventListener('change', () => {
   chrome.storage.sync.set({ ghOwner: ghOwnerInput.value.trim() })
@@ -80,15 +82,13 @@ ghTokenInput.addEventListener('change', () => {
 
 // --- Start operation ---
 startBtn.addEventListener('click', async () => {
-  // Save settings first, ensuring token is only in local storage
+  // Save settings first, ensuring token is ONLY in local storage
   chrome.storage.sync.set({
     ghOwner: ghOwnerInput.value.trim()
   })
-  chrome.storage.sync.remove('ghToken')
   chrome.storage.local.set({
     ghToken: ghTokenInput.value.trim()
   })
-
   const mode = document.querySelector('input[name="mode"]:checked').value
   const scope = document.querySelector('input[name="scope"]:checked').value
 
