@@ -1,6 +1,6 @@
 {
   "name": "jules-task-archiver-tests",
-  "version": "2.1.1",
+  "version": "1.0.0",
   "description": "Tests for Jules Task Archiver",
   "main": "background.js",
   "scripts": {
