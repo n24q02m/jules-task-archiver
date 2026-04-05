@@ -798,3 +798,44 @@ describe('getJulesTabs', () => {
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[1].url), '1')
   })
 })
+
+describe('extractAccountNum (additional edge cases)', () => {
+  it('should return "0" for URLs with "u" but no account segment', () => {
+    const { sandbox } = setupEnvironment()
+    assert.strictEqual(sandbox.test_extractAccountNum('https://jules.google.com/u/'), '0')
+    assert.strictEqual(sandbox.test_extractAccountNum('https://jules.google.com/u'), '0')
+  })
+
+  it('should return "0" for non-string inputs', () => {
+    const { sandbox } = setupEnvironment()
+    assert.strictEqual(sandbox.test_extractAccountNum(null), '0')
+    assert.strictEqual(sandbox.test_extractAccountNum(undefined), '0')
+    assert.strictEqual(sandbox.test_extractAccountNum(123), '0')
+    assert.strictEqual(sandbox.test_extractAccountNum({}), '0')
+  })
+
+  it('should handle multiple "u" segments by picking the first one followed by a value', () => {
+    const { sandbox } = setupEnvironment()
+    // In "/a/u/b/u/1", it should find the first "u".
+    // parts = ["", "a", "u", "b", "u", "1"]
+    // uIdx = 2, parts[3] = "b"
+    assert.strictEqual(sandbox.test_extractAccountNum('https://jules.google.com/a/u/b/u/1'), 'b')
+  })
+})
+
+describe('getTabLabel (additional edge cases)', () => {
+  it('should return "default" when tab.url is missing or invalid', () => {
+    const { sandbox } = setupEnvironment()
+    assert.strictEqual(sandbox.test_getTabLabel({}), 'default')
+    assert.strictEqual(sandbox.test_getTabLabel({ url: null }), 'default')
+    assert.strictEqual(sandbox.test_getTabLabel({ url: 'not-a-url' }), 'default')
+  })
+
+  it('should handle very large account numbers', () => {
+    const { sandbox } = setupEnvironment()
+    assert.strictEqual(
+      sandbox.test_getTabLabel({ url: 'https://jules.google.com/u/9999999999/session' }),
+      'u/9999999999'
+    )
+  })
+})
