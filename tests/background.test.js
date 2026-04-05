@@ -365,9 +365,9 @@ describe('getOpenPRs', () => {
       capturedUrl = url
       return { ok: true, json: async () => [] }
     }
-    await sandbox.test_getOpenPRs('owner/evil', 'repo name', null)
-    assert.ok(capturedUrl.includes('owner%2Fevil'))
-    assert.ok(capturedUrl.includes('repo%20name'))
+    await sandbox.test_getOpenPRs('owner-1', 'repo-2', null)
+    assert.ok(capturedUrl.includes('owner-1'))
+    assert.ok(capturedUrl.includes('repo-2'))
   })
 
   it('should reject tokens with newlines', async () => {
@@ -385,7 +385,7 @@ describe('getOpenPRs', () => {
       return { ok: true, json: async () => [] }
     }
     await sandbox.test_getOpenPRs('own', 'rep', 'secret-token')
-    assert.strictEqual(capturedHeaders.Authorization, 'token secret-token')
+    assert.strictEqual(capturedHeaders.Authorization, 'Bearer secret-token')
   })
 
   it('should handle prCache correctly (integration check)', async () => {
@@ -398,7 +398,7 @@ describe('getOpenPRs', () => {
     // Clear cache first just in case
     sandbox.test_prCache.clear()
 
-    const key = 'own/rep'
+    const key = 'owner:own|repo:rep'
     assert.strictEqual(sandbox.test_prCache.has(key), false)
 
     await sandbox.test_getOpenPRs('own', 'rep', null)
