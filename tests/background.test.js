@@ -341,12 +341,13 @@ describe('getOpenPRs', () => {
     const second = await sandbox.test_getOpenPRs('cacheOwner', 'cacheRepo', null)
     assert.strictEqual(second.length, 1)
   })
-
   it('should return empty array on HTTP error', async () => {
     const { sandbox } = setupEnvironment()
     sandbox.fetch = async () => ({ ok: false, status: 404 })
     const prs = await sandbox.test_getOpenPRs('err1', 'err1', null)
     assert.strictEqual(prs.length, 0)
+    const logs = sandbox.test_state().log
+    assert.ok(logs.some((l) => l.includes('WARNING: GitHub API 404 for err1/err1')))
   })
 
   it('should return empty array on network error', async () => {
@@ -356,8 +357,9 @@ describe('getOpenPRs', () => {
     }
     const prs = await sandbox.test_getOpenPRs('err2', 'err2', null)
     assert.strictEqual(prs.length, 0)
+    const logs = sandbox.test_state().log
+    assert.ok(logs.some((l) => l.includes('WARNING: Could not check PRs for err2/err2: network error')))
   })
-
   it('should encode owner and repo in URL', async () => {
     const { sandbox } = setupEnvironment()
     let capturedUrl = ''
