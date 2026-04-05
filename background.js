@@ -10,11 +10,15 @@
 // =============================================================================
 
 const JULES_ORIGIN = 'https://jules.google.com'
-
 function extractAccountNum(url) {
-  const parts = new URL(url).pathname.split('/')
-  const uIdx = parts.indexOf('u')
-  return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  if (!url) return '0'
+  try {
+    const parts = new URL(url).pathname.split('/')
+    const uIdx = parts.indexOf('u')
+    return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  } catch {
+    return '0'
+  }
 }
 
 // =============================================================================
@@ -659,6 +663,28 @@ function getTabLabel(tab) {
   return num !== '0' ? `u/${num}` : 'default'
 }
 
+/**
+ * Send message to content script with retry and auto-injection.
+ */
+async function sendToTab(tabId, message, retries = 3) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await chrome.tabs.sendMessage(tabId, message)
+    } catch (e) {
+      if (i === 0) {
+        try {
+          await ensureContentScript(tabId)
+          return await chrome.tabs.sendMessage(tabId, message)
+        } catch (err) {
+          if (err.message.includes('Security Error')) throw err
+        }
+      }
+      if (i === retries - 1) throw e
+      await new Promise((r) => setTimeout(r, 100 * (i + 1)))
+    }
+  }
+}
+
 async function ensureContentScript(tabId) {
   const checkOrigin = async () => {
     const tab = await chrome.tabs.get(tabId)
@@ -703,8 +729,7 @@ async function ensureContentScript(tabId) {
 }
 
 async function getTabConfig(tabId) {
-  await ensureContentScript(tabId)
-  const response = await chrome.tabs.sendMessage(tabId, { action: 'GET_CONFIG' })
+  const response = await sendToTab(tabId, { action: 'GET_CONFIG' })
   if (!response?.config?.at) {
     throw new Error('Could not extract page config (XSRF token missing). Try refreshing the Jules tab.')
   }
