@@ -10,11 +10,16 @@
 // =============================================================================
 
 const JULES_ORIGIN = 'https://jules.google.com'
+const JULES_URL_PATTERN = `${JULES_ORIGIN}/*`
 
 function extractAccountNum(url) {
-  const parts = new URL(url).pathname.split('/')
-  const uIdx = parts.indexOf('u')
-  return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  try {
+    const parts = new URL(url).pathname.split('/')
+    const uIdx = parts.indexOf('u')
+    return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  } catch {
+    return '0'
+  }
 }
 
 // =============================================================================
@@ -644,7 +649,7 @@ function stopKeepAlive() {
 // =============================================================================
 
 async function getJulesTabs() {
-  const tabs = await chrome.tabs.query({ url: `${JULES_ORIGIN}/*` })
+  const tabs = await chrome.tabs.query({ url: JULES_URL_PATTERN })
   return tabs
     .filter((t) => !t.url.includes('accounts.google'))
     .sort((a, b) => {
