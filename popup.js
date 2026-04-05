@@ -19,57 +19,22 @@ const progressFill = $('#progressFill')
 const logPre = $('#log')
 const summaryDiv = $('#summary')
 
-// --- Operation mode state ---
-let opMode = 'archive'
-
-// --- Operation mode selector ---
-function setActiveOpMode(value) {
-  document.querySelectorAll('#opMode button').forEach((b) => {
-    const isActive = b.dataset.value === value
-    b.classList.toggle('active', isActive)
-    b.setAttribute('aria-pressed', String(isActive))
-  })
-  opMode = value
-
-  // Progressive disclosure: hide archive-specific settings
-  const isArchive = value === 'archive'
-  const settingsSection = document.querySelector('.settings')
-  const forceCheckboxContainer = forceCheckbox.parentElement
-
-  if (settingsSection) {
-    settingsSection.style.display = isArchive ? 'block' : 'none'
-  }
-  if (forceCheckboxContainer) {
-    forceCheckboxContainer.style.display = isArchive ? 'flex' : 'none'
-  }
-}
-
-document.querySelectorAll('#opMode button').forEach((btn) => {
-  btn.addEventListener('click', () => {
-    setActiveOpMode(btn.dataset.value)
-    chrome.storage.sync.set({ opMode })
-  })
-})
-
-// --- Load saved settings & cleanup insecure storage ---
-chrome.storage.sync.get(['ghOwner', 'opMode', 'ghToken'], (syncData) => {
+// --- Load saved settings ---
+chrome.storage.sync.get(['ghOwner', 'ghToken'], (syncData) => {
   if (syncData.ghOwner) ghOwnerInput.value = syncData.ghOwner
-  if (syncData.opMode) {
-    setActiveOpMode(syncData.opMode)
-  }
-
-  // Cleanup legacy insecure storage of token in sync
-  if (syncData.ghToken) {
-    chrome.storage.local.set({ ghToken: syncData.ghToken }, () => {
-      chrome.storage.sync.remove('ghToken')
-    })
-    ghTokenInput.value = syncData.ghToken
-  }
 
   chrome.storage.local.get(['ghToken'], (localData) => {
-    if (localData.ghToken) ghTokenInput.value = localData.ghToken
+    if (localData.ghToken) {
+      ghTokenInput.value = localData.ghToken
+      if (syncData.ghToken) chrome.storage.sync.remove('ghToken')
+    } else if (syncData.ghToken) {
+      ghTokenInput.value = syncData.ghToken
+      chrome.storage.local.set({ ghToken: syncData.ghToken })
+      chrome.storage.sync.remove('ghToken')
+    }
   })
 })
+
 // --- Save settings on change ---
 ghOwnerInput.addEventListener('change', () => {
   chrome.storage.sync.set({ ghOwner: ghOwnerInput.value.trim() })
@@ -78,13 +43,12 @@ ghTokenInput.addEventListener('change', () => {
   chrome.storage.local.set({ ghToken: ghTokenInput.value.trim() })
 })
 
-// --- Start operation ---
+// --- Start archive ---
 startBtn.addEventListener('click', async () => {
-  // Save settings first, ensuring token is only in local storage
+  // Save settings first
   chrome.storage.sync.set({
     ghOwner: ghOwnerInput.value.trim()
   })
-  chrome.storage.sync.remove('ghToken')
   chrome.storage.local.set({
     ghToken: ghTokenInput.value.trim()
   })
@@ -106,8 +70,7 @@ startBtn.addEventListener('click', async () => {
     dryRun: mode === 'dry',
     force: forceCheckbox.checked,
     scope,
-    activeTabId,
-    opMode
+    activeTabId
   }
 
   // Reset UI
@@ -160,7 +123,6 @@ function renderState(state) {
     if (state.progress?.total > 0) {
       const pct = Math.round(((state.progress.archived + state.progress.skipped) / state.progress.total) * 100)
       progressFill.style.width = `${pct}%`
-      progressFill.parentElement.setAttribute('aria-valuenow', String(pct))
       currentInfo.textContent += ` [${state.progress.archived + state.progress.skipped}/${state.progress.total}]`
     }
   }
@@ -171,7 +133,6 @@ function renderState(state) {
     startBtn.textContent = 'Start'
     resetBtn.style.display = 'block'
     progressFill.style.width = '100%'
-    progressFill.parentElement.setAttribute('aria-valuenow', '100')
 
     if (state.status === 'done') {
       currentInfo.textContent = 'Complete'
@@ -198,14 +159,14 @@ function renderSummary(results) {
       div.className = 'error'
       div.textContent = `${r.label}: ERROR - ${r.err}`
     } else {
-      div.textContent = `${r.label}: ${r.count} processed`
+      div.textContent = `${r.label}: ${r.count} archived`
     }
     summaryDiv.appendChild(div)
   }
 
   const totalDiv = document.createElement('div')
   totalDiv.className = 'total'
-  totalDiv.textContent = `TOTAL: ${grand} processed`
+  totalDiv.textContent = `TOTAL: ${grand} tasks archived`
   summaryDiv.appendChild(totalDiv)
 }
 
