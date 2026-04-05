@@ -11,10 +11,15 @@
 
 const JULES_ORIGIN = 'https://jules.google.com'
 
+const JULES_URL_PATTERN = `${JULES_ORIGIN}/*`
+const ACCOUNT_RE = /\/u\/(\d+)/
 function extractAccountNum(url) {
-  const parts = new URL(url).pathname.split('/')
-  const uIdx = parts.indexOf('u')
-  return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  try {
+    const match = url.match(ACCOUNT_RE)
+    return match ? match[1] : '0'
+  } catch {
+    return '0'
+  }
 }
 
 // =============================================================================
@@ -644,7 +649,7 @@ function stopKeepAlive() {
 // =============================================================================
 
 async function getJulesTabs() {
-  const tabs = await chrome.tabs.query({ url: `${JULES_ORIGIN}/*` })
+  const tabs = await chrome.tabs.query({ url: JULES_URL_PATTERN })
   return tabs
     .filter((t) => !t.url.includes('accounts.google'))
     .sort((a, b) => {
@@ -661,11 +666,9 @@ function getTabLabel(tab) {
 
 async function ensureContentScript(tabId) {
   const checkOrigin = async () => {
-    const tab = await chrome.tabs.get(tabId)
-    if (!tab.url) return false
     try {
-      const url = new URL(tab.url)
-      return url.origin === JULES_ORIGIN
+      const tab = await chrome.tabs.get(tabId)
+      return !!tab.url && new URL(tab.url).origin === JULES_ORIGIN
     } catch {
       return false
     }
