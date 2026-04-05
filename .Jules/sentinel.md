@@ -1,0 +1,4 @@
+## 2024-05-18 - Service Worker Denial of Service via Unhandled URL Parsing
+**Vulnerability:** A Denial of Service (DoS) vulnerability existed in `extractAccountNum` (in `background.js`) and `getAccountNum` (in `content.js`) where `new URL(url)` could throw a `TypeError` for invalid URLs.
+**Learning:** In Chrome Extension service workers, unhandled exceptions (like `TypeError` from `new URL()`) crash the background process. Because URL parsing is common when intercepting tab updates or handling messages, failure to wrap this in a `try/catch` allows malformed data or invalid tab URLs to completely disable the extension's background execution context.
+**Prevention:** Always wrap `new URL()` and other error-prone parsing logic in `try/catch` blocks within service workers and fail securely by returning a safe fallback value (e.g., `'0'` in this case).
