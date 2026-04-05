@@ -1,0 +1,3 @@
+## 2025-04-03 - Avoid Regex Replacement on Large JSON Strings
+**Learning:** Applying full-string regex replacements (e.g. `.replace()`) on massive JSON payloads like those returned by the Jules `batchexecute` API forces V8 to allocate massive new strings, causing large memory spikes and slower parsing times.
+**Action:** Use index scanning (like `indexOf`) and simple single-pass parsing techniques to extract the inner target JSON payload before parsing, minimizing expensive string operations on the full payload.

@@ -12,9 +12,13 @@
 const JULES_ORIGIN = 'https://jules.google.com'
 
 function extractAccountNum(url) {
-  const parts = new URL(url).pathname.split('/')
-  const uIdx = parts.indexOf('u')
-  return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  try {
+    const parts = new URL(url).pathname.split('/')
+    const uIdx = parts.indexOf('u')
+    return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  } catch {
+    return '0'
+  }
 }
 
 // =============================================================================
@@ -126,12 +130,12 @@ function fixJsonControlChars(str) {
  * Find the end of the outermost JSON array using bracket balancing.
  * Handles control chars inside strings by skipping them.
  */
-function findJsonEnd(str) {
+function findJsonEnd(str, startIndex = 0) {
   let depth = 0
   let inStr = false
   let esc = false
 
-  for (let i = 0; i < str.length; i++) {
+  for (let i = startIndex; i < str.length; i++) {
     const ch = str[i]
 
     if (esc) {
@@ -158,19 +162,16 @@ function findJsonEnd(str) {
 }
 
 function parseResponse(text, rpcId) {
-  // Strip XSS protection prefix: )]}'
-  const cleaned = text.replace(/^\)\]\}'\s*/, '')
-
-  // Skip byte-length line
-  const firstNewline = cleaned.indexOf('\n')
-  if (firstNewline === -1) throw new Error('Invalid batchexecute response')
-  const data = cleaned.substring(firstNewline + 1)
+  // Find the first JSON array bracket (skips XSS prefix and byte-length lines)
+  // ⚡ Bolt Optimization: Avoid replacing entire string to save massive V8 allocations
+  const firstBracket = text.indexOf('[')
+  if (firstBracket === -1) throw new Error('Invalid batchexecute response')
 
   // Find valid JSON boundary
-  const jsonEnd = findJsonEnd(data)
+  const jsonEnd = findJsonEnd(text, firstBracket)
   if (jsonEnd === -1) throw new Error('Could not find JSON boundary in response')
 
-  const jsonStr = data.substring(0, jsonEnd)
+  const jsonStr = text.substring(firstBracket, jsonEnd)
   const fixed = fixJsonControlChars(jsonStr)
   const outer = JSON.parse(fixed)
 
@@ -564,7 +565,12 @@ async function getOpenPRs(owner, repo, token) {
       return []
     }
     const prs = await res.json()
-    const mapped = prs.map((pr) => ({ title: pr.title || '', branch: pr.head?.ref || '' }))
+    // ⚡ Bolt Optimization: Pre-compute lowercase titles once to avoid O(T*P) string allocations
+    const mapped = prs.map((pr) => ({
+      title: pr.title || '',
+      titleLower: (pr.title || '').toLowerCase(),
+      branch: pr.head?.ref || ''
+    }))
     prCache.set(key, mapped)
     return mapped
   } catch (e) {
@@ -578,7 +584,8 @@ function taskHasOpenPR(task, openPRs) {
   if (openPRs.length === 0) return false
   const taskTitle = (task.title || '').toLowerCase()
   if (!taskTitle || taskTitle === '(untitled)') return false
-  return openPRs.some((pr) => pr.title.toLowerCase().includes(taskTitle) || taskTitle.includes(pr.title.toLowerCase()))
+  // ⚡ Bolt Optimization: Use pre-computed lowercase title
+  return openPRs.some((pr) => pr.titleLower.includes(taskTitle) || taskTitle.includes(pr.titleLower))
 }
 
 // =============================================================================
