@@ -1,0 +1,3 @@
+## 2025-04-03 - Cache Derived Values to Avoid Nested Loop Allocations
+**Learning:** Repeatedly calling `.toLowerCase()` inside nested loops (O(N*M)) causes redundant string allocations and reduces performance.
+**Action:** Pre-compute and cache derived values in the outer scope or during the initial data fetch (e.g., adding `pr.titleLower` inside `getOpenPRs`) to significantly improve matching performance.
