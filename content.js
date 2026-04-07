@@ -6,6 +6,8 @@
  * Handles chrome.runtime messages from background/popup.
  */
 
+const JULES_ORIGIN = 'https://jules.google.com'
+
 // Store config extracted from MAIN world
 let cachedConfig = null
 
@@ -32,7 +34,7 @@ function extractConfig() {
 
   return new Promise((resolve) => {
     // Ask main-world.js to re-broadcast config
-    window.postMessage({ type: 'JULES_REQUEST_CONFIG' }, '*')
+    window.postMessage({ type: 'JULES_REQUEST_CONFIG' }, JULES_ORIGIN)
 
     const timeout = setTimeout(() => resolve(cachedConfig), 2000)
     const handler = (event) => {
@@ -48,35 +50,23 @@ function extractConfig() {
 }
 
 // Detect account from URL
-function getAccountNum() {
-  const parts = new URL(location.href).pathname.split('/')
-  const uIdx = parts.indexOf('u')
-  return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+function extractAccountNum(url) {
+  try {
+    return new URL(url).pathname.split('/u/')[1]?.split('/')[0] || '0'
+  } catch {
+    return '0'
+  }
 }
 
-function getAccountLabel() {
-  const num = getAccountNum()
-  return num !== '0' ? `u/${num}` : 'default'
-}
-
-// Message handler
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  switch (msg.action) {
-    case 'PING':
-      sendResponse({ ok: true, account: getAccountLabel() })
-      break
-
-    case 'GET_CONFIG':
-      extractConfig().then((config) => {
-        sendResponse({
-          config,
-          accountNum: getAccountNum(),
-          account: getAccountLabel()
-        })
+// Listen for messages from background/popup
+chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
+  if (request.action === 'GET_CONFIG') {
+    extractConfig().then((config) => {
+      sendResponse({
+        config,
+        accountNum: extractAccountNum(window.location.href)
       })
-      return true // async response
-
-    default:
-      sendResponse({ error: 'Unknown action' })
+    })
+    return true // async response
   }
 })
