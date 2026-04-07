@@ -12,9 +12,13 @@
 const JULES_ORIGIN = 'https://jules.google.com'
 
 function extractAccountNum(url) {
-  const parts = new URL(url).pathname.split('/')
-  const uIdx = parts.indexOf('u')
-  return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  try {
+    const parts = new URL(url).pathname.split('/')
+    const uIdx = parts.indexOf('u')
+    return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  } catch {
+    return '0'
+  }
 }
 
 // =============================================================================
@@ -501,20 +505,31 @@ async function processSuggestionsForTab(tab, options) {
     addLog(`\n[${label}] ${repo}: Found ${suggestions.length} suggestions`)
     updateState({ currentRepo: repo.replace(/^github\//, '') })
 
-    for (const s of suggestions) {
-      if (state.status === 'cancelled') break
+    const results = await Promise.all(
+      suggestions.map(async (s) => {
+        if (state.status === 'cancelled') return { s, cancelled: true }
+        if (options.dryRun) return { s, dryRun: true }
 
-      if (options.dryRun) {
-        addLog(`  [DRY] Would start: ${s.title} (${s.categorySlug})`)
-      } else {
-        addLog(`  Starting: ${s.title}...`)
         try {
           await startSuggestion(s, repo, config, startConfig)
-          addLog(`  Started: ${s.title}`)
-          totalStarted++
+          return { s, ok: true }
         } catch (err) {
-          addLog(`  [!] Failed to start "${s.title}": ${err.message}`)
+          return { s, ok: false, error: err.message }
         }
+      })
+    )
+
+    for (const res of results) {
+      if (state.status === 'cancelled' || res.cancelled) break
+      const { s } = res
+
+      if (res.dryRun) {
+        addLog(`  [DRY] Would start: ${s.title} (${s.categorySlug})`)
+      } else if (res.ok) {
+        addLog(`  Started: ${s.title}`)
+        totalStarted++
+      } else {
+        addLog(`  [!] Failed to start "${s.title}": ${res.error}`)
       }
 
       updateState({
@@ -853,9 +868,19 @@ async function processTab(tab, options) {
     updateState({ currentRepo: repo })
     addLog(`\n[${label}] -> ${repo} (${repoTasks.length} tasks)`)
 
-    for (const task of repoTasks) {
-      try {
-        await archiveTask(task.id, config)
+    const results = await Promise.all(
+      repoTasks.map(async (task) => {
+        try {
+          await archiveTask(task.id, config)
+          return { task, ok: true }
+        } catch (e) {
+          return { task, ok: false, error: e.message }
+        }
+      })
+    )
+
+    for (const { task, ok, error } of results) {
+      if (ok) {
         grandTotal++
         addLog(`  Archived: [${task.id}] ${task.title}`)
 
@@ -866,8 +891,8 @@ async function processTab(tab, options) {
             total: totalTasks
           }
         })
-      } catch (e) {
-        addLog(`  ERROR archiving ${task.id}: ${e.message}`)
+      } else {
+        addLog(`  ERROR archiving ${task.id}: ${error}`)
       }
     }
   }
