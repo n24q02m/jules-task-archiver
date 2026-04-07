@@ -12,9 +12,11 @@
 const JULES_ORIGIN = 'https://jules.google.com'
 
 function extractAccountNum(url) {
-  const parts = new URL(url).pathname.split('/')
-  const uIdx = parts.indexOf('u')
-  return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  try {
+    return new URL(url).pathname.split('/u/')[1]?.split('/')[0] || '0'
+  } catch {
+    return '0'
+  }
 }
 
 // =============================================================================
@@ -73,33 +75,20 @@ async function callBatchExecute(rpcId, payload, config) {
  */
 function fixJsonControlChars(str) {
   // ⚡ Bolt Optimization: Use chunked string slicing instead of character-by-character
-  // array pushing. This improves performance by ~7-10x for large JSON strings
-  // (e.g. batchexecute responses) by drastically reducing array allocations.
+  // array pushing. This improves performance by ~7-10x for large JSON strings.
   let out = null
   let inStr = false
-  let esc = false
   let lastIndex = 0
 
   for (let i = 0; i < str.length; i++) {
-    const ch = str[i]
     const code = str.charCodeAt(i)
-
-    if (esc) {
-      esc = false
-      continue
-    }
-
-    if (inStr && ch === '\\') {
-      esc = true
-      continue
-    }
+    const ch = str[i]
 
     if (ch === '"') {
       inStr = !inStr
-      continue
-    }
-
-    if (inStr && code < 0x20) {
+    } else if (ch === '\\' && inStr) {
+      i++ // Skip escaped character
+    } else if (inStr && code < 0x20) {
       if (!out) out = []
       if (i > lastIndex) {
         out.push(str.substring(lastIndex, i))
@@ -112,20 +101,11 @@ function fixJsonControlChars(str) {
     }
   }
 
-  // If no control characters were found, avoid joining entirely
   if (!out) return str
-
-  if (lastIndex < str.length) {
-    out.push(str.substring(lastIndex))
-  }
-
+  if (lastIndex < str.length) out.push(str.substring(lastIndex))
   return out.join('')
 }
 
-/**
- * Find the end of the outermost JSON array using bracket balancing.
- * Handles control chars inside strings by skipping them.
- */
 function findJsonEnd(str) {
   let depth = 0
   let inStr = false

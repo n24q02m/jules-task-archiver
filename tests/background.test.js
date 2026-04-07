@@ -152,6 +152,34 @@ describe('fixJsonControlChars', () => {
     const fixed = sandbox.test_fixJsonControlChars(input)
     assert.strictEqual(fixed, '["she said \\"hi\\""]')
   })
+
+  it('should handle tabs and other control chars', () => {
+    const { sandbox } = setupEnvironment()
+    const input = '["col1\tcol2\x00"]'
+    const fixed = sandbox.test_fixJsonControlChars(input)
+    assert.strictEqual(fixed, '["col1\\tcol2\\u0000"]')
+  })
+
+  it('should handle escaped backslashes correctly', () => {
+    const { sandbox } = setupEnvironment()
+    const input = '["\\\\\\n"]'
+    const fixed = sandbox.test_fixJsonControlChars(input)
+    assert.strictEqual(fixed, '["\\\\\\n"]')
+  })
+
+  it('should handle multiple strings with control chars', () => {
+    const { sandbox } = setupEnvironment()
+    const input = '["a\n", "b\r"]'
+    const fixed = sandbox.test_fixJsonControlChars(input)
+    assert.strictEqual(fixed, '["a\\n", "b\\r"]')
+  })
+
+  it('should handle complex mixed content', () => {
+    const { sandbox } = setupEnvironment()
+    const input = '{"note": "	"}'
+    const fixed = sandbox.test_fixJsonControlChars(input)
+    assert.strictEqual(fixed, '{"note": "\\t"}')
+  })
 })
 
 describe('findJsonEnd', () => {
