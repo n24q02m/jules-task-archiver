@@ -798,3 +798,39 @@ describe('getJulesTabs', () => {
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[1].url), '1')
   })
 })
+
+describe('background.js: updateState and extractAccountNum improvements', () => {
+  it('should update state via spreading and persist to session storage', () => {
+    const { sandbox, sessionSetData } = setupEnvironment()
+    const initialState = JSON.parse(JSON.stringify(sandbox.test_state()))
+
+    sandbox.test_updateState({ status: 'running', error: null })
+
+    const newState = JSON.parse(JSON.stringify(sandbox.test_state()))
+    assert.strictEqual(newState.status, 'running')
+    assert.strictEqual(newState.error, null)
+    assert.strictEqual(newState.log.length, initialState.log.length)
+
+    assert.strictEqual(sessionSetData.length, 1)
+    // Compare JSON to avoid cross-VM reference issues
+    assert.strictEqual(JSON.stringify(sessionSetData[0]), JSON.stringify({ archiveState: sandbox.test_state() }))
+  })
+
+  it('extractAccountNum should handle valid Jules URLs', () => {
+    const { sandbox } = setupEnvironment()
+    assert.strictEqual(sandbox.test_extractAccountNum('https://jules.google.com/u/1/session'), '1')
+    assert.strictEqual(sandbox.test_extractAccountNum('https://jules.google.com/u/123/tasks'), '123')
+  })
+
+  it('extractAccountNum should return "0" for URLs without /u/X/ segment', () => {
+    const { sandbox } = setupEnvironment()
+    assert.strictEqual(sandbox.test_extractAccountNum('https://jules.google.com/tasks'), '0')
+    assert.strictEqual(sandbox.test_extractAccountNum('https://google.com'), '0')
+  })
+
+  it('extractAccountNum should return "0" for invalid URLs', () => {
+    const { sandbox } = setupEnvironment()
+    assert.strictEqual(sandbox.test_extractAccountNum('not-a-url'), '0')
+    assert.strictEqual(sandbox.test_extractAccountNum(''), '0')
+  })
+})
