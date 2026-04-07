@@ -12,9 +12,13 @@
 const JULES_ORIGIN = 'https://jules.google.com'
 
 function extractAccountNum(url) {
-  const parts = new URL(url).pathname.split('/')
-  const uIdx = parts.indexOf('u')
-  return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  try {
+    const parts = new URL(url).pathname.split('/')
+    const uIdx = parts.indexOf('u')
+    return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  } catch {
+    return '0'
+  }
 }
 
 // =============================================================================
@@ -849,15 +853,21 @@ async function processTab(tab, options) {
     archiveByRepo.get(key).push(t)
   }
 
-  for (const [repo, repoTasks] of archiveByRepo) {
-    updateState({ currentRepo: repo })
+  if (archiveByRepo.size > 1) {
+    updateState({ currentRepo: `(${archiveByRepo.size} repos)` })
+  }
+
+  const repoPromises = [...archiveByRepo.entries()].map(async ([repo, repoTasks]) => {
+    if (archiveByRepo.size === 1) {
+      updateState({ currentRepo: repo })
+    }
     addLog(`\n[${label}] -> ${repo} (${repoTasks.length} tasks)`)
 
     for (const task of repoTasks) {
       try {
         await archiveTask(task.id, config)
         grandTotal++
-        addLog(`  Archived: [${task.id}] ${task.title}`)
+        addLog(`  Archived: [${task.id}] ${task.title} (${repo})`)
 
         updateState({
           progress: {
@@ -867,10 +877,12 @@ async function processTab(tab, options) {
           }
         })
       } catch (e) {
-        addLog(`  ERROR archiving ${task.id}: ${e.message}`)
+        addLog(`  ERROR archiving ${task.id} in ${repo}: ${e.message}`)
       }
     }
-  }
+  })
+
+  await Promise.all(repoPromises)
 
   addLog(`\n[${label}] TOTAL: ${grandTotal} archived`)
   return grandTotal
