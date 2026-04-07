@@ -1,0 +1,3 @@
+I have fixed the insecure window.postMessage target origin in main-world.js and content.js by replacing '*' with 'window.origin'.
+I also added a security test to verify this.
+Additionally, I fixed a bug in background.js where extractAccountNum would throw if passed an invalid URL, which was causing tests to fail.
