@@ -12,9 +12,13 @@
 const JULES_ORIGIN = 'https://jules.google.com'
 
 function extractAccountNum(url) {
-  const parts = new URL(url).pathname.split('/')
-  const uIdx = parts.indexOf('u')
-  return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  try {
+    const parts = new URL(url).pathname.split('/')
+    const uIdx = parts.indexOf('u')
+    return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  } catch {
+    return '0'
+  }
 }
 
 // =============================================================================
@@ -484,48 +488,53 @@ async function processSuggestionsForTab(tab, options) {
   )
   const allSuggestions = await Promise.all(suggestionFetches)
 
-  let totalStarted = 0
-  for (const { repo, suggestions, error } of allSuggestions) {
-    if (state.status === 'cancelled') break
+  // Parallelize repo-level processing. Suggestions within a repo are still sequential.
+  let startedCount = state.progress.archived
+  const repoPromises = allSuggestions.map(async ({ repo, suggestions, error }) => {
+    if (state.status === 'cancelled') return 0
 
     if (error) {
       addLog(`\n[${label}] ERROR fetching suggestions for ${repo}: ${error}`)
-      continue
+      return 0
     }
 
     if (suggestions.length === 0) {
       addLog(`\n[${label}] ${repo}: No suggestions found`)
-      continue
+      return 0
     }
 
     addLog(`\n[${label}] ${repo}: Found ${suggestions.length} suggestions`)
-    updateState({ currentRepo: repo.replace(/^github\//, '') })
+    let repoStarted = 0
 
     for (const s of suggestions) {
       if (state.status === 'cancelled') break
 
       if (options.dryRun) {
-        addLog(`  [DRY] Would start: ${s.title} (${s.categorySlug})`)
+        addLog(`  [DRY] [${repo}] Would start: ${s.title} (${s.categorySlug})`)
       } else {
-        addLog(`  Starting: ${s.title}...`)
+        addLog(`  [${repo}] Starting: ${s.title}...`)
         try {
           await startSuggestion(s, repo, config, startConfig)
-          addLog(`  Started: ${s.title}`)
-          totalStarted++
+          addLog(`  [${repo}] Started: ${s.title}`)
+          repoStarted++
+          startedCount++
         } catch (err) {
-          addLog(`  [!] Failed to start "${s.title}": ${err.message}`)
+          addLog(`  [!] [${repo}] Failed to start "${s.title}": ${err.message}`)
         }
       }
 
       updateState({
         progress: {
-          archived: totalStarted,
-          skipped: state.progress.skipped,
-          total: state.progress.total + 1
+          ...state.progress,
+          archived: startedCount
         }
       })
     }
-  }
+    return repoStarted
+  })
+
+  const startResults = await Promise.all(repoPromises)
+  const totalStarted = startResults.reduce((a, b) => a + b, 0)
 
   addLog(`\n[${label}] TOTAL: ${totalStarted} suggestions started`)
   return totalStarted
@@ -849,28 +858,36 @@ async function processTab(tab, options) {
     archiveByRepo.get(key).push(t)
   }
 
-  for (const [repo, repoTasks] of archiveByRepo) {
-    updateState({ currentRepo: repo })
+  // Parallelize repo-level processing. Tasks within a repo are still sequential.
+  let archivedCount = state.progress.archived
+  const repoPromises = Array.from(archiveByRepo.entries()).map(async ([repo, repoTasks]) => {
     addLog(`\n[${label}] -> ${repo} (${repoTasks.length} tasks)`)
 
+    let repoArchived = 0
     for (const task of repoTasks) {
+      if (state.status === 'cancelled') break
       try {
         await archiveTask(task.id, config)
-        grandTotal++
-        addLog(`  Archived: [${task.id}] ${task.title}`)
+        repoArchived++
+        archivedCount++
+        addLog(`  [${repo}] Archived: [${task.id}] ${task.title}`)
 
+        // Update progress safely
         updateState({
           progress: {
-            archived: state.progress.archived + 1,
-            skipped: state.progress.skipped,
-            total: totalTasks
+            ...state.progress,
+            archived: archivedCount
           }
         })
       } catch (e) {
-        addLog(`  ERROR archiving ${task.id}: ${e.message}`)
+        addLog(`  [${repo}] ERROR archiving ${task.id}: ${e.message}`)
       }
     }
-  }
+    return repoArchived
+  })
+
+  const results = await Promise.all(repoPromises)
+  grandTotal = results.reduce((a, b) => a + b, 0)
 
   addLog(`\n[${label}] TOTAL: ${grandTotal} archived`)
   return grandTotal
