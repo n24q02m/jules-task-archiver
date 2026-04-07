@@ -10,11 +10,16 @@
 // =============================================================================
 
 const JULES_ORIGIN = 'https://jules.google.com'
+const SUGGESTION_CHUNK_SIZE = 5
 
 function extractAccountNum(url) {
-  const parts = new URL(url).pathname.split('/')
-  const uIdx = parts.indexOf('u')
-  return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  try {
+    const parts = new URL(url).pathname.split('/')
+    const uIdx = parts.indexOf('u')
+    return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  } catch {
+    return '0'
+  }
 }
 
 // =============================================================================
@@ -501,29 +506,42 @@ async function processSuggestionsForTab(tab, options) {
     addLog(`\n[${label}] ${repo}: Found ${suggestions.length} suggestions`)
     updateState({ currentRepo: repo.replace(/^github\//, '') })
 
-    for (const s of suggestions) {
+    for (let i = 0; i < suggestions.length; i += SUGGESTION_CHUNK_SIZE) {
       if (state.status === 'cancelled') break
 
+      const chunk = suggestions.slice(i, i + SUGGESTION_CHUNK_SIZE)
       if (options.dryRun) {
-        addLog(`  [DRY] Would start: ${s.title} (${s.categorySlug})`)
+        for (const s of chunk) {
+          addLog(`  [DRY] Would start: ${s.title} (${s.categorySlug})`)
+          updateState({
+            progress: {
+              archived: totalStarted,
+              skipped: state.progress.skipped,
+              total: state.progress.total + 1
+            }
+          })
+        }
       } else {
-        addLog(`  Starting: ${s.title}...`)
-        try {
-          await startSuggestion(s, repo, config, startConfig)
-          addLog(`  Started: ${s.title}`)
-          totalStarted++
-        } catch (err) {
-          addLog(`  [!] Failed to start "${s.title}": ${err.message}`)
-        }
+        await Promise.all(
+          chunk.map(async (s) => {
+            addLog(`  Starting: ${s.title}...`)
+            try {
+              await startSuggestion(s, repo, config, startConfig)
+              addLog(`  Started: ${s.title}`)
+              totalStarted++
+            } catch (err) {
+              addLog(`  [!] Failed to start "${s.title}": ${err.message}`)
+            }
+            updateState({
+              progress: {
+                archived: totalStarted,
+                skipped: state.progress.skipped,
+                total: state.progress.total + 1
+              }
+            })
+          })
+        )
       }
-
-      updateState({
-        progress: {
-          archived: totalStarted,
-          skipped: state.progress.skipped,
-          total: state.progress.total + 1
-        }
-      })
     }
   }
 
