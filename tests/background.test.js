@@ -89,6 +89,7 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_getJulesTabs = getJulesTabs;
     globalThis.test_extractAccountNum = extractAccountNum;
     globalThis.test_getTabLabel = getTabLabel;
+    globalThis.test_callBatchExecute = callBatchExecute;
     globalThis.test_getOpenPRs = getOpenPRs;
     globalThis.test_prCache = prCache;
     globalThis.test_taskHasOpenPR = taskHasOpenPR;
@@ -749,6 +750,45 @@ describe('extractAccountNum', () => {
     assert.strictEqual(sandbox.test_extractAccountNum('https://jules.google.com/tasks'), '0')
     assert.strictEqual(sandbox.test_extractAccountNum('https://google.com'), '0')
     assert.strictEqual(sandbox.test_extractAccountNum(''), '0')
+  })
+
+  it('should return "0" for invalid URLs', () => {
+    const { sandbox } = setupEnvironment()
+    assert.strictEqual(sandbox.test_extractAccountNum('not-a-url'), '0')
+    assert.strictEqual(sandbox.test_extractAccountNum(null), '0')
+  })
+})
+
+describe('callBatchExecute', () => {
+  it('should execute RPC successfully', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.fetch = async () => ({
+      ok: true,
+      text: async () => ')]}\'\n\n10\n[["wrb.fr","rpc1","[\\"data\\"]",null,null,null,"generic"]]'
+    })
+    const result = await sandbox.test_callBatchExecute('rpc1', {}, { accountNum: '0' })
+    assert.deepStrictEqual(result, ['data'])
+  })
+
+  it('should throw Error on HTTP error', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.fetch = async () => ({
+      ok: false,
+      status: 500
+    })
+    await assert.rejects(sandbox.test_callBatchExecute('rpc1', {}, { accountNum: '0' }), /batchexecute HTTP 500/)
+  })
+
+  it('should throw Error on malformed response', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.fetch = async () => ({
+      ok: true,
+      text: async () => 'invalid-response'
+    })
+    await assert.rejects(
+      sandbox.test_callBatchExecute('rpc1', {}, { accountNum: '0' }),
+      /Failed to parse batchexecute response: Invalid batchexecute response/
+    )
   })
 })
 
