@@ -11,7 +11,7 @@
 // Extract config and post to isolated world
 function broadcastConfig() {
   const w = window.WIZ_global_data
-  const modelMatch = w?.TSDtV ? String(w.TSDtV).match(/beyond:models\/[\w-]+/) : null
+  const modelMatch = w?.TSDtV ? String(w.TSDtV).match(/beyond:models\/[\w.-]+/) : null
 
   window.postMessage(
     {
@@ -26,7 +26,7 @@ function broadcastConfig() {
           }
         : null
     },
-    '*'
+    window.origin
   )
 }
 
@@ -54,7 +54,7 @@ if (!window.__julesArchiver) {
               capturedAt: Date.now()
             }
           },
-          '*'
+          window.origin
         )
       } catch (_e) {
         /* ignore parse errors */
