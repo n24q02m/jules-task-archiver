@@ -26,7 +26,7 @@ function broadcastConfig() {
           }
         : null
     },
-    '*'
+    'https://jules.google.com'
   )
 }
 
@@ -54,7 +54,7 @@ if (!window.__julesArchiver) {
               capturedAt: Date.now()
             }
           },
-          '*'
+          'https://jules.google.com'
         )
       } catch (_e) {
         /* ignore parse errors */
