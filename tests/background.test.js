@@ -728,8 +728,25 @@ describe('state management', () => {
     sessionSetData.length = 0
 
     sandbox.test_updateState({ status: 'done', currentTab: 'u/0' })
-    assert.strictEqual(sandbox.test_state().status, 'done')
+    const state = sandbox.test_state()
+    assert.strictEqual(state.status, 'done')
+    assert.strictEqual(state.currentTab, 'u/0')
+    assert.strictEqual(state.log.length, 0) // existing property preserved
     assert.strictEqual(sessionSetData.length, 1)
+  })
+
+  it('should merge state patches correctly', async () => {
+    const { sandbox } = setupEnvironment({})
+    await sandbox.test_stateReadyPromise
+    await new Promise((resolve) => setTimeout(resolve, 10))
+
+    sandbox.test_updateState({ status: 'running' })
+    sandbox.test_updateState({ currentRepo: 'owner/repo' })
+
+    const state = sandbox.test_state()
+    assert.strictEqual(state.status, 'running')
+    assert.strictEqual(state.currentRepo, 'owner/repo')
+    assert.strictEqual(state.currentTab, '') // default preserved
   })
 })
 

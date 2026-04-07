@@ -12,9 +12,11 @@
 const JULES_ORIGIN = 'https://jules.google.com'
 
 function extractAccountNum(url) {
-  const parts = new URL(url).pathname.split('/')
-  const uIdx = parts.indexOf('u')
-  return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  try {
+    return new URL(url).pathname.split('/u/')[1]?.split('/')[0] || '0'
+  } catch {
+    return '0'
+  }
 }
 
 // =============================================================================
@@ -610,7 +612,8 @@ const stateReadyPromise = chrome.storage.session.get('archiveState').then((data)
 })
 
 function updateState(patch) {
-  Object.assign(state, patch)
+  state = { ...state, ...patch }
+  // console.log("[STATE]", state);
   chrome.storage.session.set({ archiveState: state })
 }
 
@@ -811,6 +814,13 @@ async function processTab(tab, options) {
 
   if (toSkip.length > 0) {
     addLog(`\n[${label}] ${toSkip.length} tasks skipped (open PRs matching)`)
+    updateState({
+      progress: {
+        archived: state.progress.archived,
+        skipped: state.progress.skipped + toSkip.length,
+        total: state.progress.total + toSkip.length
+      }
+    })
   }
 
   if (toArchive.length === 0) {
