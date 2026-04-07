@@ -13,11 +13,11 @@ const JULES_ORIGIN = 'https://jules.google.com'
 
 function extractAccountNum(url) {
   try {
-    const parts = new URL(url).pathname.split("/")
-    const uIdx = parts.indexOf("u")
-    return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : "0"
+    const parts = new URL(url).pathname.split('/')
+    const uIdx = parts.indexOf('u')
+    return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
   } catch {
-    return "0"
+    return '0'
   }
 }
 
