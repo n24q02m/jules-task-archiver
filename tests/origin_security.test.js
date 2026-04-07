@@ -70,9 +70,11 @@ describe('Security: content.js origin check', () => {
     }
 
     // Call the listeners
-    listeners.forEach(l => l(evilEvent))
+    for (const l of listeners) {
+      l(evilEvent)
+    }
 
-    const sentCount = runtimeMessages.filter(m => m.action === 'CACHE_START_CONFIG').length
+    const sentCount = runtimeMessages.filter((m) => m.action === 'CACHE_START_CONFIG').length
     assert.strictEqual(sentCount, 0, 'Should reject message from incorrect origin')
   })
 
@@ -86,84 +88,94 @@ describe('Security: content.js origin check', () => {
       data: { type: 'JULES_START_CONFIG', config: { ok: 'good' } }
     }
 
-    listeners.forEach(l => l(goodEvent))
+    for (const l of listeners) {
+      l(goodEvent)
+    }
 
-    const sentCount = runtimeMessages.filter(m => m.action === 'CACHE_START_CONFIG').length
+    const sentCount = runtimeMessages.filter((m) => m.action === 'CACHE_START_CONFIG').length
     assert.strictEqual(sentCount, 1, 'Should accept message from correct origin')
   })
 })
 
 function setupMainWorldSandbox() {
-    const listeners = []
-    let broadcasts = []
+  const listeners = []
+  const broadcasts = []
 
-    const windowMock = {
-        addEventListener: (type, handler) => {
-            if (type === 'message') listeners.push(handler)
-        },
-        postMessage: (msg, origin) => {
-            broadcasts.push({ msg, origin })
-        },
-        origin: 'https://jules.google.com',
-        location: { href: 'https://jules.google.com/u/0/' },
-        WIZ_global_data: { SNlM0e: 'token' }
-    }
+  const windowMock = {
+    addEventListener: (type, handler) => {
+      if (type === 'message') listeners.push(handler)
+    },
+    postMessage: (msg, origin) => {
+      broadcasts.push({ msg, origin })
+    },
+    origin: 'https://jules.google.com',
+    location: { href: 'https://jules.google.com/u/0/' },
+    WIZ_global_data: { SNlM0e: 'token' }
+  }
 
-    const sandbox = {
-        window: windowMock,
-        console,
-        setTimeout,
-        clearTimeout,
-        Date,
-        Promise,
-        URL,
-        URLSearchParams,
-        JSON,
-        String,
-        location: windowMock.location
-    }
+  const sandbox = {
+    window: windowMock,
+    console,
+    setTimeout,
+    clearTimeout,
+    Date,
+    Promise,
+    URL,
+    URLSearchParams,
+    JSON,
+    String,
+    location: windowMock.location
+  }
 
-    vm.createContext(sandbox)
-    vm.runInContext(mainWorldJsContent, sandbox)
+  vm.createContext(sandbox)
+  vm.runInContext(mainWorldJsContent, sandbox)
 
-    return { sandbox, listeners, broadcasts }
+  return { sandbox, listeners, broadcasts }
 }
 
 describe('Security: main-world.js origin check', () => {
-    it('should REJECT messages from non-window origin', () => {
-        const { sandbox, listeners, broadcasts } = setupMainWorldSandbox()
+  it('should REJECT messages from non-window origin', () => {
+    const { sandbox, listeners, broadcasts } = setupMainWorldSandbox()
 
-        // Initial broadcast on script load
-        const initialCount = broadcasts.length
+    // Initial broadcast on script load
+    const initialCount = broadcasts.length
 
-        // Simulate message from evil.com requesting config
-        const evilEvent = {
-            origin: 'https://evil.com',
-            source: sandbox.window,
-            data: { type: 'JULES_REQUEST_CONFIG' }
-        }
+    // Simulate message from evil.com requesting config
+    const evilEvent = {
+      origin: 'https://evil.com',
+      source: sandbox.window,
+      data: { type: 'JULES_REQUEST_CONFIG' }
+    }
 
-        // Call the listeners
-        listeners.forEach(l => l(evilEvent))
+    // Call the listeners
+    for (const l of listeners) {
+      l(evilEvent)
+    }
 
-        assert.strictEqual(broadcasts.length, initialCount, 'Should not broadcast again for incorrect origin')
-    })
+    assert.strictEqual(broadcasts.length, initialCount, 'Should not broadcast again for incorrect origin')
+  })
 
-    it('should ACCEPT messages from window origin', () => {
-        const { sandbox, listeners, broadcasts } = setupMainWorldSandbox()
+  it('should ACCEPT messages from window origin', () => {
+    const { sandbox, listeners, broadcasts } = setupMainWorldSandbox()
 
-        const initialCount = broadcasts.length
+    const initialCount = broadcasts.length
 
-        // Simulate message from window requesting config
-        const goodEvent = {
-            origin: sandbox.window.origin,
-            source: sandbox.window,
-            data: { type: 'JULES_REQUEST_CONFIG' }
-        }
+    // Simulate message from window requesting config
+    const goodEvent = {
+      origin: sandbox.window.origin,
+      source: sandbox.window,
+      data: { type: 'JULES_REQUEST_CONFIG' }
+    }
 
-        listeners.forEach(l => l(goodEvent))
+    for (const l of listeners) {
+      l(goodEvent)
+    }
 
-        assert.strictEqual(broadcasts.length, initialCount + 1, 'Should broadcast again for correct origin')
-        assert.strictEqual(broadcasts[broadcasts.length - 1].origin, sandbox.window.origin, 'Should use window origin as target')
-    })
+    assert.strictEqual(broadcasts.length, initialCount + 1, 'Should broadcast again for correct origin')
+    assert.strictEqual(
+      broadcasts[broadcasts.length - 1].origin,
+      sandbox.window.origin,
+      'Should use window origin as target'
+    )
+  })
 })
