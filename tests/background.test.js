@@ -178,6 +178,37 @@ describe('parseResponse', () => {
     const result = sandbox.test_parseResponse(response, 'p1Takd')
     assert.deepStrictEqual(result, [['task1', 'task2']])
   })
+
+  it('should throw error for response without newline', () => {
+    const { sandbox } = setupEnvironment()
+    const response = ")]}' invalid"
+    assert.throws(() => {
+      sandbox.test_parseResponse(response, 'rpc1')
+    }, /Invalid batchexecute response/)
+  })
+
+  it('should throw error when JSON boundary cannot be found', () => {
+    const { sandbox } = setupEnvironment()
+    const response = ')]}\'\n\n100\n[["incomplete'
+    assert.throws(() => {
+      sandbox.test_parseResponse(response, 'rpc1')
+    }, /Could not find JSON boundary in response/)
+  })
+
+  it('should return null when rpcId is not found', () => {
+    const { sandbox } = setupEnvironment()
+    const response = ')]}\'\n\n100\n[["wrb.fr","otherRpc","[]",null,null,null,"generic"]]'
+    const result = sandbox.test_parseResponse(response, 'missingRpc')
+    assert.strictEqual(result, null)
+  })
+
+  it('should throw error for invalid JSON payload', () => {
+    const { sandbox } = setupEnvironment()
+    const response = ')]}\'\n\n100\n[["wrb.fr","rpc1","{invalid json}",null,null,null,"generic"]]'
+    assert.throws(() => {
+      sandbox.test_parseResponse(response, 'rpc1')
+    }, SyntaxError)
+  })
 })
 
 // =============================================================================
