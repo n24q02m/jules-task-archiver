@@ -98,6 +98,9 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_SUGGESTION = SUGGESTION;
     globalThis.test_SDETAIL = SDETAIL;
     globalThis.test_CATEGORY_CONFIG = CATEGORY_CONFIG;
+    globalThis.test_getTabRepos = getTabRepos;
+    globalThis.test_fetchSuggestionsForRepos = fetchSuggestionsForRepos;
+    globalThis.test_processRepo = processRepo;
     globalThis.test_DEFAULT_CATEGORY = DEFAULT_CATEGORY;
   `
 
@@ -796,5 +799,79 @@ describe('getJulesTabs', () => {
     assert.strictEqual(tabs.length, 2)
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[0].url), '0')
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[1].url), '1')
+  })
+})
+describe('Suggestions Orchestrator Helpers', () => {
+  it('getTabRepos should extract unique repos from tasks', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.listTasks = async () => [
+      { source: 'github/owner/repo1' },
+      { source: 'github/owner/repo2' },
+      { source: 'github/owner/repo1' },
+      { source: null }
+    ]
+    const repos = await sandbox.test_getTabRepos({}, 'label')
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(repos)), ['github/owner/repo1', 'github/owner/repo2'])
+  })
+
+  it('fetchSuggestionsForRepos should fetch for all repos concurrently', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.listSuggestions = async (repo) => {
+      if (repo === 'repo1') return [{ title: 's1' }]
+      throw new Error('fail')
+    }
+    const results = await sandbox.test_fetchSuggestionsForRepos(['repo1', 'repo2'], {}, 'label')
+    const resultsPlain = JSON.parse(JSON.stringify(results))
+    assert.strictEqual(resultsPlain.length, 2)
+    assert.strictEqual(resultsPlain[0].repo, 'repo1')
+    assert.strictEqual(resultsPlain[0].suggestions[0].title, 's1')
+    assert.strictEqual(resultsPlain[1].repo, 'repo2')
+    assert.strictEqual(resultsPlain[1].error, 'fail')
+  })
+
+  it('processRepo should handle dryRun', async () => {
+    const { sandbox } = setupEnvironment()
+    let started = false
+    sandbox.startSuggestion = async () => {
+      started = true
+    }
+
+    const count = await sandbox.test_processRepo(
+      'github/owner/repo',
+      [{ title: 's1' }],
+      null,
+      { dryRun: true },
+      {},
+      {},
+      'label'
+    )
+
+    assert.strictEqual(count, 0)
+    assert.strictEqual(started, false)
+    assert.strictEqual(sandbox.test_state().progress.total, 1)
+    assert.strictEqual(sandbox.test_state().progress.archived, 0)
+  })
+
+  it('processRepo should start suggestions when not dryRun', async () => {
+    const { sandbox } = setupEnvironment()
+    let started = false
+    sandbox.startSuggestion = async () => {
+      started = true
+    }
+
+    const count = await sandbox.test_processRepo(
+      'github/owner/repo',
+      [{ title: 's1' }],
+      null,
+      { dryRun: false },
+      {},
+      {},
+      'label'
+    )
+
+    assert.strictEqual(count, 1)
+    assert.strictEqual(started, true)
+    assert.strictEqual(sandbox.test_state().progress.total, 1)
+    assert.strictEqual(sandbox.test_state().progress.archived, 1)
   })
 })
