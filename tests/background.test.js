@@ -178,6 +178,12 @@ describe('parseResponse', () => {
     const result = sandbox.test_parseResponse(response, 'p1Takd')
     assert.deepStrictEqual(result, [['task1', 'task2']])
   })
+  it('should throw error for invalid response format', () => {
+    const { sandbox } = setupEnvironment()
+    assert.throws(() => sandbox.test_parseResponse('', 'rpcId'), /Invalid batchexecute response format/)
+    assert.throws(() => sandbox.test_parseResponse(")]}' 100", 'rpcId'), /Invalid batchexecute response format/)
+    assert.throws(() => sandbox.test_parseResponse(")]}'\n\n100\n[", 'rpcId'), /Invalid batchexecute response format/)
+  })
 })
 
 // =============================================================================
