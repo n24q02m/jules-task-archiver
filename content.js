@@ -49,9 +49,11 @@ function extractConfig() {
 
 // Detect account from URL
 function getAccountNum() {
-  const parts = new URL(location.href).pathname.split('/')
-  const uIdx = parts.indexOf('u')
-  return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  try {
+    return new URL(location.href).pathname.split('/u/')[1]?.split('/')[0] || '0'
+  } catch {
+    return '0'
+  }
 }
 
 function getAccountLabel() {
