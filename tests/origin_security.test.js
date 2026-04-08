@@ -53,7 +53,10 @@ function setupSandbox(origin = 'https://jules.google.com') {
   const sandbox = {
     window: windowMock,
     chrome: chromeMock,
-    setTimeout: (cb) => { cb(); return 1; },
+    setTimeout: (cb) => {
+      cb()
+      return 1
+    },
     clearTimeout: () => {},
     Date: { now: () => 1000 },
     Promise,
@@ -72,7 +75,7 @@ describe('Origin Security Tests', () => {
     const { sandbox, listeners, windowMock } = setupSandbox()
 
     // Add export for testing
-    const testableContentJs = contentJsCode + '\n; globalThis.test_getCachedConfig = () => cachedConfig; globalThis.test_setCachedConfig = (v) => { cachedConfig = v; };'
+    const testableContentJs = `${contentJsCode}\n; globalThis.test_getCachedConfig = () => cachedConfig; globalThis.test_setCachedConfig = (v) => { cachedConfig = v; };`
 
     vm.runInContext(testableContentJs, sandbox)
 
@@ -127,18 +130,22 @@ describe('Origin Security Tests', () => {
     })
 
     assert.strictEqual(messagesSent.length, 1, 'Should broadcast config for valid origin')
-    assert.strictEqual(messagesSent[0].targetOrigin, windowMock.origin, 'Broadcast target origin should be window.origin')
+    assert.strictEqual(
+      messagesSent[0].targetOrigin,
+      windowMock.origin,
+      'Broadcast target origin should be window.origin'
+    )
   })
 
   it('content.js should use window.origin for target origin when requesting config', async () => {
     const { sandbox, messagesSent, windowMock } = setupSandbox()
-    const testableContentJs = contentJsCode + '\n; globalThis.test_extractConfig = extractConfig; globalThis.test_setCachedConfig = (v) => { cachedConfig = v; };'
+    const testableContentJs = `${contentJsCode}\n; globalThis.test_extractConfig = extractConfig; globalThis.test_setCachedConfig = (v) => { cachedConfig = v; };`
     vm.runInContext(testableContentJs, sandbox)
 
     sandbox.test_setCachedConfig(null)
     sandbox.test_extractConfig() // This will call window.postMessage
 
-    const message = messagesSent.find(m => m.data.type === 'JULES_REQUEST_CONFIG')
+    const message = messagesSent.find((m) => m.data.type === 'JULES_REQUEST_CONFIG')
     assert.ok(message, 'JULES_REQUEST_CONFIG message should be sent')
     assert.strictEqual(message.targetOrigin, windowMock.origin, 'Target origin should be window.origin')
   })
