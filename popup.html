@@ -17,8 +17,8 @@
         <input type="text" id="ghOwner" placeholder="your-github-username" />
       </label>
       <label for="ghToken">
-        GitHub Token <span class="hint">(optional, for private repos)</span>
-        <input type="password" id="ghToken" placeholder="ghp_..." />
+        GitHub Token <span id="ghTokenHint" class="hint">(optional, for private repos)</span>
+        <input type="password" id="ghToken" placeholder="ghp_..." aria-describedby="ghTokenHint" />
       </label>
     </section>
 
@@ -31,7 +31,7 @@
           <button type="button" data-value="suggestions" aria-pressed="false">Start Suggestions</button>
         </div>
       </div>
-      <div class="radio-group">
+      <div class="radio-group" role="radiogroup" aria-label="Execution Mode">
         <label><input type="radio" name="mode" value="dry" checked /> Dry Run</label>
         <label><input type="radio" name="mode" value="run" /> Run</label>
       </div>
@@ -39,7 +39,7 @@
         <input type="checkbox" id="force" />
         Force (skip PR check)
       </label>
-      <div class="radio-group">
+      <div class="radio-group" role="radiogroup" aria-label="Target Scope">
         <label><input type="radio" name="scope" value="current" /> Current tab</label>
         <label><input type="radio" name="scope" value="all" checked /> All Jules tabs</label>
       </div>
