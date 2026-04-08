@@ -205,15 +205,19 @@ const TASK = {
 const ARCHIVABLE_STATES = new Set([3, 9]) // 3=completed, 9=failed
 
 function parseTask(raw) {
+  // ⚡ Bolt Optimization: Cache the source string and split result to avoid
+  // redundant O(N) string allocations during task parsing.
+  const source = raw[TASK.SOURCE] || ''
+  const sourceParts = source.split('/')
   return {
     id: raw[TASK.ID],
     title: raw[TASK.DISPLAY_TITLE] || raw[TASK.SHORT_TITLE] || '(untitled)',
-    source: raw[TASK.SOURCE] || '',
+    source: source,
     state: raw[TASK.STATE],
     statusCode: raw[TASK.STATUS_CODE],
-    repo: (raw[TASK.SOURCE] || '').replace(/^github\//, ''),
-    owner: (raw[TASK.SOURCE] || '').split('/')[1] || '',
-    repoName: (raw[TASK.SOURCE] || '').split('/')[2] || ''
+    repo: source.replace(/^github\//, ''),
+    owner: sourceParts[1] || '',
+    repoName: sourceParts[2] || ''
   }
 }
 
@@ -564,7 +568,13 @@ async function getOpenPRs(owner, repo, token) {
       return []
     }
     const prs = await res.json()
-    const mapped = prs.map((pr) => ({ title: pr.title || '', branch: pr.head?.ref || '' }))
+    // ⚡ Bolt Optimization: Pre-calculate titleLower here (O(N) operations)
+    // rather than during the nested task filtering loop (which was O(N * M)).
+    const mapped = prs.map((pr) => ({
+      title: pr.title || '',
+      titleLower: (pr.title || '').toLowerCase(),
+      branch: pr.head?.ref || ''
+    }))
     prCache.set(key, mapped)
     return mapped
   } catch (e) {
@@ -578,7 +588,7 @@ function taskHasOpenPR(task, openPRs) {
   if (openPRs.length === 0) return false
   const taskTitle = (task.title || '').toLowerCase()
   if (!taskTitle || taskTitle === '(untitled)') return false
-  return openPRs.some((pr) => pr.title.toLowerCase().includes(taskTitle) || taskTitle.includes(pr.title.toLowerCase()))
+  return openPRs.some((pr) => pr.titleLower.includes(taskTitle) || taskTitle.includes(pr.titleLower))
 }
 
 // =============================================================================
