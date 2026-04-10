@@ -78,6 +78,7 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_updateState = updateState;
     globalThis.test_addLog = addLog;
     globalThis.test_buildBatchRequest = buildBatchRequest;
+    globalThis.test_callBatchExecute = callBatchExecute;
     globalThis.test_fixJsonControlChars = fixJsonControlChars;
     globalThis.test_findJsonEnd = findJsonEnd;
     globalThis.test_parseResponse = parseResponse;
@@ -168,6 +169,42 @@ describe('findJsonEnd', () => {
   it('should return -1 for unbalanced input', () => {
     const { sandbox } = setupEnvironment()
     assert.strictEqual(sandbox.test_findJsonEnd('[["a"'), -1)
+  })
+})
+
+describe('callBatchExecute', () => {
+  it('should return parsed payload on success', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.fetch = async () => ({
+      ok: true,
+      text: async () => ')]}\'\n\n10\n[["wrb.fr","rpc1","[\\"success\\"]",null,null,null,"generic"]]'
+    })
+    const result = await sandbox.test_callBatchExecute('rpc1', {}, { accountNum: '0', bl: 'bl', fsid: 'sid', at: 'at' })
+    assert.deepStrictEqual(result, ['success'])
+  })
+
+  it('should throw error on HTTP failure', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.fetch = async () => ({
+      ok: false,
+      status: 500
+    })
+    await assert.rejects(
+      sandbox.test_callBatchExecute('rpc1', {}, { accountNum: '0', bl: 'bl', fsid: 'sid', at: 'at' }),
+      { message: 'batchexecute HTTP 500' }
+    )
+  })
+
+  it('should throw error on malformed response', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.fetch = async () => ({
+      ok: true,
+      text: async () => ")]}'\ninvalid"
+    })
+    await assert.rejects(
+      sandbox.test_callBatchExecute('rpc1', {}, { accountNum: '0', bl: 'bl', fsid: 'sid', at: 'at' }),
+      { message: /Failed to parse batchexecute response: Invalid batchexecute response/ }
+    )
   })
 })
 
