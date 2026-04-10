@@ -731,6 +731,31 @@ describe('state management', () => {
     assert.strictEqual(sandbox.test_state().status, 'done')
     assert.strictEqual(sessionSetData.length, 1)
   })
+
+  it('updateState should merge patches and not mutate previous state object', async () => {
+    const { sandbox } = setupEnvironment({})
+    await sandbox.test_stateReadyPromise
+    const initialState = sandbox.test_state()
+
+    sandbox.test_updateState({ status: 'running' })
+    const newState = sandbox.test_state()
+
+    assert.strictEqual(newState.status, 'running')
+    assert.notStrictEqual(initialState, newState, 'State object should be replaced, not mutated')
+    assert.strictEqual(initialState.status, 'idle', 'Initial state object should remain unchanged')
+  })
+
+  it('addLog should update state with a new log entry', async () => {
+    const { sandbox } = setupEnvironment({})
+    await sandbox.test_stateReadyPromise
+
+    sandbox.test_addLog('First log')
+    // Use JSON normalization to avoid VM reference equality issues with deepStrictEqual
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(sandbox.test_state().log)), ['First log'])
+
+    sandbox.test_addLog('Second log')
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(sandbox.test_state().log)), ['First log', 'Second log'])
+  })
 })
 
 // =============================================================================
