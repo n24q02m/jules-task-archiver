@@ -12,9 +12,13 @@
 const JULES_ORIGIN = 'https://jules.google.com'
 
 function extractAccountNum(url) {
-  const parts = new URL(url).pathname.split('/')
-  const uIdx = parts.indexOf('u')
-  return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  try {
+    const parts = new URL(url).pathname.split('/')
+    const uIdx = parts.indexOf('u')
+    return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  } catch {
+    return '0'
+  }
 }
 
 // =============================================================================
@@ -436,6 +440,88 @@ async function getStartConfig() {
 // Suggestions Orchestrator
 // =============================================================================
 
+async function discoverReposFromTasks(config, label) {
+  addLog(`[${label}] Fetching task list to discover repos...`)
+  let tasks
+  try {
+    tasks = await listTasks('', config)
+  } catch (e) {
+    addLog(`[${label}] ERROR listing tasks: ${e.message}`)
+    return []
+  }
+
+  const repos = [...new Set(tasks.map((t) => t.source).filter(Boolean))]
+  if (repos.length === 0) {
+    addLog(`[${label}] No repos found from tasks.`)
+    return []
+  }
+
+  addLog(`[${label}] Found ${repos.length} repos: ${repos.join(', ')}`)
+  return repos
+}
+
+async function fetchSuggestionsConcurrently(repos, config, label) {
+  addLog(`\n[${label}] Fetching suggestions for ${repos.length} repos concurrently...`)
+  const suggestionFetches = repos.map((repo) =>
+    listSuggestions(repo, config)
+      .then((suggestions) => ({ repo, suggestions }))
+      .catch((e) => ({ repo, error: e.message }))
+  )
+  return Promise.all(suggestionFetches)
+}
+
+async function processRepoSuggestions(repoData, config, startConfig, options, label, currentTotalStarted) {
+  const { repo, suggestions, error } = repoData
+  if (error) {
+    addLog(`\n[${label}] ERROR fetching suggestions for ${repo}: ${error}`)
+    return currentTotalStarted
+  }
+
+  if (suggestions.length === 0) {
+    addLog(`\n[${label}] ${repo}: No suggestions found`)
+    return currentTotalStarted
+  }
+
+  addLog(`\n[${label}] ${repo}: Found ${suggestions.length} suggestions`)
+  updateState({ currentRepo: repo.replace(/^github\//, '') })
+
+  let totalStarted = currentTotalStarted
+  for (const s of suggestions) {
+    if (state.status === 'cancelled') break
+
+    if (options.dryRun) {
+      addLog(`  [DRY] Would start: ${s.title} (${s.categorySlug})`)
+    } else {
+      addLog(`  Starting: ${s.title}...`)
+      try {
+        await startSuggestion(s, repo, config, startConfig)
+        addLog(`  Started: ${s.title}`)
+        totalStarted++
+      } catch (err) {
+        addLog(`  [!] Failed to start "${s.title}": ${err.message}`)
+      }
+    }
+
+    updateState({
+      progress: {
+        archived: totalStarted,
+        skipped: state.progress.skipped,
+        total: state.progress.total + 1
+      }
+    })
+  }
+  return totalStarted
+}
+
+async function processAllSuggestions(allSuggestions, config, startConfig, options, label) {
+  let totalStarted = 0
+  for (const repoData of allSuggestions) {
+    if (state.status === 'cancelled') break
+    totalStarted = await processRepoSuggestions(repoData, config, startConfig, options, label, totalStarted)
+  }
+  return totalStarted
+}
+
 async function processSuggestionsForTab(tab, options) {
   const label = getTabLabel(tab)
   updateState({ currentTab: label })
@@ -458,74 +544,11 @@ async function processSuggestionsForTab(tab, options) {
     addLog(`[${label}] Tip: Click Start on any suggestion in Jules UI to capture config.`)
   }
 
-  // Get repos from existing tasks
-  addLog(`[${label}] Fetching task list to discover repos...`)
-  let tasks
-  try {
-    tasks = await listTasks('', config)
-  } catch (e) {
-    addLog(`[${label}] ERROR listing tasks: ${e.message}`)
-    return 0
-  }
+  const repos = await discoverReposFromTasks(config, label)
+  if (repos.length === 0) return 0
 
-  const repos = [...new Set(tasks.map((t) => t.source).filter(Boolean))]
-  if (repos.length === 0) {
-    addLog(`[${label}] No repos found from tasks.`)
-    return 0
-  }
-
-  addLog(`[${label}] Found ${repos.length} repos: ${repos.join(', ')}`)
-
-  addLog(`\n[${label}] Fetching suggestions for ${repos.length} repos concurrently...`)
-  const suggestionFetches = repos.map((repo) =>
-    listSuggestions(repo, config)
-      .then((suggestions) => ({ repo, suggestions }))
-      .catch((e) => ({ repo, error: e.message }))
-  )
-  const allSuggestions = await Promise.all(suggestionFetches)
-
-  let totalStarted = 0
-  for (const { repo, suggestions, error } of allSuggestions) {
-    if (state.status === 'cancelled') break
-
-    if (error) {
-      addLog(`\n[${label}] ERROR fetching suggestions for ${repo}: ${error}`)
-      continue
-    }
-
-    if (suggestions.length === 0) {
-      addLog(`\n[${label}] ${repo}: No suggestions found`)
-      continue
-    }
-
-    addLog(`\n[${label}] ${repo}: Found ${suggestions.length} suggestions`)
-    updateState({ currentRepo: repo.replace(/^github\//, '') })
-
-    for (const s of suggestions) {
-      if (state.status === 'cancelled') break
-
-      if (options.dryRun) {
-        addLog(`  [DRY] Would start: ${s.title} (${s.categorySlug})`)
-      } else {
-        addLog(`  Starting: ${s.title}...`)
-        try {
-          await startSuggestion(s, repo, config, startConfig)
-          addLog(`  Started: ${s.title}`)
-          totalStarted++
-        } catch (err) {
-          addLog(`  [!] Failed to start "${s.title}": ${err.message}`)
-        }
-      }
-
-      updateState({
-        progress: {
-          archived: totalStarted,
-          skipped: state.progress.skipped,
-          total: state.progress.total + 1
-        }
-      })
-    }
-  }
+  const allSuggestions = await fetchSuggestionsConcurrently(repos, config, label)
+  const totalStarted = await processAllSuggestions(allSuggestions, config, startConfig, options, label)
 
   addLog(`\n[${label}] TOTAL: ${totalStarted} suggestions started`)
   return totalStarted

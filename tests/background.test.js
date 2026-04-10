@@ -89,6 +89,11 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_getJulesTabs = getJulesTabs;
     globalThis.test_extractAccountNum = extractAccountNum;
     globalThis.test_getTabLabel = getTabLabel;
+    globalThis.test_discoverReposFromTasks = discoverReposFromTasks;
+    globalThis.test_fetchSuggestionsConcurrently = fetchSuggestionsConcurrently;
+    globalThis.test_processRepoSuggestions = processRepoSuggestions;
+    globalThis.test_processAllSuggestions = processAllSuggestions;
+    globalThis.test_listTasks = listTasks;
     globalThis.test_getOpenPRs = getOpenPRs;
     globalThis.test_prCache = prCache;
     globalThis.test_taskHasOpenPR = taskHasOpenPR;
@@ -796,5 +801,42 @@ describe('getJulesTabs', () => {
     assert.strictEqual(tabs.length, 2)
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[0].url), '0')
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[1].url), '1')
+  })
+})
+
+describe('discoverReposFromTasks', () => {
+  it('should extract unique repos from tasks', async () => {
+    const { sandbox } = setupEnvironment()
+    const config = { at: 'at', bl: 'bl', fsid: 'fsid', accountNum: '0' }
+
+    // Mock listTasks on sandbox
+    sandbox.listTasks = async () => [
+      { source: 'github/org/repo1' },
+      { source: 'github/org/repo2' },
+      { source: 'github/org/repo1' },
+      { source: null }
+    ]
+
+    const rawRepos = await sandbox.test_discoverReposFromTasks(config, 'default')
+    // Normalize VM object for host environment comparison
+    const repos = JSON.parse(JSON.stringify(rawRepos))
+    assert.deepStrictEqual(repos, ['github/org/repo1', 'github/org/repo2'])
+
+    const state = sandbox.test_state()
+    assert.ok(state.log.some((msg) => msg.includes('Found 2 repos')))
+  })
+
+  it('should return empty array and log when no repos found', async () => {
+    const { sandbox } = setupEnvironment()
+    const config = { at: 'at', bl: 'bl', fsid: 'fsid', accountNum: '0' }
+
+    sandbox.listTasks = async () => []
+
+    const rawRepos = await sandbox.test_discoverReposFromTasks(config, 'default')
+    const repos = JSON.parse(JSON.stringify(rawRepos))
+    assert.deepStrictEqual(repos, [])
+
+    const state = sandbox.test_state()
+    assert.ok(state.log.some((msg) => msg.includes('No repos found from tasks')))
   })
 })
