@@ -12,9 +12,13 @@
 const JULES_ORIGIN = 'https://jules.google.com'
 
 function extractAccountNum(url) {
-  const parts = new URL(url).pathname.split('/')
-  const uIdx = parts.indexOf('u')
-  return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  try {
+    const parts = new URL(url).pathname.split('/')
+    const uIdx = parts.indexOf('u')
+    return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  } catch {
+    return '0'
+  }
 }
 
 // =============================================================================
@@ -232,6 +236,38 @@ async function archiveTask(taskId, config) {
   await callBatchExecute('Tjmm5c', [[taskId], 1], config)
 }
 
+/**
+ * Archives tasks for a single repository sequentially.
+ * Used by processTab to parallelize across repositories.
+ */
+async function archiveRepo(repo, repoTasks, config, label) {
+  addLog(`
+[${label}] -> ${repo} (${repoTasks.length} tasks)`)
+  let repoGrandTotal = 0
+
+  for (const task of repoTasks) {
+    if (state.status === 'cancelled') break
+    try {
+      await archiveTask(task.id, config)
+      repoGrandTotal++
+
+      // Update shared progress counter
+      updateState({
+        progress: {
+          archived: state.progress.archived + 1,
+          skipped: state.progress.skipped,
+          total: state.progress.total
+        }
+      })
+
+      addLog(`  [${repo}] Archived: [${task.id}] ${task.title}`)
+    } catch (e) {
+      addLog(`  [${repo}] ERROR archiving ${task.id}: ${e.message}`)
+    }
+  }
+  return repoGrandTotal
+}
+
 // =============================================================================
 // Suggestion Operations
 // =============================================================================
@@ -247,6 +283,7 @@ const SUGGESTION = {
 const SDETAIL = {
   TITLE: 0,
   DESCRIPTION: 1,
+
   GITHUB_URL: 2,
   FILE_PATH: 3,
   LINE: 4,
@@ -849,28 +886,19 @@ async function processTab(tab, options) {
     archiveByRepo.get(key).push(t)
   }
 
-  for (const [repo, repoTasks] of archiveByRepo) {
-    updateState({ currentRepo: repo })
-    addLog(`\n[${label}] -> ${repo} (${repoTasks.length} tasks)`)
-
-    for (const task of repoTasks) {
-      try {
-        await archiveTask(task.id, config)
-        grandTotal++
-        addLog(`  Archived: [${task.id}] ${task.title}`)
-
-        updateState({
-          progress: {
-            archived: state.progress.archived + 1,
-            skipped: state.progress.skipped,
-            total: totalTasks
-          }
-        })
-      } catch (e) {
-        addLog(`  ERROR archiving ${task.id}: ${e.message}`)
-      }
-    }
+  // ⚡ Bolt Optimization: Parallelize across different repositories
+  // Use (N repos) to prevent UI flickering during parallel processing
+  if (archiveByRepo.size > 1) {
+    updateState({ currentRepo: `(${archiveByRepo.size} repos)` })
+  } else if (archiveByRepo.size === 1) {
+    updateState({ currentRepo: archiveByRepo.keys().next().value })
   }
+
+  const repoPromises = [...archiveByRepo.entries()].map(([repo, repoTasks]) =>
+    archiveRepo(repo, repoTasks, config, label)
+  )
+  const repoTotals = await Promise.all(repoPromises)
+  grandTotal = repoTotals.reduce((a, b) => a + b, 0)
 
   addLog(`\n[${label}] TOTAL: ${grandTotal} archived`)
   return grandTotal
