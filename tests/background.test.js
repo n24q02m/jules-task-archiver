@@ -798,3 +798,45 @@ describe('getJulesTabs', () => {
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[1].url), '1')
   })
 })
+
+// =============================================================================
+// Performance / Chunked Processing Tests
+// =============================================================================
+
+describe('Chunked Processing', () => {
+  it('should process archival in chunks', async () => {
+    const { sandbox } = setupEnvironment()
+
+    let calls = 0
+    sandbox.archiveTask = async (_id, _config) => {
+      calls++
+      return Promise.resolve()
+    }
+
+    // Mock dependencies
+    sandbox.getTabConfig = async () => ({ bl: 'bl_123', fsid: 'fsid', at: 'at', accountNum: '0' })
+    sandbox.listTasks = async () => {
+      const tasks = []
+      for (let i = 0; i < 15; i++) {
+        tasks.push({ id: `t${i}`, title: `Task ${i}`, state: 4, repo: 'repo1' })
+      }
+      return tasks
+    }
+    sandbox.isArchivable = (t) => t.state === 4
+    sandbox.getOpenPRs = async () => []
+    sandbox.getTabLabel = (_t) => 'default'
+
+    // Expose needed internals for the test
+    const scriptContent =
+      'globalThis.test_processTab = processTab; globalThis.test_ARCHIVE_CHUNK_SIZE = ARCHIVE_CHUNK_SIZE;'
+    vm.runInContext(scriptContent, sandbox)
+
+    const tab = { id: 1, url: 'https://jules.google.com/u/0/session' }
+    const options = { force: true }
+
+    await sandbox.test_processTab(tab, options)
+
+    assert.strictEqual(calls, 15)
+    assert.strictEqual(sandbox.test_ARCHIVE_CHUNK_SIZE, 10)
+  })
+})

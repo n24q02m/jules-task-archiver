@@ -10,11 +10,17 @@
 // =============================================================================
 
 const JULES_ORIGIN = 'https://jules.google.com'
+const ARCHIVE_CHUNK_SIZE = 10
+const SUGGESTION_CHUNK_SIZE = 5
 
 function extractAccountNum(url) {
-  const parts = new URL(url).pathname.split('/')
-  const uIdx = parts.indexOf('u')
-  return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  try {
+    const parts = new URL(url).pathname.split('/')
+    const uIdx = parts.indexOf('u')
+    return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  } catch (_e) {
+    return '0'
+  }
 }
 
 // =============================================================================
@@ -501,29 +507,47 @@ async function processSuggestionsForTab(tab, options) {
     addLog(`\n[${label}] ${repo}: Found ${suggestions.length} suggestions`)
     updateState({ currentRepo: repo.replace(/^github\//, '') })
 
-    for (const s of suggestions) {
+    for (let i = 0; i < suggestions.length; i += SUGGESTION_CHUNK_SIZE) {
       if (state.status === 'cancelled') break
+      const chunk = suggestions.slice(i, i + SUGGESTION_CHUNK_SIZE)
 
       if (options.dryRun) {
-        addLog(`  [DRY] Would start: ${s.title} (${s.categorySlug})`)
-      } else {
-        addLog(`  Starting: ${s.title}...`)
-        try {
-          await startSuggestion(s, repo, config, startConfig)
-          addLog(`  Started: ${s.title}`)
-          totalStarted++
-        } catch (err) {
-          addLog(`  [!] Failed to start "${s.title}": ${err.message}`)
+        for (const s of chunk) {
+          addLog(`  [DRY] Would start: ${s.title} (${s.categorySlug})`)
+          updateState({
+            progress: {
+              archived: totalStarted,
+              skipped: state.progress.skipped,
+              total: state.progress.total + 1
+            }
+          })
         }
+        continue
       }
 
-      updateState({
-        progress: {
-          archived: totalStarted,
-          skipped: state.progress.skipped,
-          total: state.progress.total + 1
+      const results = await Promise.all(
+        chunk.map((s) =>
+          startSuggestion(s, repo, config, startConfig)
+            .then(() => ({ s, success: true }))
+            .catch((err) => ({ s, success: false, error: err.message }))
+        )
+      )
+
+      for (const { s, success, error } of results) {
+        if (success) {
+          addLog(`  Started: ${s.title}`)
+          totalStarted++
+        } else {
+          addLog(`  [!] Failed to start "${s.title}": ${error}`)
         }
-      })
+        updateState({
+          progress: {
+            archived: totalStarted,
+            skipped: state.progress.skipped,
+            total: state.progress.total + 1
+          }
+        })
+      }
     }
   }
 
@@ -853,21 +877,30 @@ async function processTab(tab, options) {
     updateState({ currentRepo: repo })
     addLog(`\n[${label}] -> ${repo} (${repoTasks.length} tasks)`)
 
-    for (const task of repoTasks) {
-      try {
-        await archiveTask(task.id, config)
-        grandTotal++
-        addLog(`  Archived: [${task.id}] ${task.title}`)
+    for (let i = 0; i < repoTasks.length; i += ARCHIVE_CHUNK_SIZE) {
+      const chunk = repoTasks.slice(i, i + ARCHIVE_CHUNK_SIZE)
+      const results = await Promise.all(
+        chunk.map((task) =>
+          archiveTask(task.id, config)
+            .then(() => ({ task, success: true }))
+            .catch((e) => ({ task, success: false, error: e.message }))
+        )
+      )
 
-        updateState({
-          progress: {
-            archived: state.progress.archived + 1,
-            skipped: state.progress.skipped,
-            total: totalTasks
-          }
-        })
-      } catch (e) {
-        addLog(`  ERROR archiving ${task.id}: ${e.message}`)
+      for (const { task, success, error } of results) {
+        if (success) {
+          grandTotal++
+          addLog(`  Archived: [${task.id}] ${task.title}`)
+          updateState({
+            progress: {
+              archived: state.progress.archived + 1,
+              skipped: state.progress.skipped,
+              total: totalTasks
+            }
+          })
+        } else {
+          addLog(`  ERROR archiving ${task.id}: ${error}`)
+        }
       }
     }
   }
