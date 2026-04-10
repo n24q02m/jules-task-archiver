@@ -99,6 +99,11 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_SDETAIL = SDETAIL;
     globalThis.test_CATEGORY_CONFIG = CATEGORY_CONFIG;
     globalThis.test_DEFAULT_CATEGORY = DEFAULT_CATEGORY;
+    globalThis.test_processSuggestionsForTab = processSuggestionsForTab;
+    globalThis.test_listSuggestions = listSuggestions;
+    globalThis.test_startSuggestion = startSuggestion;
+    globalThis.test_listTasks = listTasks;
+    globalThis.test_SUGGESTION_CHUNK_SIZE = SUGGESTION_CHUNK_SIZE;
   `
 
   const script = new vm.Script(scriptContent)
@@ -796,5 +801,94 @@ describe('getJulesTabs', () => {
     assert.strictEqual(tabs.length, 2)
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[0].url), '0')
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[1].url), '1')
+  })
+})
+
+// =============================================================================
+// Suggestions Orchestration Tests
+// =============================================================================
+
+describe('processSuggestionsForTab', () => {
+  it('should process suggestions in chunks concurrently', async () => {
+    const { sandbox } = setupEnvironment()
+    const tab = { id: 1, url: 'https://jules.google.com/u/0/session' }
+    const options = { opMode: 'suggestions', dryRun: false }
+
+    // Mock dependencies
+    const suggestions = Array.from({ length: 12 }, (_, i) => ({
+      id: `s${i}`,
+      title: `Suggestion ${i}`,
+      categorySlug: 'cleanup'
+    }))
+
+    let listTasksCalled = 0
+    sandbox.listTasks = async () => {
+      listTasksCalled++
+      return [{ source: 'github/owner/repo' }]
+    }
+
+    let listSuggestionsCalled = 0
+    sandbox.listSuggestions = async () => {
+      listSuggestionsCalled++
+      return suggestions
+    }
+
+    let startedCount = 0
+    const startedSuggestions = []
+    sandbox.startSuggestion = async (s) => {
+      startedCount++
+      startedSuggestions.push(s.id)
+      return { ok: true }
+    }
+
+    // We need to mock getTabConfig too as it's called by processSuggestionsForTab
+    sandbox.getTabConfig = async () => ({
+      at: 'token',
+      bl: 'build_label',
+      fsid: 'fsid',
+      accountNum: '0'
+    })
+
+    const count = await sandbox.test_processSuggestionsForTab(tab, options)
+
+    assert.strictEqual(count, 12)
+    assert.strictEqual(startedCount, 12)
+    assert.strictEqual(listTasksCalled, 1)
+    assert.strictEqual(listSuggestionsCalled, 1)
+
+    // Verify chunking by checking logs (simplified)
+    const logs = sandbox.test_state().log
+    const startingLogs = logs.filter((l) => l.includes('Starting:'))
+    const startedLogs = logs.filter((l) => l.includes('Started:'))
+
+    assert.strictEqual(startingLogs.length, 12)
+    assert.strictEqual(startedLogs.length, 12)
+  })
+
+  it('should handle errors in startSuggestion and continue', async () => {
+    const { sandbox } = setupEnvironment()
+    const tab = { id: 1, url: 'https://jules.google.com/u/0/session' }
+    const options = { opMode: 'suggestions', dryRun: false }
+
+    const suggestions = [
+      { id: 's1', title: 'S1', categorySlug: 'c' },
+      { id: 's2', title: 'S2', categorySlug: 'c' }
+    ]
+
+    sandbox.listTasks = async () => [{ source: 'repo' }]
+    sandbox.listSuggestions = async () => suggestions
+    sandbox.getTabConfig = async () => ({ at: 't', bl: 'b', fsid: 'f', accountNum: '0' })
+
+    sandbox.startSuggestion = async (s) => {
+      if (s.id === 's1') throw new Error('Fail')
+      return { ok: true }
+    }
+
+    const count = await sandbox.test_processSuggestionsForTab(tab, options)
+
+    assert.strictEqual(count, 1) // Only s2 succeeded
+    const logs = sandbox.test_state().log
+    assert.ok(logs.some((l) => l.includes('Failed to start "S1": Fail')))
+    assert.ok(logs.some((l) => l.includes('Started: S2')))
   })
 })
