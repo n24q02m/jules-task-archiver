@@ -12,9 +12,13 @@
 const JULES_ORIGIN = 'https://jules.google.com'
 
 function extractAccountNum(url) {
-  const parts = new URL(url).pathname.split('/')
-  const uIdx = parts.indexOf('u')
-  return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  try {
+    const parts = new URL(url).pathname.split('/')
+    const uIdx = parts.indexOf('u')
+    return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  } catch {
+    return '0'
+  }
 }
 
 // =============================================================================
@@ -163,7 +167,7 @@ function parseResponse(text, rpcId) {
 
   // Skip byte-length line
   const firstNewline = cleaned.indexOf('\n')
-  if (firstNewline === -1) throw new Error('Invalid batchexecute response')
+  if (firstNewline === -1) throw new Error('Invalid batchexecute response format')
   const data = cleaned.substring(firstNewline + 1)
 
   // Find valid JSON boundary

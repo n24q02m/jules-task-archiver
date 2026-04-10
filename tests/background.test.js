@@ -174,9 +174,31 @@ describe('findJsonEnd', () => {
 describe('parseResponse', () => {
   it('should extract payload from batchexecute response', () => {
     const { sandbox } = setupEnvironment()
-    const response = ')]}\'\n\n100\n[["wrb.fr","p1Takd","[[\\"task1\\",\\"task2\\"]]",null,null,null,"generic"]]'
+    const response = ")]}'" + '\n\n100\n[["wrb.fr","p1Takd","[[\\"task1\\",\\"task2\\"]]",null,null,null,"generic"]]'
     const result = sandbox.test_parseResponse(response, 'p1Takd')
     assert.deepStrictEqual(result, [['task1', 'task2']])
+  })
+
+  it('should throw error for malformed response (missing newline)', () => {
+    const { sandbox } = setupEnvironment()
+    const response = ")]}'" + ' invalid'
+    assert.throws(() => sandbox.test_parseResponse(response, 'rpc1'), {
+      message: 'Invalid batchexecute response format'
+    })
+  })
+
+  it('should throw error for invalid JSON structure in response', () => {
+    const { sandbox } = setupEnvironment()
+    const response = ")]}'" + '\n\n100\n{"not": "an array"}'
+    assert.throws(() => sandbox.test_parseResponse(response, 'rpc1'), Error)
+  })
+
+  it('should throw error when findJsonEnd fails', () => {
+    const { sandbox } = setupEnvironment()
+    const response = ")]}'" + '\n\n100\n[ unfinished'
+    assert.throws(() => sandbox.test_parseResponse(response, 'rpc1'), {
+      message: 'Could not find JSON boundary in response'
+    })
   })
 })
 
