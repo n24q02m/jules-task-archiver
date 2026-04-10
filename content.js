@@ -5,6 +5,7 @@
  * Relays StartSuggestion config to background service worker.
  * Handles chrome.runtime messages from background/popup.
  */
+const JULES_ORIGIN = 'https://jules.google.com'
 
 // Store config extracted from MAIN world
 let cachedConfig = null
@@ -32,7 +33,7 @@ function extractConfig() {
 
   return new Promise((resolve) => {
     // Ask main-world.js to re-broadcast config
-    window.postMessage({ type: 'JULES_REQUEST_CONFIG' }, '*')
+    window.postMessage({ type: 'JULES_REQUEST_CONFIG' }, JULES_ORIGIN)
 
     const timeout = setTimeout(() => resolve(cachedConfig), 2000)
     const handler = (event) => {

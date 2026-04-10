@@ -7,6 +7,7 @@
  *
  * Communicates with content.js (isolated world) via window.postMessage.
  */
+const JULES_ORIGIN = 'https://jules.google.com'
 
 // Extract config and post to isolated world
 function broadcastConfig() {
@@ -26,7 +27,7 @@ function broadcastConfig() {
           }
         : null
     },
-    '*'
+    JULES_ORIGIN
   )
 }
 
@@ -54,7 +55,7 @@ if (!window.__julesArchiver) {
               capturedAt: Date.now()
             }
           },
-          '*'
+          JULES_ORIGIN
         )
       } catch (_e) {
         /* ignore parse errors */
