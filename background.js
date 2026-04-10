@@ -12,9 +12,13 @@
 const JULES_ORIGIN = 'https://jules.google.com'
 
 function extractAccountNum(url) {
-  const parts = new URL(url).pathname.split('/')
-  const uIdx = parts.indexOf('u')
-  return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  try {
+    const parts = new URL(url).pathname.split('/')
+    const uIdx = parts.indexOf('u')
+    return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  } catch {
+    return '0'
+  }
 }
 
 // =============================================================================
@@ -718,36 +722,19 @@ async function getTabConfig(tabId) {
 // Orchestrator
 // =============================================================================
 
-async function processTab(tab, options) {
-  const label = getTabLabel(tab)
-  updateState({ currentTab: label })
-  addLog(`\n${'='.repeat(50)}`)
-  addLog(`${label}: ${tab.url}`)
-  addLog(`${'='.repeat(50)}`)
-
-  // Get page config (tokens for batchexecute)
-  let config
-  try {
-    config = await getTabConfig(tab.id)
-    addLog(`[${label}] Config extracted (bl: ${config.bl.split('_').pop()})`)
-  } catch (e) {
-    addLog(`[${label}] ERROR: ${e.message}`)
-    return 0
-  }
-
-  // List all active tasks via API
+async function fetchAndFilterTasks(config, label) {
   addLog(`[${label}] Fetching tasks via API...`)
   let tasks
   try {
     tasks = await listTasks('', config)
   } catch (e) {
     addLog(`[${label}] ERROR listing tasks: ${e.message}`)
-    return 0
+    return null
   }
 
   if (tasks.length === 0) {
     addLog(`[${label}] No tasks found.`)
-    return 0
+    return []
   }
 
   // Filter by task state: only completed/failed are candidates
@@ -756,11 +743,10 @@ async function processTab(tab, options) {
 
   addLog(`[${label}] ${tasks.length} total: ${candidates.length} completed/failed, ${active.length} active`)
 
-  if (candidates.length === 0) {
-    addLog(`[${label}] No completed/failed tasks to archive.`)
-    return 0
-  }
+  return candidates
+}
 
+async function getTasksToArchive(candidates, options, label) {
   // Group candidates by repo
   const byRepo = new Map()
   for (const task of candidates) {
@@ -813,6 +799,10 @@ async function processTab(tab, options) {
     addLog(`\n[${label}] ${toSkip.length} tasks skipped (open PRs matching)`)
   }
 
+  return toArchive
+}
+
+async function performArchival(toArchive, config, options, label) {
   if (toArchive.length === 0) {
     addLog(`[${label}] Nothing to archive (all tasks have matching open PRs).`)
     return 0
@@ -874,6 +864,34 @@ async function processTab(tab, options) {
 
   addLog(`\n[${label}] TOTAL: ${grandTotal} archived`)
   return grandTotal
+}
+
+async function processTab(tab, options) {
+  const label = getTabLabel(tab)
+  updateState({ currentTab: label })
+  addLog(`\n${'='.repeat(50)}`)
+  addLog(`${label}: ${tab.url}`)
+  addLog(`${'='.repeat(50)}`)
+
+  // Get page config (tokens for batchexecute)
+  let config
+  try {
+    config = await getTabConfig(tab.id)
+    addLog(`[${label}] Config extracted (bl: ${config.bl.split('_').pop()})`)
+  } catch (e) {
+    addLog(`[${label}] ERROR: ${e.message}`)
+    return 0
+  }
+
+  // 1. Fetch candidates
+  const candidates = await fetchAndFilterTasks(config, label)
+  if (!candidates || candidates.length === 0) return 0
+
+  // 2. PR check
+  const toArchive = await getTasksToArchive(candidates, options, label)
+
+  // 3. Perform archival
+  return await performArchival(toArchive, config, options, label)
 }
 
 async function startOperation(options) {

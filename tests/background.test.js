@@ -47,8 +47,12 @@ function setupEnvironment(initialStorage = {}) {
     }
   }
 
+  const logs = []
   const sandbox = {
     chrome: chromeMock,
+    addLog: (msg) => {
+      logs.push(msg)
+    },
     fetch: async () => ({ ok: true, json: async () => [], text: async () => ")]}'\n\n4\n[[]]" }),
     setTimeout,
     setInterval,
@@ -99,12 +103,15 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_SDETAIL = SDETAIL;
     globalThis.test_CATEGORY_CONFIG = CATEGORY_CONFIG;
     globalThis.test_DEFAULT_CATEGORY = DEFAULT_CATEGORY;
+    globalThis.test_fetchAndFilterTasks = fetchAndFilterTasks;
+    globalThis.test_getTasksToArchive = getTasksToArchive;
+    globalThis.test_performArchival = performArchival;
   `
 
   const script = new vm.Script(scriptContent)
   script.runInContext(sandbox)
 
-  return { sandbox, sessionSetData }
+  return { sandbox, sessionSetData, logs }
 }
 
 // =============================================================================
@@ -796,5 +803,113 @@ describe('getJulesTabs', () => {
     assert.strictEqual(tabs.length, 2)
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[0].url), '0')
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[1].url), '1')
+  })
+})
+
+// =============================================================================
+// processTab Refactoring Tests
+// =============================================================================
+
+describe('processTab Refactoring Helpers', () => {
+  describe('fetchAndFilterTasks', () => {
+    it('should return null when listTasks fails', async () => {
+      const { sandbox } = setupEnvironment()
+      sandbox.listTasks = async () => {
+        throw new Error('API Fail')
+      }
+
+      const result = await sandbox.test_fetchAndFilterTasks({}, 'u/0')
+      assert.strictEqual(result, null)
+    })
+
+    it('should return empty array when no tasks found', async () => {
+      const { sandbox } = setupEnvironment()
+      sandbox.listTasks = async () => []
+
+      const result = await sandbox.test_fetchAndFilterTasks({}, 'u/0')
+      assert.deepStrictEqual(JSON.parse(JSON.stringify(result)), [])
+    })
+
+    it('should filter archivable candidates correctly', async () => {
+      const { sandbox } = setupEnvironment()
+      const mockTasks = [
+        { id: '1', state: 3 }, // COMPLETED (archivable)
+        { id: '2', state: 9 }, // FAILED (archivable)
+        { id: '3', state: 2 } // RUNNING (not archivable)
+      ]
+      sandbox.listTasks = async () => mockTasks
+
+      const result = await sandbox.test_fetchAndFilterTasks({}, 'u/0')
+      const normalized = JSON.parse(JSON.stringify(result))
+      assert.strictEqual(normalized.length, 2)
+      assert.strictEqual(normalized[0].id, '1')
+      assert.strictEqual(normalized[1].id, '2')
+    })
+  })
+
+  describe('getTasksToArchive', () => {
+    it('should archive all when force is true', async () => {
+      const { sandbox } = setupEnvironment()
+      const candidates = [{ id: '1', state: 3, repo: 'r1' }]
+
+      const result = await sandbox.test_getTasksToArchive(candidates, { force: true }, 'u/0')
+      assert.strictEqual(JSON.parse(JSON.stringify(result)).length, 1)
+    })
+
+    it('should filter out tasks with open PRs', async () => {
+      const { sandbox } = setupEnvironment()
+      const candidates = [
+        { id: '1', state: 8, repo: 'owner/repo', repoName: 'repo', owner: 'owner', title: 'Task 1' },
+        { id: '2', state: 8, repo: 'owner/repo', repoName: 'repo', owner: 'owner', title: 'Task 2' },
+        { id: '3', state: 9, repo: 'owner/repo', repoName: 'repo', owner: 'owner', title: 'Task 3' }
+      ]
+      // Replace the globalThis.test_getOpenPRs with our mock
+      sandbox.getOpenPRs = async () => [{ title: 'Task 1', titleLower: 'task 1', branch: 'b1' }]
+
+      const result = await sandbox.test_getTasksToArchive(candidates, { force: false }, 'u/0')
+      const normalized = JSON.parse(JSON.stringify(result))
+      // Task 1 skipped (has PR), Task 2 archived (no PR), Task 3 archived (state 9)
+      assert.strictEqual(normalized.length, 2)
+      assert.ok(normalized.find((t) => t.id === '2'))
+      assert.ok(normalized.find((t) => t.id === '3'))
+    })
+  })
+
+  describe('performArchival', () => {
+    it('should return 0 when nothing to archive', async () => {
+      const { sandbox } = setupEnvironment()
+      const result = await sandbox.test_performArchival([], {}, {}, 'u/0')
+      assert.strictEqual(result, 0)
+    })
+
+    it('should perform dry run correctly', async () => {
+      const { sandbox } = setupEnvironment()
+      const toArchive = [{ id: '1', title: 'T1', state: 3, repo: 'r1' }]
+
+      const result = await sandbox.test_performArchival(toArchive, {}, { dryRun: true }, 'u/0')
+      assert.strictEqual(result, 0)
+    })
+
+    it('should perform actual archival and update state', async () => {
+      const { sandbox } = setupEnvironment()
+      const toArchive = [
+        { id: '1', title: 'T1', state: 3, repo: 'r1' },
+        { id: '2', title: 'T2', state: 3, repo: 'r1' }
+      ]
+      const archivedIds = []
+      sandbox.archiveTask = async (id) => {
+        archivedIds.push(id)
+      }
+
+      const result = await sandbox.test_performArchival(toArchive, {}, { dryRun: false }, 'u/0')
+      assert.strictEqual(result, 2)
+      assert.strictEqual(archivedIds.length, 2)
+      assert.ok(archivedIds.includes('1'))
+      assert.ok(archivedIds.includes('2'))
+
+      const state = sandbox.test_state()
+      assert.strictEqual(state.progress.archived, 2)
+      assert.strictEqual(state.progress.total, 2)
+    })
   })
 })
