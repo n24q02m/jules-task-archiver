@@ -12,9 +12,13 @@
 const JULES_ORIGIN = 'https://jules.google.com'
 
 function extractAccountNum(url) {
-  const parts = new URL(url).pathname.split('/')
-  const uIdx = parts.indexOf('u')
-  return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  try {
+    const parts = new URL(url).pathname.split('/')
+    const uIdx = parts.indexOf('u')
+    return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  } catch (_e) {
+    return '0'
+  }
 }
 
 // =============================================================================
@@ -77,20 +81,13 @@ function fixJsonControlChars(str) {
   // (e.g. batchexecute responses) by drastically reducing array allocations.
   let out = null
   let inStr = false
-  let esc = false
   let lastIndex = 0
 
   for (let i = 0; i < str.length; i++) {
     const ch = str[i]
-    const code = str.charCodeAt(i)
-
-    if (esc) {
-      esc = false
-      continue
-    }
 
     if (inStr && ch === '\\') {
-      esc = true
+      i++ // Skip escaped character
       continue
     }
 
@@ -99,16 +96,19 @@ function fixJsonControlChars(str) {
       continue
     }
 
-    if (inStr && code < 0x20) {
-      if (!out) out = []
-      if (i > lastIndex) {
-        out.push(str.substring(lastIndex, i))
+    if (inStr) {
+      const code = str.charCodeAt(i)
+      if (code < 0x20) {
+        if (!out) out = []
+        if (i > lastIndex) {
+          out.push(str.substring(lastIndex, i))
+        }
+        if (code === 0x0a) out.push('\\n')
+        else if (code === 0x0d) out.push('\\r')
+        else if (code === 0x09) out.push('\\t')
+        else out.push(`\\u${code.toString(16).padStart(4, '0')}`)
+        lastIndex = i + 1
       }
-      if (code === 0x0a) out.push('\\n')
-      else if (code === 0x0d) out.push('\\r')
-      else if (code === 0x09) out.push('\\t')
-      else out.push(`\\u${code.toString(16).padStart(4, '0')}`)
-      lastIndex = i + 1
     }
   }
 
