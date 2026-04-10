@@ -12,9 +12,13 @@
 const JULES_ORIGIN = 'https://jules.google.com'
 
 function extractAccountNum(url) {
-  const parts = new URL(url).pathname.split('/')
-  const uIdx = parts.indexOf('u')
-  return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  try {
+    const parts = new URL(url).pathname.split('/')
+    const uIdx = parts.indexOf('u')
+    return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  } catch {
+    return '0'
+  }
 }
 
 // =============================================================================
@@ -56,12 +60,18 @@ async function callBatchExecute(rpcId, payload, config) {
   })
 
   if (!res.ok) {
-    throw new Error(`batchexecute ${rpcId} failed: HTTP ${res.status}`)
+    throw new Error(`batchexecute HTTP ${res.status}`)
   }
 
-  return parseResponse(await res.text(), rpcId)
-}
+  const text = await res.text()
+  // The batchexecute response starts with )]}'
 
+  try {
+    return parseResponse(text, rpcId)
+  } catch (e) {
+    throw new Error(`Failed to parse batchexecute response: ${e.message}`)
+  }
+}
 // =============================================================================
 // Response Parser
 // =============================================================================
