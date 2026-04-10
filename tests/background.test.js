@@ -89,6 +89,22 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_getJulesTabs = getJulesTabs;
     globalThis.test_extractAccountNum = extractAccountNum;
     globalThis.test_getTabLabel = getTabLabel;
+    globalThis.test_processSuggestionsForTab = processSuggestionsForTab;
+
+    globalThis.test_processTab = processTab;
+
+    globalThis.test_processAllSuggestions = processAllSuggestions;
+
+    globalThis.test_fetchSuggestionsConcurrently = fetchSuggestionsConcurrently;
+
+    globalThis.test_discoverReposFromTasks = discoverReposFromTasks;
+
+    globalThis.test_performArchival = performArchival;
+
+    globalThis.test_getTasksToArchive = getTasksToArchive;
+
+    globalThis.test_fetchAndFilterTasks = fetchAndFilterTasks;
+
     globalThis.test_getOpenPRs = getOpenPRs;
     globalThis.test_prCache = prCache;
     globalThis.test_taskHasOpenPR = taskHasOpenPR;

@@ -437,7 +437,190 @@ async function getStartConfig() {
 }
 
 // =============================================================================
-// Suggestions Orchestrator
+// Orchestrators
+
+async function discoverReposFromTasks(label, config) {
+  addLog(`[${label}] Fetching task list to discover repos...`)
+  let tasks
+  try {
+    tasks = await listTasks('', config)
+  } catch (e) {
+    addLog(`[${label}] ERROR listing tasks: ${e.message}`)
+    return []
+  }
+  const repos = [...new Set(tasks.map((t) => t.source).filter(Boolean))]
+  if (repos.length === 0) {
+    addLog(`[${label}] No repos found from tasks.`)
+  } else {
+    addLog(`[${label}] Found ${repos.length} repos: ${repos.join(', ')}`)
+  }
+  return repos
+}
+
+async function fetchSuggestionsConcurrently(label, repos, config) {
+  addLog(`\n[${label}] Fetching suggestions for ${repos.length} repos concurrently...`)
+  return await Promise.all(
+    repos.map((repo) =>
+      listSuggestions(repo, config)
+        .then((suggestions) => ({ repo, suggestions }))
+        .catch((e) => ({ repo, error: e.message }))
+    )
+  )
+}
+
+async function processAllSuggestions(label, allSuggestions, options, config, startConfig) {
+  let totalStarted = 0
+  for (const { repo, suggestions, error } of allSuggestions) {
+    if (state.status === 'cancelled') break
+    if (error) {
+      addLog(`\n[${label}] ERROR fetching suggestions for ${repo}: ${error}`)
+      continue
+    }
+    if (suggestions.length === 0) {
+      addLog(`\n[${label}] ${repo}: No suggestions found`)
+      continue
+    }
+
+    addLog(`\n[${label}] ${repo}: Found ${suggestions.length} suggestions`)
+    updateState({ currentRepo: repo.replace(/^github\//, '') })
+
+    for (const s of suggestions) {
+      if (state.status === 'cancelled') break
+      if (options.dryRun) {
+        addLog(`  [DRY] Would start: ${s.title} (${s.categorySlug})`)
+      } else {
+        addLog(`  Starting: ${s.title}...`)
+        try {
+          await startSuggestion(s, repo, config, startConfig)
+          addLog(`  Started: ${s.title}`)
+          totalStarted++
+        } catch (err) {
+          addLog(`  [!] Failed to start "${s.title}": ${err.message}`)
+        }
+      }
+      updateState({
+        progress: {
+          archived: totalStarted,
+          skipped: state.progress.skipped,
+          total: state.progress.total + 1
+        }
+      })
+    }
+  }
+  return totalStarted
+}
+
+async function fetchAndFilterTasks(label, config) {
+  addLog(`[${label}] Fetching tasks via API...`)
+  let tasks
+  try {
+    tasks = await listTasks('', config)
+  } catch (e) {
+    addLog(`[${label}] ERROR listing tasks: ${e.message}`)
+    return null
+  }
+  if (tasks.length === 0) {
+    addLog(`[${label}] No tasks found.`)
+    return null
+  }
+  const candidates = tasks.filter(isArchivable)
+  const activeCount = tasks.length - candidates.length
+  addLog(`[${label}] ${tasks.length} total: ${candidates.length} completed/failed, ${activeCount} active`)
+  if (candidates.length === 0) {
+    addLog(`[${label}] No completed/failed tasks to archive.`)
+    return null
+  }
+  return candidates
+}
+
+async function getTasksToArchive(label, candidates, options) {
+  const byRepo = new Map()
+  for (const task of candidates) {
+    const key = task.repo || '(no repo)'
+    if (!byRepo.has(key)) byRepo.set(key, [])
+    byRepo.get(key).push(task)
+  }
+  const toArchive = []
+  const toSkip = []
+  const { ghOwner } = await chrome.storage.sync.get(['ghOwner'])
+  const { ghToken } = await chrome.storage.local.get(['ghToken'])
+  if (options.force) {
+    addLog(`[${label}] FORCE: skipping PR check`)
+    return { toArchive: candidates, toSkip: [] }
+  }
+  addLog(`\n[${label}] Checking open PRs per task...`)
+  const repoEntries = [...byRepo.entries()]
+  const prFetches = repoEntries.map(([_repo, repoTasks]) => {
+    const owner = repoTasks[0]?.owner || ghOwner || ''
+    const repoName = repoTasks[0]?.repoName || ''
+    return owner && repoName ? getOpenPRs(owner, repoName, ghToken) : Promise.resolve([])
+  })
+  const allPRs = await Promise.all(prFetches)
+  for (let i = 0; i < repoEntries.length; i++) {
+    const [repo, repoTasks] = repoEntries[i]
+    const openPRs = allPRs[i]
+    addLog(`  ${repo}: ${repoTasks.length} tasks, ${openPRs.length} open PRs`)
+    for (const task of repoTasks) {
+      if (task.state === 9) {
+        toArchive.push(task)
+      } else if (taskHasOpenPR(task, openPRs)) {
+        toSkip.push(task)
+        addLog(`    SKIP [${task.id}] ${task.title} (matching open PR)`)
+      } else {
+        toArchive.push(task)
+      }
+    }
+  }
+  if (toSkip.length > 0) {
+    addLog(`\n[${label}] ${toSkip.length} tasks skipped (open PRs matching)`)
+  }
+  return { toArchive, toSkip }
+}
+
+async function performArchival(label, toArchive, config, dryRun) {
+  const totalTasks = toArchive.length
+  addLog(`\n[${label}] Archiving ${totalTasks} tasks`)
+  const archiveByRepo = new Map()
+  for (const t of toArchive) {
+    const key = t.repo || '(no repo)'
+    if (!archiveByRepo.has(key)) archiveByRepo.set(key, [])
+    archiveByRepo.get(key).push(t)
+  }
+  if (dryRun) {
+    addLog(`[${label}] DRY RUN - would archive ${totalTasks} tasks`)
+    for (const [repo, repoTasks] of archiveByRepo) {
+      addLog(`  ${repo}: ${repoTasks.length} tasks`)
+      for (const t of repoTasks) {
+        addLog(`    [${t.id}] ${t.title} (state=${t.state})`)
+      }
+    }
+    return 0
+  }
+  let grandTotal = 0
+  for (const [repo, repoTasks] of archiveByRepo) {
+    updateState({ currentRepo: repo })
+    addLog(`\n[${label}] -> ${repo} (${repoTasks.length} tasks)`)
+    for (const task of repoTasks) {
+      try {
+        await archiveTask(task.id, config)
+        grandTotal++
+        addLog(`  Archived: [${task.id}] ${task.title}`)
+        updateState({
+          progress: {
+            archived: state.progress.archived + 1,
+            skipped: state.progress.skipped,
+            total: totalTasks
+          }
+        })
+      } catch (e) {
+        addLog(`  ERROR archiving ${task.id}: ${e.message}`)
+      }
+    }
+  }
+  addLog(`\n[${label}] TOTAL: ${grandTotal} archived`)
+  return grandTotal
+}
+
 // =============================================================================
 
 async function processSuggestionsForTab(tab, options) {
@@ -462,74 +645,11 @@ async function processSuggestionsForTab(tab, options) {
     addLog(`[${label}] Tip: Click Start on any suggestion in Jules UI to capture config.`)
   }
 
-  // Get repos from existing tasks
-  addLog(`[${label}] Fetching task list to discover repos...`)
-  let tasks
-  try {
-    tasks = await listTasks('', config)
-  } catch (e) {
-    addLog(`[${label}] ERROR listing tasks: ${e.message}`)
-    return 0
-  }
+  const repos = await discoverReposFromTasks(label, config)
+  if (repos.length === 0) return 0
 
-  const repos = [...new Set(tasks.map((t) => t.source).filter(Boolean))]
-  if (repos.length === 0) {
-    addLog(`[${label}] No repos found from tasks.`)
-    return 0
-  }
-
-  addLog(`[${label}] Found ${repos.length} repos: ${repos.join(', ')}`)
-
-  addLog(`\n[${label}] Fetching suggestions for ${repos.length} repos concurrently...`)
-  const suggestionFetches = repos.map((repo) =>
-    listSuggestions(repo, config)
-      .then((suggestions) => ({ repo, suggestions }))
-      .catch((e) => ({ repo, error: e.message }))
-  )
-  const allSuggestions = await Promise.all(suggestionFetches)
-
-  let totalStarted = 0
-  for (const { repo, suggestions, error } of allSuggestions) {
-    if (state.status === 'cancelled') break
-
-    if (error) {
-      addLog(`\n[${label}] ERROR fetching suggestions for ${repo}: ${error}`)
-      continue
-    }
-
-    if (suggestions.length === 0) {
-      addLog(`\n[${label}] ${repo}: No suggestions found`)
-      continue
-    }
-
-    addLog(`\n[${label}] ${repo}: Found ${suggestions.length} suggestions`)
-    updateState({ currentRepo: repo.replace(/^github\//, '') })
-
-    for (const s of suggestions) {
-      if (state.status === 'cancelled') break
-
-      if (options.dryRun) {
-        addLog(`  [DRY] Would start: ${s.title} (${s.categorySlug})`)
-      } else {
-        addLog(`  Starting: ${s.title}...`)
-        try {
-          await startSuggestion(s, repo, config, startConfig)
-          addLog(`  Started: ${s.title}`)
-          totalStarted++
-        } catch (err) {
-          addLog(`  [!] Failed to start "${s.title}": ${err.message}`)
-        }
-      }
-
-      updateState({
-        progress: {
-          archived: totalStarted,
-          skipped: state.progress.skipped,
-          total: state.progress.total + 1
-        }
-      })
-    }
-  }
+  const allSuggestions = await fetchSuggestionsConcurrently(label, repos, config)
+  const totalStarted = await processAllSuggestions(label, allSuggestions, options, config, startConfig)
 
   addLog(`\n[${label}] TOTAL: ${totalStarted} suggestions started`)
   return totalStarted
@@ -721,130 +841,6 @@ async function getTabConfig(tabId) {
 // =============================================================================
 // Orchestrator
 // =============================================================================
-
-async function fetchAndFilterTasks(label, config) {
-  addLog(`[${label}] Fetching tasks via API...`)
-  let tasks
-  try {
-    tasks = await listTasks('', config)
-  } catch (e) {
-    addLog(`[${label}] ERROR listing tasks: ${e.message}`)
-    return null
-  }
-
-  if (tasks.length === 0) {
-    addLog(`[${label}] No tasks found.`)
-    return null
-  }
-
-  const candidates = tasks.filter(isArchivable)
-  const activeCount = tasks.length - candidates.length
-  addLog(`[${label}] ${tasks.length} total: ${candidates.length} completed/failed, ${activeCount} active`)
-
-  if (candidates.length === 0) {
-    addLog(`[${label}] No completed/failed tasks to archive.`)
-    return null
-  }
-  return candidates
-}
-
-async function getTasksToArchive(label, candidates, options) {
-  const byRepo = new Map()
-  for (const task of candidates) {
-    const key = task.repo || '(no repo)'
-    if (!byRepo.has(key)) byRepo.set(key, [])
-    byRepo.get(key).push(task)
-  }
-
-  const toArchive = []
-  const toSkip = []
-  const { ghOwner } = await chrome.storage.sync.get(['ghOwner'])
-  const { ghToken } = await chrome.storage.local.get(['ghToken'])
-
-  if (options.force) {
-    addLog(`[${label}] FORCE: skipping PR check`)
-    return { toArchive: candidates, toSkip: [] }
-  }
-
-  addLog(`\n[${label}] Checking open PRs per task...`)
-  const repoEntries = [...byRepo.entries()]
-  const prFetches = repoEntries.map(([_repo, repoTasks]) => {
-    const owner = repoTasks[0]?.owner || ghOwner || ''
-    const repoName = repoTasks[0]?.repoName || ''
-    return owner && repoName ? getOpenPRs(owner, repoName, ghToken) : Promise.resolve([])
-  })
-  const allPRs = await Promise.all(prFetches)
-
-  for (let i = 0; i < repoEntries.length; i++) {
-    const [repo, repoTasks] = repoEntries[i]
-    const openPRs = allPRs[i]
-    addLog(`  ${repo}: ${repoTasks.length} tasks, ${openPRs.length} open PRs`)
-
-    for (const task of repoTasks) {
-      if (task.state === 9) {
-        toArchive.push(task)
-      } else if (taskHasOpenPR(task, openPRs)) {
-        toSkip.push(task)
-        addLog(`    SKIP [${task.id}] ${task.title} (matching open PR)`)
-      } else {
-        toArchive.push(task)
-      }
-    }
-  }
-
-  if (toSkip.length > 0) {
-    addLog(`\n[${label}] ${toSkip.length} tasks skipped (open PRs matching)`)
-  }
-  return { toArchive, toSkip }
-}
-
-async function performArchival(label, toArchive, config, dryRun) {
-  const totalTasks = toArchive.length
-  addLog(`\n[${label}] Archiving ${totalTasks} tasks`)
-
-  const archiveByRepo = new Map()
-  for (const t of toArchive) {
-    const key = t.repo || '(no repo)'
-    if (!archiveByRepo.has(key)) archiveByRepo.set(key, [])
-    archiveByRepo.get(key).push(t)
-  }
-
-  if (dryRun) {
-    addLog(`[${label}] DRY RUN - would archive ${totalTasks} tasks`)
-    for (const [repo, repoTasks] of archiveByRepo) {
-      addLog(`  ${repo}: ${repoTasks.length} tasks`)
-      for (const t of repoTasks) {
-        addLog(`    [${t.id}] ${t.title} (state=${t.state})`)
-      }
-    }
-    return 0
-  }
-
-  let grandTotal = 0
-  for (const [repo, repoTasks] of archiveByRepo) {
-    updateState({ currentRepo: repo })
-    addLog(`\n[${label}] -> ${repo} (${repoTasks.length} tasks)`)
-
-    for (const task of repoTasks) {
-      try {
-        await archiveTask(task.id, config)
-        grandTotal++
-        addLog(`  Archived: [${task.id}] ${task.title}`)
-        updateState({
-          progress: {
-            archived: state.progress.archived + 1,
-            skipped: state.progress.skipped,
-            total: totalTasks
-          }
-        })
-      } catch (e) {
-        addLog(`  ERROR archiving ${task.id}: ${e.message}`)
-      }
-    }
-  }
-  addLog(`\n[${label}] TOTAL: ${grandTotal} archived`)
-  return grandTotal
-}
 
 async function processTab(tab, options) {
   const label = getTabLabel(tab)

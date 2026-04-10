@@ -165,6 +165,7 @@ function setupEnvironment(initialTabs = {}) {
     bgScriptContent +
     `
     globalThis.test_ensureContentScript = ensureContentScript;
+    globalThis.test_stateReadyPromise = stateReadyPromise;
     globalThis.test_JULES_ORIGIN = JULES_ORIGIN;
   `
 
