@@ -12,9 +12,13 @@
 const JULES_ORIGIN = 'https://jules.google.com'
 
 function extractAccountNum(url) {
-  const parts = new URL(url).pathname.split('/')
-  const uIdx = parts.indexOf('u')
-  return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  try {
+    const parts = new URL(url).pathname.split('/')
+    const uIdx = parts.indexOf('u')
+    return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  } catch {
+    return '0'
+  }
 }
 
 // =============================================================================
@@ -205,15 +209,20 @@ const TASK = {
 const ARCHIVABLE_STATES = new Set([3, 9]) // 3=completed, 9=failed
 
 function parseTask(raw) {
+  // ⚡ Bolt Optimization: Cache source string and its split array to avoid
+  // redundant string allocations and array creations. This reduces GC pressure
+  // during large task list parsing.
+  const source = raw[TASK.SOURCE] || ''
+  const sourceParts = source.split('/')
   return {
     id: raw[TASK.ID],
     title: raw[TASK.DISPLAY_TITLE] || raw[TASK.SHORT_TITLE] || '(untitled)',
-    source: raw[TASK.SOURCE] || '',
+    source: source,
     state: raw[TASK.STATE],
     statusCode: raw[TASK.STATUS_CODE],
-    repo: (raw[TASK.SOURCE] || '').replace(/^github\//, ''),
-    owner: (raw[TASK.SOURCE] || '').split('/')[1] || '',
-    repoName: (raw[TASK.SOURCE] || '').split('/')[2] || ''
+    repo: source.replace(/^github\//, ''),
+    owner: sourceParts[1] || '',
+    repoName: sourceParts[2] || ''
   }
 }
 
