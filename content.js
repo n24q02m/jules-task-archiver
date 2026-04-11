@@ -11,7 +11,7 @@ let cachedConfig = null
 
 // Listen for messages from MAIN world script
 window.addEventListener('message', (event) => {
-  if (event.source !== window) return
+  if (event.source !== window || event.origin !== window.origin) return
   if (event.data?.type === 'JULES_ARCHIVER_CONFIG') {
     cachedConfig = event.data.config
   }
@@ -32,11 +32,11 @@ function extractConfig() {
 
   return new Promise((resolve) => {
     // Ask main-world.js to re-broadcast config
-    window.postMessage({ type: 'JULES_REQUEST_CONFIG' }, '*')
+    window.postMessage({ type: 'JULES_REQUEST_CONFIG' }, window.origin)
 
     const timeout = setTimeout(() => resolve(cachedConfig), 2000)
     const handler = (event) => {
-      if (event.source !== window) return
+      if (event.source !== window || event.origin !== window.origin) return
       if (event.data?.type !== 'JULES_ARCHIVER_CONFIG') return
       window.removeEventListener('message', handler)
       clearTimeout(timeout)
@@ -49,9 +49,13 @@ function extractConfig() {
 
 // Detect account from URL
 function getAccountNum() {
-  const parts = new URL(location.href).pathname.split('/')
-  const uIdx = parts.indexOf('u')
-  return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  try {
+    const parts = new URL(location.href).pathname.split('/')
+    const uIdx = parts.indexOf('u')
+    return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  } catch (_e) {
+    return '0'
+  }
 }
 
 function getAccountLabel() {
