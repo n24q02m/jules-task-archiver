@@ -12,9 +12,13 @@
 const JULES_ORIGIN = 'https://jules.google.com'
 
 function extractAccountNum(url) {
-  const parts = new URL(url).pathname.split('/')
-  const uIdx = parts.indexOf('u')
-  return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  try {
+    const parts = new URL(url).pathname.split('/')
+    const uIdx = parts.indexOf('u')
+    return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  } catch {
+    return '0'
+  }
 }
 
 // =============================================================================
@@ -564,7 +568,12 @@ async function getOpenPRs(owner, repo, token) {
       return []
     }
     const prs = await res.json()
-    const mapped = prs.map((pr) => ({ title: pr.title || '', branch: pr.head?.ref || '' }))
+    // ⚡ Bolt Optimization: Pre-calculate titleLower to avoid redundant O(N x M) lowercasing operations in taskHasOpenPR loops.
+    const mapped = prs.map((pr) => ({
+      title: pr.title || '',
+      titleLower: (pr.title || '').toLowerCase(),
+      branch: pr.head?.ref || ''
+    }))
     prCache.set(key, mapped)
     return mapped
   } catch (e) {
@@ -578,7 +587,7 @@ function taskHasOpenPR(task, openPRs) {
   if (openPRs.length === 0) return false
   const taskTitle = (task.title || '').toLowerCase()
   if (!taskTitle || taskTitle === '(untitled)') return false
-  return openPRs.some((pr) => pr.title.toLowerCase().includes(taskTitle) || taskTitle.includes(pr.title.toLowerCase()))
+  return openPRs.some((pr) => pr.titleLower && (pr.titleLower.includes(taskTitle) || taskTitle.includes(pr.titleLower)))
 }
 
 // =============================================================================
