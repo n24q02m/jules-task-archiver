@@ -191,6 +191,11 @@ function renderSummary(results) {
   summaryDiv.textContent = ''
 
   let grand = 0
+  // ⚡ Bolt Optimization: Use DocumentFragment to batch DOM updates.
+  // Appending multiple elements to a fragment and then appending the fragment
+  // to the DOM once minimizes expensive reflows and repaints, improving performance
+  // for large summary lists.
+  const fragment = document.createDocumentFragment()
   for (const r of results) {
     grand += r.count
     const div = document.createElement('div')
@@ -200,13 +205,15 @@ function renderSummary(results) {
     } else {
       div.textContent = `${r.label}: ${r.count} processed`
     }
-    summaryDiv.appendChild(div)
+    fragment.appendChild(div)
   }
 
   const totalDiv = document.createElement('div')
   totalDiv.className = 'total'
   totalDiv.textContent = `TOTAL: ${grand} processed`
-  summaryDiv.appendChild(totalDiv)
+  fragment.appendChild(totalDiv)
+
+  summaryDiv.appendChild(fragment)
 }
 
 // --- Check for existing state on popup open ---
