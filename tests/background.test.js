@@ -26,7 +26,13 @@ function setupEnvironment(initialStorage = {}) {
         get: async () => ({})
       },
       local: {
-        get: async () => ({})
+        get: async (key) => {
+          return key ? { [key]: currentStorage[key] } : currentStorage
+        },
+        set: async (data) => {
+          sessionSetData.push(data)
+          currentStorage = { ...currentStorage, ...data }
+        }
       }
     },
     runtime: {
@@ -95,6 +101,7 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_parseSuggestion = parseSuggestion;
     globalThis.test_buildSuggestionPrompt = buildSuggestionPrompt;
     globalThis.test_buildStartPayload = buildStartPayload;
+    globalThis.test_getStartConfig = getStartConfig;
     globalThis.test_SUGGESTION = SUGGESTION;
     globalThis.test_SDETAIL = SDETAIL;
     globalThis.test_CATEGORY_CONFIG = CATEGORY_CONFIG;
@@ -796,5 +803,26 @@ describe('getJulesTabs', () => {
     assert.strictEqual(tabs.length, 2)
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[0].url), '0')
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[1].url), '1')
+  })
+})
+
+// =============================================================================
+// Start Config Tests
+// =============================================================================
+
+describe('getStartConfig', () => {
+  it('should retrieve julesStartConfig from local storage', async () => {
+    const mockConfig = { modelId: 'test-model', experimentIds: [123] }
+    const { sandbox } = setupEnvironment({ julesStartConfig: mockConfig })
+
+    const config = await sandbox.test_getStartConfig()
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(config)), mockConfig)
+  })
+
+  it('should return undefined if julesStartConfig is not set', async () => {
+    const { sandbox } = setupEnvironment({})
+
+    const config = await sandbox.test_getStartConfig()
+    assert.strictEqual(config, undefined)
   })
 })
