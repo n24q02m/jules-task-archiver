@@ -99,6 +99,8 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_SDETAIL = SDETAIL;
     globalThis.test_CATEGORY_CONFIG = CATEGORY_CONFIG;
     globalThis.test_DEFAULT_CATEGORY = DEFAULT_CATEGORY;
+    globalThis.test_getTabConfig = getTabConfig;
+    globalThis.test_ensureContentScript = ensureContentScript;
   `
 
   const script = new vm.Script(scriptContent)
@@ -796,5 +798,54 @@ describe('getJulesTabs', () => {
     assert.strictEqual(tabs.length, 2)
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[0].url), '0')
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[1].url), '1')
+  })
+})
+
+// =============================================================================
+// getTabConfig Tests
+// =============================================================================
+
+describe('getTabConfig', () => {
+  it('should return config when content script responds successfully', async () => {
+    const { sandbox } = setupEnvironment()
+    const mockConfig = { at: 'token123', bl: 'build123', fsid: 'sid123' }
+    sandbox.chrome.tabs.sendMessage = async (_tabId, msg) => {
+      if (msg.action === 'PING') return { ok: true }
+      if (msg.action === 'GET_CONFIG') return { config: mockConfig, accountNum: '5' }
+    }
+
+    const config = await sandbox.test_getTabConfig(1)
+    assert.strictEqual(config.at, 'token123')
+    assert.strictEqual(config.accountNum, '5')
+  })
+
+  it('should throw error when config is missing XSRF token', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.chrome.tabs.sendMessage = async (_tabId, msg) => {
+      if (msg.action === 'PING') return { ok: true }
+      if (msg.action === 'GET_CONFIG') return { config: { bl: 'b' }, accountNum: '0' }
+    }
+
+    await assert.rejects(sandbox.test_getTabConfig(1), /Could not extract page config/)
+  })
+
+  it('should throw error when ensureContentScript fails', async () => {
+    const { sandbox } = setupEnvironment()
+    // Fail ensureContentScript by making PING always fail
+    sandbox.chrome.tabs.sendMessage = async () => {
+      throw new Error('Tab closed')
+    }
+
+    // We need to speed up the timeout for testing
+    const originalDateNow = sandbox.Date.now
+    let now = 0
+    sandbox.Date.now = () => {
+      now += 1000
+      return now
+    }
+
+    await assert.rejects(sandbox.test_getTabConfig(1), /Content script failed to initialize/)
+
+    sandbox.Date.now = originalDateNow
   })
 })
