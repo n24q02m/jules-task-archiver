@@ -83,6 +83,7 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_parseResponse = parseResponse;
     globalThis.test_parseTask = parseTask;
     globalThis.test_isArchivable = isArchivable;
+    globalThis.test_listTasks = listTasks;
     globalThis.test_TASK = TASK;
     globalThis.test_ARCHIVABLE_STATES = ARCHIVABLE_STATES;
     globalThis.test_JULES_ORIGIN = JULES_ORIGIN;
@@ -796,5 +797,67 @@ describe('getJulesTabs', () => {
     assert.strictEqual(tabs.length, 2)
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[0].url), '0')
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[1].url), '1')
+  })
+})
+
+// =============================================================================
+// listTasks Tests
+// =============================================================================
+
+// =============================================================================
+// listTasks Tests
+// =============================================================================
+
+// =============================================================================
+// listTasks Tests
+// =============================================================================
+
+describe('listTasks', () => {
+  it('should list and parse tasks correctly', async () => {
+    const rawTask = new Array(31).fill(null)
+    rawTask[0] = 'task-1'
+    rawTask[1] = 'Title'
+    rawTask[4] = 'github/owner/repo'
+    rawTask[5] = 3
+
+    // result[0] should be an array of raw tasks
+    const innerPayload = [[rawTask]]
+    const mockResponse = `)]}'\n\n100\n[["er", "p1Takd", ${JSON.stringify(JSON.stringify(innerPayload))}]]`
+
+    const { sandbox } = setupEnvironment()
+    let fetchCalled = false
+    sandbox.fetch = async (url, options) => {
+      fetchCalled = true
+      assert.ok(url.includes('rpcids=p1Takd'))
+      const body = new URLSearchParams(options.body)
+      const f_req = body.get('f.req')
+      assert.ok(f_req.includes('filter-1'))
+      assert.ok(f_req.includes('4'))
+      return {
+        ok: true,
+        text: async () => mockResponse
+      }
+    }
+
+    const config = { accountNum: '0' }
+    const tasks = await sandbox.test_listTasks('filter-1', config)
+
+    assert.ok(fetchCalled)
+    assert.strictEqual(tasks.length, 1)
+    assert.strictEqual(tasks[0].id, 'task-1')
+    assert.strictEqual(tasks[0].title, 'Title')
+    assert.strictEqual(tasks[0].repo, 'owner/repo')
+  })
+
+  it('should return empty array when no tasks found', async () => {
+    const mockResponse = ')]}\'\n\n4\n[["er", "p1Takd", null]]'
+    const { sandbox } = setupEnvironment()
+    sandbox.fetch = async () => ({
+      ok: true,
+      text: async () => mockResponse
+    })
+
+    const tasks = await sandbox.test_listTasks('filter', {})
+    assert.strictEqual(tasks.length, 0)
   })
 })
