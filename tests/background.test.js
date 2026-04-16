@@ -99,6 +99,9 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_SDETAIL = SDETAIL;
     globalThis.test_CATEGORY_CONFIG = CATEGORY_CONFIG;
     globalThis.test_DEFAULT_CATEGORY = DEFAULT_CATEGORY;
+    globalThis.test_startKeepAlive = startKeepAlive;
+    globalThis.test_stopKeepAlive = stopKeepAlive;
+    globalThis.test_getKeepAliveInterval = () => keepAliveInterval;
   `
 
   const script = new vm.Script(scriptContent)
@@ -796,5 +799,35 @@ describe('getJulesTabs', () => {
     assert.strictEqual(tabs.length, 2)
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[0].url), '0')
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[1].url), '1')
+  })
+})
+
+// =============================================================================
+// Keep Alive Tests
+// =============================================================================
+
+describe('keepAlive', () => {
+  it('should start and stop keepAlive interval', () => {
+    const { sandbox } = setupEnvironment()
+
+    // Initial state
+    assert.strictEqual(sandbox.test_getKeepAliveInterval(), null)
+
+    // Start
+    sandbox.test_startKeepAlive()
+    const interval = sandbox.test_getKeepAliveInterval()
+    assert.ok(interval !== null)
+
+    // Start again (should be idempotent)
+    sandbox.test_startKeepAlive()
+    assert.strictEqual(sandbox.test_getKeepAliveInterval(), interval)
+
+    // Stop
+    sandbox.test_stopKeepAlive()
+    assert.strictEqual(sandbox.test_getKeepAliveInterval(), null)
+
+    // Stop again (should handle null)
+    sandbox.test_stopKeepAlive()
+    assert.strictEqual(sandbox.test_getKeepAliveInterval(), null)
   })
 })
