@@ -117,6 +117,13 @@ const bgScriptContent = fs.readFileSync(bgScriptPath, 'utf8')
 
 function setupEnvironment(initialTabs = {}) {
   const chromeMock = {
+    alarms: {
+      create: () => {},
+      clear: () => {},
+      onAlarm: {
+        addListener: () => {}
+      }
+    },
     storage: {
       session: {
         get: async () => ({}),
