@@ -16,7 +16,7 @@ function extractAccountNum(url) {
     const parts = new URL(url).pathname.split('/')
     const uIdx = parts.indexOf('u')
     return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
-  } catch (e) {
+  } catch (_e) {
     return '0'
   }
 }
@@ -432,8 +432,8 @@ async function startSuggestion(suggestion, repo, config, startConfig) {
 }
 
 async function getStartConfig() {
-  const { startConfig } = await chrome.storage.session.get('startConfig')
-  return startConfig || null
+  const { julesStartConfig } = await chrome.storage.local.get('julesStartConfig')
+  return julesStartConfig
 }
 
 // =============================================================================
@@ -963,7 +963,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       return true
 
     case 'CACHE_START_CONFIG':
-      chrome.storage.session.set({ startConfig: msg.config })
+      chrome.storage.local.set({ julesStartConfig: msg.config })
       sendResponse({ ok: true })
       break
 
