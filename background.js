@@ -16,7 +16,7 @@ function extractAccountNum(url) {
     const parts = new URL(url).pathname.split('/')
     const uIdx = parts.indexOf('u')
     return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
-  } catch (e) {
+  } catch (_e) {
     return '0'
   }
 }
@@ -440,7 +440,7 @@ async function getStartConfig() {
 // Suggestions Orchestrator
 // =============================================================================
 
-async function processSuggestionsForTab(tab, options) {
+async function processSuggestionsForTab(tab, _options) {
   const label = getTabLabel(tab)
   updateState({ currentTab: label })
   addLog(`\n${'='.repeat(50)}`)
@@ -508,7 +508,7 @@ async function processSuggestionsForTab(tab, options) {
     for (const s of suggestions) {
       if (state.status === 'cancelled') break
 
-      if (options.dryRun) {
+      if (dryRun) {
         addLog(`  [DRY] Would start: ${s.title} (${s.categorySlug})`)
       } else {
         addLog(`  Starting: ${s.title}...`)
@@ -723,6 +723,12 @@ async function getTabConfig(tabId) {
 // =============================================================================
 
 async function processTab(tab, options) {
+  if (options.opMode === 'suggestions') {
+    return processSuggestionsForTab(tab, options)
+  }
+
+  const { force, dryRun } = options
+
   const label = getTabLabel(tab)
   updateState({ currentTab: label })
   addLog(`\n${'='.repeat(50)}`)
@@ -780,7 +786,7 @@ async function processTab(tab, options) {
   const { ghOwner } = await chrome.storage.sync.get(['ghOwner'])
   const { ghToken } = await chrome.storage.local.get(['ghToken'])
 
-  if (options.force) {
+  if (force) {
     addLog(`[${label}] FORCE: skipping PR check`)
     for (const task of candidates) toArchive.push(task)
   } else {
@@ -826,7 +832,7 @@ async function processTab(tab, options) {
   const totalTasks = toArchive.length
   addLog(`\n[${label}] Archiving ${totalTasks} tasks`)
 
-  if (options.dryRun) {
+  if (dryRun) {
     addLog(`[${label}] DRY RUN - would archive ${totalTasks} tasks`)
     const archiveByRepo = new Map()
     for (const t of toArchive) {
