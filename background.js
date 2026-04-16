@@ -441,20 +441,9 @@ async function getStartConfig() {
 // =============================================================================
 
 async function processSuggestionsForTab(tab, options) {
-  const label = getTabLabel(tab)
-  updateState({ currentTab: label })
-  addLog(`\n${'='.repeat(50)}`)
-  addLog(`${label}: ${tab.url}`)
-  addLog(`${'='.repeat(50)}`)
-
-  let config
-  try {
-    config = await getTabConfig(tab.id)
-    addLog(`[${label}] Config extracted (bl: ${config.bl.split('_').pop()})`)
-  } catch (e) {
-    addLog(`[${label}] ERROR: ${e.message}`)
-    return 0
-  }
+  const prepared = await prepareTab(tab)
+  if (!prepared) return 0
+  const { label, config } = prepared
 
   const startConfig = await getStartConfig()
   if (!startConfig) {
@@ -663,6 +652,23 @@ function getTabLabel(tab) {
   return num !== '0' ? `u/${num}` : 'default'
 }
 
+async function prepareTab(tab) {
+  const label = getTabLabel(tab)
+  updateState({ currentTab: label })
+  addLog(`\n${'='.repeat(50)}`)
+  addLog(`${label}: ${tab.url}`)
+  addLog(`${'='.repeat(50)}`)
+
+  try {
+    const config = await getTabConfig(tab.id)
+    addLog(`[${label}] Config extracted (bl: ${config.bl.split('_').pop()})`)
+    return { label, config }
+  } catch (e) {
+    addLog(`[${label}] ERROR: ${e.message}`)
+    return null
+  }
+}
+
 async function ensureContentScript(tabId) {
   const checkOrigin = async () => {
     const tab = await chrome.tabs.get(tabId)
@@ -723,21 +729,9 @@ async function getTabConfig(tabId) {
 // =============================================================================
 
 async function processTab(tab, options) {
-  const label = getTabLabel(tab)
-  updateState({ currentTab: label })
-  addLog(`\n${'='.repeat(50)}`)
-  addLog(`${label}: ${tab.url}`)
-  addLog(`${'='.repeat(50)}`)
-
-  // Get page config (tokens for batchexecute)
-  let config
-  try {
-    config = await getTabConfig(tab.id)
-    addLog(`[${label}] Config extracted (bl: ${config.bl.split('_').pop()})`)
-  } catch (e) {
-    addLog(`[${label}] ERROR: ${e.message}`)
-    return 0
-  }
+  const prepared = await prepareTab(tab)
+  if (!prepared) return 0
+  const { label, config } = prepared
 
   // List all active tasks via API
   addLog(`[${label}] Fetching tasks via API...`)
