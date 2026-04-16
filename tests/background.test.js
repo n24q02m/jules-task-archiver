@@ -750,6 +750,13 @@ describe('extractAccountNum', () => {
     assert.strictEqual(sandbox.test_extractAccountNum('https://google.com'), '0')
     assert.strictEqual(sandbox.test_extractAccountNum(''), '0')
   })
+
+  it('should handle null, undefined, and malformed URLs gracefully', () => {
+    const { sandbox } = setupEnvironment()
+    assert.strictEqual(sandbox.test_extractAccountNum(null), '0')
+    assert.strictEqual(sandbox.test_extractAccountNum(undefined), '0')
+    assert.strictEqual(sandbox.test_extractAccountNum('not-a-url'), '0')
+  })
 })
 
 describe('getTabLabel', () => {
