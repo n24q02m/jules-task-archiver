@@ -10,6 +10,7 @@
 // =============================================================================
 
 const JULES_ORIGIN = 'https://jules.google.com'
+const ARCHIVE_CHUNK_SIZE = 10
 
 function extractAccountNum(url) {
   try {
@@ -857,21 +858,30 @@ async function processTab(tab, options) {
     updateState({ currentRepo: repo })
     addLog(`\n[${label}] -> ${repo} (${repoTasks.length} tasks)`)
 
-    for (const task of repoTasks) {
-      try {
-        await archiveTask(task.id, config)
-        grandTotal++
-        addLog(`  Archived: [${task.id}] ${task.title}`)
+    for (let i = 0; i < repoTasks.length; i += ARCHIVE_CHUNK_SIZE) {
+      const chunk = repoTasks.slice(i, i + ARCHIVE_CHUNK_SIZE)
+      const results = await Promise.all(
+        chunk.map((task) =>
+          archiveTask(task.id, config)
+            .then(() => ({ task, ok: true }))
+            .catch((e) => ({ task, ok: false, error: e.message }))
+        )
+      )
 
-        updateState({
-          progress: {
-            archived: state.progress.archived + 1,
-            skipped: state.progress.skipped,
-            total: totalTasks
-          }
-        })
-      } catch (e) {
-        addLog(`  ERROR archiving ${task.id}: ${e.message}`)
+      for (const res of results) {
+        if (res.ok) {
+          grandTotal++
+          addLog(`  Archived: [${res.task.id}] ${res.task.title}`)
+          updateState({
+            progress: {
+              archived: state.progress.archived + 1,
+              skipped: state.progress.skipped,
+              total: totalTasks
+            }
+          })
+        } else {
+          addLog(`  ERROR archiving ${res.task.id}: ${res.error}`)
+        }
       }
     }
   }
