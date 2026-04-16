@@ -16,7 +16,7 @@ function extractAccountNum(url) {
     const parts = new URL(url).pathname.split('/')
     const uIdx = parts.indexOf('u')
     return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
-  } catch (e) {
+  } catch (_e) {
     return '0'
   }
 }
@@ -441,20 +441,9 @@ async function getStartConfig() {
 // =============================================================================
 
 async function processSuggestionsForTab(tab, options) {
-  const label = getTabLabel(tab)
-  updateState({ currentTab: label })
-  addLog(`\n${'='.repeat(50)}`)
-  addLog(`${label}: ${tab.url}`)
-  addLog(`${'='.repeat(50)}`)
-
-  let config
-  try {
-    config = await getTabConfig(tab.id)
-    addLog(`[${label}] Config extracted (bl: ${config.bl.split('_').pop()})`)
-  } catch (e) {
-    addLog(`[${label}] ERROR: ${e.message}`)
-    return 0
-  }
+  const prep = await prepareTab(tab)
+  if (!prep) return 0
+  const { label, config } = prep
 
   const startConfig = await getStartConfig()
   if (!startConfig) {
@@ -718,54 +707,24 @@ async function getTabConfig(tabId) {
   }
 }
 
-// =============================================================================
-// Orchestrator
-// =============================================================================
-
-async function processTab(tab, options) {
+async function prepareTab(tab) {
   const label = getTabLabel(tab)
   updateState({ currentTab: label })
   addLog(`\n${'='.repeat(50)}`)
   addLog(`${label}: ${tab.url}`)
   addLog(`${'='.repeat(50)}`)
 
-  // Get page config (tokens for batchexecute)
-  let config
   try {
-    config = await getTabConfig(tab.id)
+    const config = await getTabConfig(tab.id)
     addLog(`[${label}] Config extracted (bl: ${config.bl.split('_').pop()})`)
+    return { label, config }
   } catch (e) {
     addLog(`[${label}] ERROR: ${e.message}`)
-    return 0
+    return null
   }
+}
 
-  // List all active tasks via API
-  addLog(`[${label}] Fetching tasks via API...`)
-  let tasks
-  try {
-    tasks = await listTasks('', config)
-  } catch (e) {
-    addLog(`[${label}] ERROR listing tasks: ${e.message}`)
-    return 0
-  }
-
-  if (tasks.length === 0) {
-    addLog(`[${label}] No tasks found.`)
-    return 0
-  }
-
-  // Filter by task state: only completed/failed are candidates
-  const candidates = tasks.filter(isArchivable)
-  const active = tasks.filter((t) => !isArchivable(t))
-
-  addLog(`[${label}] ${tasks.length} total: ${candidates.length} completed/failed, ${active.length} active`)
-
-  if (candidates.length === 0) {
-    addLog(`[${label}] No completed/failed tasks to archive.`)
-    return 0
-  }
-
-  // Group candidates by repo
+async function filterTasksByPR(candidates, options, label) {
   const byRepo = new Map()
   for (const task of candidates) {
     const key = task.repo || '(no repo)'
@@ -773,7 +732,6 @@ async function processTab(tab, options) {
     byRepo.get(key).push(task)
   }
 
-  // PR check: task-level matching (skip tasks with open matching PRs)
   const toArchive = []
   const toSkip = []
 
@@ -785,7 +743,6 @@ async function processTab(tab, options) {
     for (const task of candidates) toArchive.push(task)
   } else {
     addLog(`\n[${label}] Checking open PRs per task...`)
-    // Fetch open PRs concurrently for all repos
     const repoEntries = [...byRepo.entries()]
     const prFetches = repoEntries.map(([_repo, repoTasks]) => {
       const owner = repoTasks[0]?.owner || ghOwner || ''
@@ -801,7 +758,6 @@ async function processTab(tab, options) {
 
       for (const task of repoTasks) {
         if (task.state === 9) {
-          // Failed tasks: always archive (no PR created)
           toArchive.push(task)
         } else if (taskHasOpenPR(task, openPRs)) {
           toSkip.push(task)
@@ -817,23 +773,22 @@ async function processTab(tab, options) {
     addLog(`\n[${label}] ${toSkip.length} tasks skipped (open PRs matching)`)
   }
 
-  if (toArchive.length === 0) {
-    addLog(`[${label}] Nothing to archive (all tasks have matching open PRs).`)
-    return 0
-  }
+  return toArchive
+}
 
-  // Archive
+async function executeArchive(toArchive, config, options, label) {
   const totalTasks = toArchive.length
   addLog(`\n[${label}] Archiving ${totalTasks} tasks`)
 
+  const archiveByRepo = new Map()
+  for (const t of toArchive) {
+    const key = t.repo || '(no repo)'
+    if (!archiveByRepo.has(key)) archiveByRepo.set(key, [])
+    archiveByRepo.get(key).push(t)
+  }
+
   if (options.dryRun) {
     addLog(`[${label}] DRY RUN - would archive ${totalTasks} tasks`)
-    const archiveByRepo = new Map()
-    for (const t of toArchive) {
-      const key = t.repo || '(no repo)'
-      if (!archiveByRepo.has(key)) archiveByRepo.set(key, [])
-      archiveByRepo.get(key).push(t)
-    }
     for (const [repo, repoTasks] of archiveByRepo) {
       addLog(`  ${repo}: ${repoTasks.length} tasks`)
       for (const t of repoTasks) {
@@ -844,15 +799,6 @@ async function processTab(tab, options) {
   }
 
   let grandTotal = 0
-
-  // Group toArchive by repo for organized logging
-  const archiveByRepo = new Map()
-  for (const t of toArchive) {
-    const key = t.repo || '(no repo)'
-    if (!archiveByRepo.has(key)) archiveByRepo.set(key, [])
-    archiveByRepo.get(key).push(t)
-  }
-
   for (const [repo, repoTasks] of archiveByRepo) {
     updateState({ currentRepo: repo })
     addLog(`\n[${label}] -> ${repo} (${repoTasks.length} tasks)`)
@@ -878,6 +824,49 @@ async function processTab(tab, options) {
 
   addLog(`\n[${label}] TOTAL: ${grandTotal} archived`)
   return grandTotal
+}
+
+// =============================================================================
+// Orchestrator
+// =============================================================================
+
+async function processTab(tab, options) {
+  const prep = await prepareTab(tab)
+  if (!prep) return 0
+  const { label, config } = prep
+
+  // List all active tasks via API
+  addLog(`[${label}] Fetching tasks via API...`)
+  let tasks
+  try {
+    tasks = await listTasks('', config)
+  } catch (e) {
+    addLog(`[${label}] ERROR listing tasks: ${e.message}`)
+    return 0
+  }
+
+  if (tasks.length === 0) {
+    addLog(`[${label}] No tasks found.`)
+    return 0
+  }
+
+  const candidates = tasks.filter(isArchivable)
+  const active = tasks.filter((t) => !isArchivable(t))
+  addLog(`[${label}] ${tasks.length} total: ${candidates.length} completed/failed, ${active.length} active`)
+
+  if (candidates.length === 0) {
+    addLog(`[${label}] No completed/failed tasks to archive.`)
+    return 0
+  }
+
+  const toArchive = await filterTasksByPR(candidates, options, label)
+
+  if (toArchive.length === 0) {
+    addLog(`[${label}] Nothing to archive (all tasks have matching open PRs).`)
+    return 0
+  }
+
+  return await executeArchive(toArchive, config, options, label)
 }
 
 async function startOperation(options) {
