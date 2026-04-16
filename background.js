@@ -16,7 +16,7 @@ function extractAccountNum(url) {
     const parts = new URL(url).pathname.split('/')
     const uIdx = parts.indexOf('u')
     return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
-  } catch (e) {
+  } catch (_e) {
     return '0'
   }
 }
@@ -285,9 +285,19 @@ function parseSuggestion(raw) {
 }
 
 async function listSuggestions(repo, config) {
-  const result = await callBatchExecute('hQP40d', [repo], config)
-  if (!result || !Array.isArray(result) || !Array.isArray(result[0])) return []
-  return result[0].map(parseSuggestion).filter(Boolean)
+  const payload = [2, repo, 10]
+  const result = await callBatchExecute('Q0gixc', payload, config)
+  if (!result?.[0]) return []
+
+  return result[0]
+    .map(parseSuggestion)
+    .filter(Boolean)
+    .sort((a, b) => {
+      // Group by category, then by ID
+      const catCompare = a.categorySlug.localeCompare(b.categorySlug)
+      if (catCompare !== 0) return catCompare
+      return a.id.localeCompare(b.id)
+    })
 }
 
 // =============================================================================

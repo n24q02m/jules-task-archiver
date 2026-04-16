@@ -99,6 +99,7 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_SDETAIL = SDETAIL;
     globalThis.test_CATEGORY_CONFIG = CATEGORY_CONFIG;
     globalThis.test_DEFAULT_CATEGORY = DEFAULT_CATEGORY;
+    globalThis.test_listSuggestions = listSuggestions;
   `
 
   const script = new vm.Script(scriptContent)
@@ -796,5 +797,157 @@ describe('getJulesTabs', () => {
     assert.strictEqual(tabs.length, 2)
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[0].url), '0')
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[1].url), '1')
+  })
+})
+
+// =============================================================================
+
+// =============================================================================
+// listSuggestions Tests
+// =============================================================================
+
+describe('listSuggestions', () => {
+  it('should call callBatchExecute with correct RPC ID and payload', async () => {
+    let capturedRpcId, capturedPayload
+    const { sandbox } = setupEnvironment()
+    sandbox.fetch = async (url, options) => {
+      const u = new URL(url)
+      capturedRpcId = u.searchParams.get('rpcids')
+
+      const bodyParams = new URLSearchParams(options.body)
+      const reqStr = bodyParams.get('f.req')
+      const req = JSON.parse(reqStr)
+      capturedPayload = JSON.parse(req[0][0][1])
+
+      const innerJson = JSON.stringify([[]])
+      const outerJson = JSON.stringify([['wrb.fr', 'Q0gixc', innerJson]])
+      return {
+        ok: true,
+        text: async () => `)]}'\n${outerJson.length}\n${outerJson}`
+      }
+    }
+
+    await sandbox.test_listSuggestions('owner/repo', { at: 'at', bl: 'bl', fsid: 'fsid', accountNum: '0' })
+    assert.strictEqual(capturedRpcId, 'Q0gixc')
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(capturedPayload)), [2, 'owner/repo', 10])
+  })
+
+  it('should map, filter, and sort suggestions', async () => {
+    const { sandbox } = setupEnvironment()
+    const mockSuggestions = [
+      // Suggestion 1: Category B, ID 2
+      [
+        'id-2',
+        ['Title 2', 'Desc 2', 'url', 'file', 1, 0.9, 'reason', 'code', 'js', 'category-b', 1],
+        'status',
+        null,
+        'tab'
+      ],
+      // Suggestion 2: Category A, ID 1
+      [
+        'id-1',
+        ['Title 1', 'Desc 1', 'url', 'file', 1, 0.9, 'reason', 'code', 'js', 'category-a', 1],
+        'status',
+        null,
+        'tab'
+      ],
+      // Suggestion 3: Category B, ID 1
+      [
+        'id-1-b',
+        ['Title 1b', 'Desc 1b', 'url', 'file', 1, 0.9, 'reason', 'code', 'js', 'category-b', 1],
+        'status',
+        null,
+        'tab'
+      ]
+    ]
+
+    sandbox.fetch = async () => {
+      const innerJson = JSON.stringify([mockSuggestions])
+      const outerJson = JSON.stringify([['wrb.fr', 'Q0gixc', innerJson]])
+      return {
+        ok: true,
+        text: async () => `)]}'\n${outerJson.length}\n${outerJson}`
+      }
+    }
+
+    const suggestions = await sandbox.test_listSuggestions('repo', {
+      at: 'at',
+      bl: 'bl',
+      fsid: 'fsid',
+      accountNum: '0'
+    })
+    const normalized = JSON.parse(JSON.stringify(suggestions))
+    assert.strictEqual(normalized.length, 3)
+    assert.strictEqual(normalized[0].categorySlug, 'category-a')
+    assert.strictEqual(normalized[1].categorySlug, 'category-b')
+    assert.strictEqual(normalized[1].id, 'id-1-b')
+    assert.strictEqual(normalized[2].categorySlug, 'category-b')
+    assert.strictEqual(normalized[2].id, 'id-2')
+  })
+
+  it('should return empty array on malformed or empty response', async () => {
+    const { sandbox } = setupEnvironment()
+
+    // Empty result[0]
+    sandbox.fetch = async () => {
+      const innerJson = JSON.stringify([[]])
+      const outerJson = JSON.stringify([['wrb.fr', 'Q0gixc', innerJson]])
+      return {
+        ok: true,
+        text: async () => `)]}'\n${outerJson.length}\n${outerJson}`
+      }
+    }
+    let res = await sandbox.test_listSuggestions('repo', { at: 'at', bl: 'bl', fsid: 'fsid', accountNum: '0' })
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(res)), [])
+
+    // Missing result[0]
+    sandbox.fetch = async () => {
+      const innerJson = JSON.stringify([])
+      const outerJson = JSON.stringify([['wrb.fr', 'Q0gixc', innerJson]])
+      return {
+        ok: true,
+        text: async () => `)]}'\n${outerJson.length}\n${outerJson}`
+      }
+    }
+    res = await sandbox.test_listSuggestions('repo', { at: 'at', bl: 'bl', fsid: 'fsid', accountNum: '0' })
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(res)), [])
+  })
+})
+
+describe('listSuggestions (integration)', () => {
+  it('should work with real callBatchExecute and mocked fetch', async () => {
+    const { sandbox } = setupEnvironment()
+
+    sandbox.fetch = async () => {
+      const mockResult = [
+        [
+          [
+            's1',
+            ['Title 1', 'Desc 1', 'url', 'file', 1, 0.9, 'reason', 'code', 'js', 'cat-a', 1],
+            'status',
+            null,
+            'tab'
+          ]
+        ]
+      ]
+      const innerJson = JSON.stringify(mockResult)
+      const outerJson = JSON.stringify([['wrb.fr', 'Q0gixc', innerJson]])
+      return {
+        ok: true,
+        text: async () => `)]}'\n${outerJson.length}\n${outerJson}`
+      }
+    }
+
+    const suggestions = await sandbox.test_listSuggestions('owner/repo', {
+      at: 'at',
+      bl: 'bl',
+      fsid: 'fsid',
+      accountNum: '0'
+    })
+
+    const normalized = JSON.parse(JSON.stringify(suggestions))
+    assert.strictEqual(normalized.length, 1)
+    assert.strictEqual(normalized[0].id, 's1')
+    assert.strictEqual(normalized[0].title, 'Title 1')
   })
 })
