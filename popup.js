@@ -30,6 +30,18 @@ function setActiveOpMode(value) {
     b.setAttribute('aria-pressed', String(isActive))
   })
   opMode = value
+
+  // Progressive disclosure: hide archive-specific settings
+  const isArchive = value === 'archive'
+  const settingsSection = document.querySelector('.settings')
+  const forceCheckboxContainer = forceCheckbox.parentElement
+
+  if (settingsSection) {
+    settingsSection.style.display = isArchive ? 'block' : 'none'
+  }
+  if (forceCheckboxContainer) {
+    forceCheckboxContainer.style.display = isArchive ? 'flex' : 'none'
+  }
 }
 
 document.querySelectorAll('#opMode button').forEach((btn) => {
@@ -39,18 +51,25 @@ document.querySelectorAll('#opMode button').forEach((btn) => {
   })
 })
 
-// --- Load saved settings ---
-chrome.storage.sync.get(['ghOwner', 'opMode'], (syncData) => {
+// --- Load saved settings & cleanup insecure storage ---
+chrome.storage.sync.get(['ghOwner', 'opMode', 'ghToken'], (syncData) => {
   if (syncData.ghOwner) ghOwnerInput.value = syncData.ghOwner
   if (syncData.opMode) {
     setActiveOpMode(syncData.opMode)
+  }
+
+  // Cleanup legacy insecure storage of token in sync
+  if (syncData.ghToken) {
+    chrome.storage.local.set({ ghToken: syncData.ghToken }, () => {
+      chrome.storage.sync.remove('ghToken')
+    })
+    ghTokenInput.value = syncData.ghToken
   }
 
   chrome.storage.local.get(['ghToken'], (localData) => {
     if (localData.ghToken) ghTokenInput.value = localData.ghToken
   })
 })
-
 // --- Save settings on change ---
 ghOwnerInput.addEventListener('change', () => {
   chrome.storage.sync.set({ ghOwner: ghOwnerInput.value.trim() })
@@ -61,10 +80,11 @@ ghTokenInput.addEventListener('change', () => {
 
 // --- Start operation ---
 startBtn.addEventListener('click', async () => {
-  // Save settings first
+  // Save settings first, ensuring token is only in local storage
   chrome.storage.sync.set({
     ghOwner: ghOwnerInput.value.trim()
   })
+  chrome.storage.sync.remove('ghToken')
   chrome.storage.local.set({
     ghToken: ghTokenInput.value.trim()
   })
