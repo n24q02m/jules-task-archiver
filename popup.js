@@ -143,6 +143,8 @@ chrome.storage.onChanged.addListener((changes) => {
 
 // --- Render state ---
 function renderState(state) {
+  if (!state) return
+
   // Log
   if (state.log?.length > 0) {
     logPre.textContent = state.log.join('\n')
