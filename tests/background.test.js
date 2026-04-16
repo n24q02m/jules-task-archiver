@@ -886,7 +886,7 @@ describe('processTab', () => {
           text: async () => batchResponse
         }
       }
-      if (url.includes('api.github.com')) {
+      if (new URL(url).hostname === 'api.github.com') {
         return {
           ok: true,
           json: async () => [{ title: 'Title 1' }]
