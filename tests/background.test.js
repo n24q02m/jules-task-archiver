@@ -7,7 +7,7 @@ const path = require('node:path')
 const bgScriptPath = path.join(__dirname, '..', 'background.js')
 const bgScriptContent = fs.readFileSync(bgScriptPath, 'utf8')
 
-function setupEnvironment(initialStorage = {}) {
+function setupEnvironment(initialStorage = {}, mocks = {}) {
   const sessionSetData = []
   let currentStorage = { ...initialStorage }
 
@@ -49,7 +49,7 @@ function setupEnvironment(initialStorage = {}) {
 
   const sandbox = {
     chrome: chromeMock,
-    fetch: async () => ({ ok: true, json: async () => [], text: async () => ")]}'\n\n4\n[[]]" }),
+    fetch: mocks.fetch || (async () => ({ ok: true, json: async () => [], text: async () => ")]}'\n\n4\n[[]]" })),
     setTimeout,
     setInterval,
     clearInterval,
@@ -78,6 +78,7 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_updateState = updateState;
     globalThis.test_addLog = addLog;
     globalThis.test_buildBatchRequest = buildBatchRequest;
+    globalThis.test_callBatchExecute = callBatchExecute;
     globalThis.test_fixJsonControlChars = fixJsonControlChars;
     globalThis.test_findJsonEnd = findJsonEnd;
     globalThis.test_parseResponse = parseResponse;
@@ -796,5 +797,67 @@ describe('getJulesTabs', () => {
     assert.strictEqual(tabs.length, 2)
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[0].url), '0')
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[1].url), '1')
+  })
+})
+
+// =============================================================================
+// callBatchExecute Tests
+// =============================================================================
+
+describe('callBatchExecute', () => {
+  it('should execute successfully and return parsed response', async () => {
+    let fetchCalled = false
+    let fetchOptions = null
+    const mockResponse = ')]}\'\n\n100\n[["wrb.fr","rpc-id","[\\"result\\"]",null,null,null,"generic"]]'
+
+    const mocks = {
+      fetch: async (_url, options) => {
+        fetchCalled = true
+        fetchOptions = options
+        return {
+          ok: true,
+          text: async () => mockResponse
+        }
+      }
+    }
+
+    const { sandbox } = setupEnvironment({}, mocks)
+    const config = { at: 'token', accountNum: '0', bl: 'build' }
+    const result = await sandbox.test_callBatchExecute('rpc-id', ['payload'], config)
+
+    assert.strictEqual(fetchCalled, true)
+    assert.strictEqual(fetchOptions.method, 'POST')
+    assert.strictEqual(fetchOptions.headers['content-type'], 'application/x-www-form-urlencoded;charset=UTF-8')
+    assert.deepStrictEqual(result, ['result'])
+  })
+
+  it('should throw error on HTTP failure', async () => {
+    const mocks = {
+      fetch: async () => ({
+        ok: false,
+        status: 500
+      })
+    }
+
+    const { sandbox } = setupEnvironment({}, mocks)
+    const config = { at: 'token', accountNum: '0', bl: 'build' }
+
+    await assert.rejects(
+      sandbox.test_callBatchExecute('rpc-id', ['payload'], config),
+      /batchexecute rpc-id failed: HTTP 500/
+    )
+  })
+
+  it('should propagate network errors', async () => {
+    const mocks = {
+      fetch: async () => {
+        throw new Error('Network failure')
+      }
+    }
+
+    const { sandbox } = setupEnvironment({}, mocks)
+    const config = { at: 'token', accountNum: '0', bl: 'build' }
+
+    await assert.rejects(sandbox.test_callBatchExecute('rpc-id', ['payload'], config), /Network failure/)
   })
 })
