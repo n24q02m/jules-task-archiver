@@ -9,6 +9,15 @@
 // Store config extracted from MAIN world
 let cachedConfig = null
 
+// Inject main-world.js into the page to access variables
+function injectMainWorldScript() {
+  const script = document.createElement('script')
+  script.src = chrome.runtime.getURL('main-world.js')
+  script.onload = () => script.remove()
+  ;(document.head || document.documentElement).appendChild(script)
+}
+injectMainWorldScript()
+
 // Listen for messages from MAIN world script
 window.addEventListener('message', (event) => {
   if (event.source !== window) return
@@ -49,9 +58,13 @@ function extractConfig() {
 
 // Detect account from URL
 function getAccountNum() {
-  const parts = new URL(location.href).pathname.split('/')
-  const uIdx = parts.indexOf('u')
-  return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  try {
+    const parts = new URL(location.href).pathname.split('/')
+    const uIdx = parts.indexOf('u')
+    return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+  } catch (e) {
+    return '0'
+  }
 }
 
 function getAccountLabel() {
