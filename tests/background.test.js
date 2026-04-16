@@ -99,6 +99,11 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_SDETAIL = SDETAIL;
     globalThis.test_CATEGORY_CONFIG = CATEGORY_CONFIG;
     globalThis.test_DEFAULT_CATEGORY = DEFAULT_CATEGORY;
+    globalThis.test_processSuggestionsForTab = processSuggestionsForTab;
+    globalThis.test_getTabConfig = getTabConfig;
+    globalThis.test_listTasks = listTasks;
+    globalThis.test_listSuggestions = listSuggestions;
+    globalThis.test_startSuggestion = startSuggestion;
   `
 
   const script = new vm.Script(scriptContent)
@@ -796,5 +801,144 @@ describe('getJulesTabs', () => {
     assert.strictEqual(tabs.length, 2)
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[0].url), '0')
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[1].url), '1')
+  })
+})
+
+// =============================================================================
+// processSuggestionsForTab Tests
+// =============================================================================
+
+describe('processSuggestionsForTab', () => {
+  const mockTab = { id: 1, url: 'https://jules.google.com/u/0/session' }
+  const mockOptions = { dryRun: false }
+
+  function createBatchResponse(rpcId, data) {
+    const inner = JSON.stringify(data)
+    const outer = [[null, rpcId, inner, null]]
+    return `)]}'\n\n${JSON.stringify(outer).length}\n${JSON.stringify(outer)}`
+  }
+
+  it('should successfully process suggestions for a tab', async () => {
+    const { sandbox } = setupEnvironment()
+    await sandbox.test_stateReadyPromise
+
+    // Mock listTasks (p1Takd)
+    const taskRaw = []
+    taskRaw[0] = 'task-1' // ID
+    taskRaw[4] = 'github/owner/repo' // SOURCE
+    taskRaw[26] = 'Task Title' // DISPLAY_TITLE
+
+    // Mock listSuggestions (hQP40d)
+    const suggestionRaw = []
+    suggestionRaw[0] = 'sug-1' // ID
+    suggestionRaw[1] = ['Title', 'Desc', 'url', 'file', 10, 0.9, 'rationale', 'code', 'js', 'slug', 1] // DETAILS
+    suggestionRaw[2] = 1 // STATUS
+
+    sandbox.fetch = async (url) => {
+      if (url.includes('rpcids=p1Takd')) {
+        return { ok: true, text: async () => createBatchResponse('p1Takd', [[taskRaw]]) }
+      }
+      if (url.includes('rpcids=hQP40d')) {
+        return { ok: true, text: async () => createBatchResponse('hQP40d', [[suggestionRaw]]) }
+      }
+      if (url.includes('rpcids=Rja83d')) {
+        return { ok: true, text: async () => createBatchResponse('Rja83d', [null]) }
+      }
+      return { ok: true, text: async () => ")]}'\n\n4\n[[]]" }
+    }
+
+    const result = await sandbox.test_processSuggestionsForTab(mockTab, mockOptions)
+
+    assert.strictEqual(result, 1)
+    const logs = sandbox.test_state().log
+    assert.ok(logs.some((l) => l.includes('Found 1 repos: github/owner/repo')))
+    assert.ok(logs.some((l) => l.includes('Found 1 suggestions')))
+    assert.ok(logs.some((l) => l.includes('Started: Title')))
+    assert.strictEqual(sandbox.test_state().progress.archived, 1)
+  })
+
+  it('should respect dryRun option', async () => {
+    const { sandbox } = setupEnvironment()
+    await sandbox.test_stateReadyPromise
+
+    const taskRaw = []
+    taskRaw[4] = 'github/owner/repo'
+
+    const suggestionRaw = []
+    suggestionRaw[0] = 'sug-1'
+    suggestionRaw[1] = ['Title', 'Desc', 'url', 'file', 10, 0.9, 'rationale', 'code', 'js', 'slug', 1]
+
+    sandbox.fetch = async (url) => {
+      if (url.includes('rpcids=p1Takd')) {
+        return { ok: true, text: async () => createBatchResponse('p1Takd', [[taskRaw]]) }
+      }
+      if (url.includes('rpcids=hQP40d')) {
+        return { ok: true, text: async () => createBatchResponse('hQP40d', [[suggestionRaw]]) }
+      }
+      return { ok: true, text: async () => ")]}'\n\n4\n[[]]" }
+    }
+
+    const result = await sandbox.test_processSuggestionsForTab(mockTab, { dryRun: true })
+
+    assert.strictEqual(result, 0)
+    const logs = sandbox.test_state().log
+    assert.ok(logs.some((l) => l.includes('[DRY] Would start: Title (slug)')))
+  })
+
+  it('should handle getTabConfig failure', async () => {
+    const { sandbox } = setupEnvironment()
+    await sandbox.test_stateReadyPromise
+
+    sandbox.chrome.tabs.sendMessage = async (_id, msg) => {
+      if (msg.action === 'PING') return {}
+      throw new Error('Tab not found')
+    }
+
+    const result = await sandbox.test_processSuggestionsForTab(mockTab, mockOptions)
+
+    assert.strictEqual(result, 0)
+    const logs = sandbox.test_state().log
+    assert.ok(logs.some((l) => l.includes('ERROR: Tab not found')))
+  })
+
+  it('should handle empty task list', async () => {
+    const { sandbox } = setupEnvironment()
+    await sandbox.test_stateReadyPromise
+
+    sandbox.fetch = async () => ({ ok: true, text: async () => createBatchResponse('p1Takd', [[]]) })
+
+    const result = await sandbox.test_processSuggestionsForTab(mockTab, mockOptions)
+
+    assert.strictEqual(result, 0)
+    const logs = sandbox.test_state().log
+    assert.ok(logs.some((l) => l.includes('No repos found from tasks')))
+  })
+
+  it('should respect cancelled status', async () => {
+    const { sandbox } = setupEnvironment()
+    await sandbox.test_stateReadyPromise
+
+    const taskRaw = []
+    taskRaw[4] = 'github/owner/repo'
+
+    sandbox.fetch = async (url) => {
+      if (url.includes('rpcids=p1Takd')) {
+        return { ok: true, text: async () => createBatchResponse('p1Takd', [[taskRaw]]) }
+      }
+      return { ok: true, text: async () => ")]}'\n\n4\n[[]]" }
+    }
+
+    // Set status to cancelled
+    sandbox.test_updateState({ status: 'cancelled' })
+
+    const result = await sandbox.test_processSuggestionsForTab(mockTab, mockOptions)
+
+    assert.strictEqual(result, 0)
+    // Check logs to verify it didn't proceed to processing the results
+    const logs = sandbox.test_state().log
+    // "Fetching suggestions" log happens before the cancellation check in the loop
+    assert.ok(logs.some((l) => l.includes('Fetching suggestions for 1 repos')))
+    // But it should NOT have reached the repo-specific "Found X suggestions" log
+    assert.ok(!logs.some((l) => l.includes('Found 1 suggestions')))
   })
 })
