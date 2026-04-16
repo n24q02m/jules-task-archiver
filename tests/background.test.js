@@ -99,6 +99,8 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_SDETAIL = SDETAIL;
     globalThis.test_CATEGORY_CONFIG = CATEGORY_CONFIG;
     globalThis.test_DEFAULT_CATEGORY = DEFAULT_CATEGORY;
+    globalThis.test_archiveTask = archiveTask;
+    globalThis.test_callBatchExecute = callBatchExecute;
   `
 
   const script = new vm.Script(scriptContent)
@@ -110,6 +112,33 @@ function setupEnvironment(initialStorage = {}) {
 // =============================================================================
 // batchexecute Client Tests
 // =============================================================================
+
+describe('archiveTask', () => {
+  it('should call callBatchExecute with correct parameters', async () => {
+    const { sandbox } = setupEnvironment()
+    let captured = null
+    sandbox.fetch = async (url, options) => {
+      captured = { url, body: options.body }
+      return {
+        ok: true,
+        text: async () => ")]}'\n\n4\n[[]]"
+      }
+    }
+
+    const config = { bl: 'b', fsid: 'f', at: 'a', accountNum: '0' }
+    await sandbox.test_archiveTask('task-123', config)
+
+    assert.ok(captured.url.includes('rpcids=Tjmm5c'))
+    assert.ok(captured.body.includes('Tjmm5c'))
+    assert.ok(captured.body.includes('task-123'))
+
+    // Verify exact payload structure in body
+    const params = new URLSearchParams(captured.body)
+    const freq = JSON.parse(params.get('f.req'))
+    assert.strictEqual(freq[0][0][0], 'Tjmm5c')
+    assert.strictEqual(freq[0][0][1], JSON.stringify([['task-123'], 1]))
+  })
+})
 
 describe('buildBatchRequest', () => {
   it('should format correct URL and body', () => {

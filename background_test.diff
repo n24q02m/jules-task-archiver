@@ -1,0 +1,9 @@
+<<<<<<< SEARCH
+    globalThis.test_DEFAULT_CATEGORY = DEFAULT_CATEGORY;
+  `
+=======
+    globalThis.test_DEFAULT_CATEGORY = DEFAULT_CATEGORY;
+    globalThis.test_archiveTask = archiveTask;
+    globalThis.test_callBatchExecute = callBatchExecute;
+  `
+>>>>>>> REPLACE
