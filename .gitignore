@@ -17,7 +17,7 @@ node_modules/
 *.pem
 
 # AI agents
-.jules/
+.jules*
 JULES.md
 .code-review-graph/
 
@@ -26,10 +26,11 @@ JULES.md
 .env.*
 
 # AI Assistant / Rules
-.jules/
-.jules
+.jules*
+.jules*
 .superpower/
 superpower/
 superpowers/
 docs/superpowers/
 
+.Jules*
