@@ -99,6 +99,12 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_SDETAIL = SDETAIL;
     globalThis.test_CATEGORY_CONFIG = CATEGORY_CONFIG;
     globalThis.test_DEFAULT_CATEGORY = DEFAULT_CATEGORY;
+    globalThis.test_processSuggestionsForTab = processSuggestionsForTab;
+    globalThis.test_listTasks = listTasks;
+    globalThis.test_getTabConfig = getTabConfig;
+    globalThis.test_getStartConfig = getStartConfig;
+    globalThis.test_listSuggestions = listSuggestions;
+    globalThis.test_startSuggestion = startSuggestion;
   `
 
   const script = new vm.Script(scriptContent)
@@ -796,5 +802,48 @@ describe('getJulesTabs', () => {
     assert.strictEqual(tabs.length, 2)
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[0].url), '0')
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[1].url), '1')
+  })
+})
+
+// =============================================================================
+// Suggestions Orchestrator Tests
+// =============================================================================
+
+describe('processSuggestionsForTab', () => {
+  it('should handle error when listTasks fails', async () => {
+    const { sandbox } = setupEnvironment()
+    const tab = { id: 1, url: 'https://jules.google.com/u/0/session' }
+    const options = { dryRun: false }
+
+    // Mock chrome.tabs.sendMessage to return config
+    sandbox.chrome.tabs.sendMessage = async () => ({
+      config: { bl: 'bl_123', fsid: 'fsid_123', at: 'at_123' },
+      accountNum: '0',
+      account: 'default'
+    })
+
+    // Mock chrome.storage.local.get for startConfig
+    sandbox.chrome.storage.local.get = async () => ({
+      startConfig: {
+        modelConfig: [null, 'beyond:models/test-model'],
+        experimentIds: [],
+        featureFlags: []
+      }
+    })
+
+    // Mock fetch to fail for listTasks (p1Takd)
+    sandbox.fetch = async (url) => {
+      if (url.includes('rpcids=p1Takd')) {
+        throw new Error('Network error')
+      }
+      return { ok: true, text: async () => ")]}'\n\n4\n[[]]" }
+    }
+
+    const result = await sandbox.test_processSuggestionsForTab(tab, options)
+    assert.strictEqual(result, 0)
+
+    const state = sandbox.test_state()
+    const hasErrorLog = state.log.some((msg) => msg.includes('ERROR fetching tasks: Network error'))
+    assert.ok(hasErrorLog, 'Expected error log message not found')
   })
 })
