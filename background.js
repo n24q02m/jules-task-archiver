@@ -11,12 +11,15 @@
 
 const JULES_ORIGIN = 'https://jules.google.com'
 
+const ARCHIVE_CHUNK_SIZE = 10
+const SUGGESTION_CHUNK_SIZE = 5
+
 function extractAccountNum(url) {
   try {
     const parts = new URL(url).pathname.split('/')
     const uIdx = parts.indexOf('u')
     return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
-  } catch (e) {
+  } catch (_e) {
     return '0'
   }
 }
@@ -489,47 +492,65 @@ async function processSuggestionsForTab(tab, options) {
   const allSuggestions = await Promise.all(suggestionFetches)
 
   let totalStarted = 0
-  for (const { repo, suggestions, error } of allSuggestions) {
-    if (state.status === 'cancelled') break
+  const activeRepos = allSuggestions.filter((s) => !s.error && s.suggestions.length > 0)
+  if (activeRepos.length > 1) updateState({ currentRepo: `(${activeRepos.length} repos)` })
 
-    if (error) {
-      addLog(`\n[${label}] ERROR fetching suggestions for ${repo}: ${error}`)
-      continue
-    }
+  await Promise.all(
+    allSuggestions.map(async ({ repo, suggestions, error }) => {
+      if (state.status === 'cancelled') return
 
-    if (suggestions.length === 0) {
-      addLog(`\n[${label}] ${repo}: No suggestions found`)
-      continue
-    }
-
-    addLog(`\n[${label}] ${repo}: Found ${suggestions.length} suggestions`)
-    updateState({ currentRepo: repo.replace(/^github\//, '') })
-
-    for (const s of suggestions) {
-      if (state.status === 'cancelled') break
-
-      if (options.dryRun) {
-        addLog(`  [DRY] Would start: ${s.title} (${s.categorySlug})`)
-      } else {
-        addLog(`  Starting: ${s.title}...`)
-        try {
-          await startSuggestion(s, repo, config, startConfig)
-          addLog(`  Started: ${s.title}`)
-          totalStarted++
-        } catch (err) {
-          addLog(`  [!] Failed to start "${s.title}": ${err.message}`)
-        }
+      if (error) {
+        addLog(`\n[${label}] ERROR fetching suggestions for ${repo}: ${error}`)
+        return
       }
 
-      updateState({
-        progress: {
-          archived: totalStarted,
-          skipped: state.progress.skipped,
-          total: state.progress.total + 1
+      if (suggestions.length === 0) {
+        addLog(`\n[${label}] ${repo}: No suggestions found`)
+        return
+      }
+
+      addLog(`\n[${label}] ${repo}: Found ${suggestions.length} suggestions`)
+      if (activeRepos.length === 1) updateState({ currentRepo: repo.replace(/^github\//, '') })
+
+      for (let i = 0; i < suggestions.length; i += SUGGESTION_CHUNK_SIZE) {
+        if (state.status === 'cancelled') break
+        const chunk = suggestions.slice(i, i + SUGGESTION_CHUNK_SIZE)
+
+        const results = await Promise.all(
+          chunk.map(async (s) => {
+            if (options.dryRun) {
+              return { title: s.title, dry: true, category: s.categorySlug }
+            }
+            try {
+              await startSuggestion(s, repo, config, startConfig)
+              return { title: s.title, ok: true }
+            } catch (err) {
+              return { title: s.title, ok: false, err: err.message }
+            }
+          })
+        )
+
+        for (const res of results) {
+          if (res.dry) {
+            addLog(`  [DRY] Would start: ${res.title} (${res.category})`)
+          } else if (res.ok) {
+            addLog(`  Started: ${res.title}`)
+            totalStarted++
+          } else {
+            addLog(`  [!] Failed to start "${res.title}": ${res.err}`)
+          }
+
+          updateState({
+            progress: {
+              archived: totalStarted,
+              skipped: state.progress.skipped,
+              total: state.progress.total + 1
+            }
+          })
         }
-      })
-    }
-  }
+      }
+    })
+  )
 
   addLog(`\n[${label}] TOTAL: ${totalStarted} suggestions started`)
   return totalStarted
@@ -568,7 +589,11 @@ async function getOpenPRs(owner, repo, token) {
       return []
     }
     const prs = await res.json()
-    const mapped = prs.map((pr) => ({ title: pr.title || '', branch: pr.head?.ref || '' }))
+    const mapped = prs.map((pr) => ({
+      title: pr.title || '',
+      titleLower: (pr.title || '').toLowerCase(),
+      branch: pr.head?.ref || ''
+    }))
     prCache.set(key, mapped)
     return mapped
   } catch (e) {
@@ -582,7 +607,10 @@ function taskHasOpenPR(task, openPRs) {
   if (openPRs.length === 0) return false
   const taskTitle = (task.title || '').toLowerCase()
   if (!taskTitle || taskTitle === '(untitled)') return false
-  return openPRs.some((pr) => pr.title.toLowerCase().includes(taskTitle) || taskTitle.includes(pr.title.toLowerCase()))
+  return openPRs.some((pr) => {
+    const prTitleLower = pr.titleLower || (pr.title || '').toLowerCase()
+    return prTitleLower.includes(taskTitle) || taskTitle.includes(prTitleLower)
+  })
 }
 
 // =============================================================================
@@ -853,28 +881,48 @@ async function processTab(tab, options) {
     archiveByRepo.get(key).push(t)
   }
 
-  for (const [repo, repoTasks] of archiveByRepo) {
-    updateState({ currentRepo: repo })
-    addLog(`\n[${label}] -> ${repo} (${repoTasks.length} tasks)`)
+  const activeRepos = [...archiveByRepo.entries()]
+  if (activeRepos.length > 1) updateState({ currentRepo: `(${activeRepos.length} repos)` })
 
-    for (const task of repoTasks) {
-      try {
-        await archiveTask(task.id, config)
-        grandTotal++
-        addLog(`  Archived: [${task.id}] ${task.title}`)
+  await Promise.all(
+    activeRepos.map(async ([repo, repoTasks]) => {
+      if (activeRepos.length === 1) updateState({ currentRepo: repo })
+      addLog(`\n[${label}] -> ${repo} (${repoTasks.length} tasks)`)
 
-        updateState({
-          progress: {
-            archived: state.progress.archived + 1,
-            skipped: state.progress.skipped,
-            total: totalTasks
+      for (let i = 0; i < repoTasks.length; i += ARCHIVE_CHUNK_SIZE) {
+        if (state.status === 'cancelled') break
+        const chunk = repoTasks.slice(i, i + ARCHIVE_CHUNK_SIZE)
+
+        const results = await Promise.all(
+          chunk.map(async (task) => {
+            try {
+              await archiveTask(task.id, config)
+              return { id: task.id, title: task.title, ok: true }
+            } catch (e) {
+              return { id: task.id, title: task.title, ok: false, err: e.message }
+            }
+          })
+        )
+
+        for (const res of results) {
+          if (res.ok) {
+            grandTotal++
+            addLog(`  Archived: [${res.id}] ${res.title}`)
+          } else {
+            addLog(`  ERROR archiving ${res.id}: ${res.err}`)
           }
-        })
-      } catch (e) {
-        addLog(`  ERROR archiving ${task.id}: ${e.message}`)
+
+          updateState({
+            progress: {
+              archived: state.progress.archived + 1,
+              skipped: state.progress.skipped,
+              total: totalTasks
+            }
+          })
+        }
       }
-    }
-  }
+    })
+  )
 
   addLog(`\n[${label}] TOTAL: ${grandTotal} archived`)
   return grandTotal
@@ -914,17 +962,18 @@ async function startOperation(options) {
 
     addLog(`Found ${tabs.length} Jules tab(s)\n`)
 
-    const results = []
-    for (const tab of tabs) {
-      const label = getTabLabel(tab)
-      try {
-        const count = isSuggestions ? await processSuggestionsForTab(tab, options) : await processTab(tab, options)
-        results.push({ label, count })
-      } catch (e) {
-        addLog(`ERROR [${label}]: ${e.message}`)
-        results.push({ label, count: 0, err: e.message })
-      }
-    }
+    const results = await Promise.all(
+      tabs.map(async (tab) => {
+        const label = getTabLabel(tab)
+        try {
+          const count = isSuggestions ? await processSuggestionsForTab(tab, options) : await processTab(tab, options)
+          return { label, count }
+        } catch (e) {
+          addLog(`ERROR [${label}]: ${e.message}`)
+          return { label, count: 0, err: e.message }
+        }
+      })
+    )
 
     // Summary
     const verb = isSuggestions ? 'started' : 'archived'
