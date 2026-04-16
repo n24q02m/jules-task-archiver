@@ -25,7 +25,7 @@ function setupPopupSandbox() {
           textContent: '',
           classList: { toggle: () => {} },
           setAttribute: () => {},
-          parentElement: { style: {} },
+          parentElement: { style: {} }
         }
       }
       return elements[sel]
@@ -38,30 +38,30 @@ function setupPopupSandbox() {
       appendChild: function (child) {
         if (!this.children) this.children = []
         this.children.push(child)
-      },
+      }
     }),
     createDocumentFragment: () => ({
       tag: 'fragment',
       children: [],
       appendChild: function (child) {
         this.children.push(child)
-      },
-    }),
+      }
+    })
   }
 
   const chrome = {
     storage: {
       sync: { get: (_keys, cb) => cb({}), set: () => {}, remove: () => {} },
       local: { get: (_keys, cb) => cb({}), set: () => {} },
-      onChanged: { addListener: () => {} },
+      onChanged: { addListener: () => {} }
     },
     runtime: {
       sendMessage: (_msg, cb) => {
         if (cb) cb({})
       },
-      onMessage: { addListener: () => {} },
+      onMessage: { addListener: () => {} }
     },
-    tabs: { query: () => {} },
+    tabs: { query: () => {} }
   }
 
   const sandbox = { chrome, document, console, setTimeout, setInterval, clearInterval }
@@ -76,7 +76,7 @@ describe('popup.js: renderSummary', () => {
     const { sandbox, elements } = setupPopupSandbox()
     const results = [
       { label: 'repo1', count: 5 },
-      { label: 'repo2', count: 3, err: 'failed' },
+      { label: 'repo2', count: 3, err: 'failed' }
     ]
 
     sandbox.renderSummary(results)
