@@ -96,6 +96,7 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_buildSuggestionPrompt = buildSuggestionPrompt;
     globalThis.test_buildStartPayload = buildStartPayload;
     globalThis.test_SUGGESTION = SUGGESTION;
+    globalThis.test_startSuggestion = startSuggestion;
     globalThis.test_SDETAIL = SDETAIL;
     globalThis.test_CATEGORY_CONFIG = CATEGORY_CONFIG;
     globalThis.test_DEFAULT_CATEGORY = DEFAULT_CATEGORY;
@@ -796,5 +797,61 @@ describe('getJulesTabs', () => {
     assert.strictEqual(tabs.length, 2)
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[0].url), '0')
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[1].url), '1')
+  })
+})
+
+// =============================================================================
+// StartSuggestion Orchestration Tests
+// =============================================================================
+
+describe('startSuggestion', () => {
+  it('should call fetch with the correct RPC ID and payload', async () => {
+    const { sandbox } = setupEnvironment()
+    let capturedUrl, capturedOptions
+
+    sandbox.fetch = async (url, options) => {
+      capturedUrl = url
+      capturedOptions = options
+      return {
+        ok: true,
+        text: async () => ')]}\'\n\n10\n[null, null, "[]"]'
+      }
+    }
+
+    const suggestion = {
+      id: 's1',
+      title: 'T',
+      filePath: 'f',
+      line: 1,
+      language: 'ts',
+      codeSnippet: 'c',
+      rationale: 'r',
+      categorySlug: 'other'
+    }
+    const repo = 'github/owner/repo'
+    const config = { at: 'xsrf-token', accountNum: '3', bl: 'build-label', fsid: '123' }
+    const startConfig = {
+      modelConfig: [null, 'beyond:models/test-model'],
+      experimentIds: [12345]
+    }
+
+    await sandbox.test_startSuggestion(suggestion, repo, config, startConfig)
+
+    assert.ok(capturedUrl.includes('rpcids=Rja83d'))
+    assert.ok(capturedUrl.includes('jules.google.com/u/3/'))
+    assert.strictEqual(capturedOptions.method, 'POST')
+
+    const body = new URLSearchParams(capturedOptions.body)
+    const fReq = JSON.parse(body.get('f.req'))
+    const payload = JSON.parse(fReq[0][0][1])
+
+    // Verify orchestration: payload[4] should be repo
+    assert.strictEqual(payload[4], repo)
+    // payload[2][1] should be modelId from startConfig
+    assert.strictEqual(payload[2][1], 'beyond:models/test-model')
+    // payload[9][4] should be experimentIds
+    assert.deepStrictEqual(payload[9][4], [12345])
+    // payload[9][11][1] should be suggestion ID
+    assert.strictEqual(payload[9][11][1], 's1')
   })
 })
