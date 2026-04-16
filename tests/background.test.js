@@ -99,6 +99,8 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_SDETAIL = SDETAIL;
     globalThis.test_CATEGORY_CONFIG = CATEGORY_CONFIG;
     globalThis.test_DEFAULT_CATEGORY = DEFAULT_CATEGORY;
+    globalThis.test_processSuggestionsForTab = processSuggestionsForTab;
+    globalThis.test_getTabConfig = getTabConfig;
   `
 
   const script = new vm.Script(scriptContent)
@@ -796,5 +798,29 @@ describe('getJulesTabs', () => {
     assert.strictEqual(tabs.length, 2)
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[0].url), '0')
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[1].url), '1')
+  })
+})
+
+// =============================================================================
+// Orchestrator Error Handling Tests
+// =============================================================================
+
+describe('processSuggestionsForTab error handling', () => {
+  it('should log error and return 0 if getTabConfig fails', async () => {
+    const { sandbox } = setupEnvironment()
+    const tab = { id: 123, url: 'https://jules.google.com/u/0/session' }
+
+    // Mock chrome.tabs.sendMessage to simulate failure in getTabConfig
+    sandbox.chrome.tabs.sendMessage = async () => {
+      return {} // Missing config.at will cause getTabConfig to throw
+    }
+
+    const result = await sandbox.test_processSuggestionsForTab(tab, { scope: 'current' })
+
+    assert.strictEqual(result, 0)
+    const state = sandbox.test_state()
+    const errorLog = state.log.find((l) => l.includes('ERROR: Could not extract page config'))
+    assert.ok(errorLog, 'Error log not found in state')
+    assert.ok(errorLog.includes('[default] ERROR:'), 'Error log should contain tab label')
   })
 })
