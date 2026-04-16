@@ -1,71 +1,76 @@
 <<<<<<< SEARCH
-async function ensureContentScript(tabId) {
-  const tab = await chrome.tabs.get(tabId)
-  if (!tab.url?.startsWith(`${JULES_ORIGIN}/`)) {
-    throw new Error('Security Error: Cannot inject script into non-Jules tab')
-  }
+    for (const s of suggestions) {
+      if (state.status === 'cancelled') break
 
-  try {
-    await chrome.tabs.sendMessage(tabId, { action: 'PING' })
-  } catch {
-    await chrome.scripting.executeScript({
-      target: { tabId },
-      files: ['content.js']
-    })
-    const deadline = Date.now() + 3000
-    while (Date.now() < deadline) {
-      try {
-        await new Promise((r) => setTimeout(r, 100))
-        await chrome.tabs.sendMessage(tabId, { action: 'PING' })
-        return
-      } catch {
-        // Keep waiting
+      if (options.dryRun) {
+        addLog(`  [DRY] Would start: ${s.title} (${s.categorySlug})`)
+      } else {
+        addLog(`  Starting: ${s.title}...`)
+        try {
+          await startSuggestion(s, repo, config, startConfig)
+          addLog(`  Started: ${s.title}`)
+          totalStarted++
+        } catch (err) {
+          addLog(`  [!] Failed to start "${s.title}": ${err.message}`)
+        }
       }
+
+      updateState({
+        progress: {
+          archived: totalStarted,
+          skipped: state.progress.skipped,
+          total: state.progress.total + 1
+        }
+      })
     }
-    throw new Error('Content script failed to initialize within 3s')
-  }
-}
 =======
-async function ensureContentScript(tabId) {
-  const checkOrigin = async () => {
-    const tab = await chrome.tabs.get(tabId)
-    if (!tab.url) return false
-    try {
-      const url = new URL(tab.url)
-      return url.origin === JULES_ORIGIN
-    } catch {
-      return false
-    }
-  }
+    for (let i = 0; i < suggestions.length; i += SUGGESTION_CHUNK_SIZE) {
+      if (state.status === 'cancelled') break
 
-  if (!(await checkOrigin())) {
-    throw new Error('Security Error: Cannot inject script into non-Jules tab')
-  }
+      const chunk = suggestions.slice(i, i + SUGGESTION_CHUNK_SIZE)
 
-  try {
-    await chrome.tabs.sendMessage(tabId, { action: 'PING' })
-  } catch {
-    // Re-verify immediately before injection to prevent TOCTOU
-    if (!(await checkOrigin())) {
-      throw new Error('Security Error: Cannot inject script into non-Jules tab')
-    }
+      if (options.dryRun) {
+        for (const s of chunk) {
+          addLog(`  [DRY] Would start: ${s.title} (${s.categorySlug})`)
+          updateState({
+            progress: {
+              archived: totalStarted,
+              skipped: state.progress.skipped,
+              total: state.progress.total + 1
+            }
+          })
+        }
+        continue
+      }
 
-    await chrome.scripting.executeScript({
-      target: { tabId },
-      files: ['content.js']
-    })
+      // Parallel requests, sequential state updates
+      const results = await Promise.all(
+        chunk.map(async (s) => {
+          addLog(`  Starting: ${s.title}...`)
+          try {
+            await startSuggestion(s, repo, config, startConfig)
+            return { s, success: true }
+          } catch (err) {
+            return { s, success: false, error: err.message }
+          }
+        })
+      )
 
-    const deadline = Date.now() + 3000
-    while (Date.now() < deadline) {
-      try {
-        await new Promise((r) => setTimeout(r, 100))
-        await chrome.tabs.sendMessage(tabId, { action: 'PING' })
-        return
-      } catch {
-        // Keep waiting
+      for (const res of results) {
+        if (res.success) {
+          addLog(`  Started: ${res.s.title}`)
+          totalStarted++
+        } else {
+          addLog(`  [!] Failed to start "${res.s.title}": ${res.error}`)
+        }
+
+        updateState({
+          progress: {
+            archived: totalStarted,
+            skipped: state.progress.skipped,
+            total: state.progress.total + 1
+          }
+        })
       }
     }
-    throw new Error('Content script failed to initialize within 3s')
-  }
-}
 >>>>>>> REPLACE
