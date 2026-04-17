@@ -16,7 +16,7 @@ function extractAccountNum(url) {
     const parts = new URL(url).pathname.split('/')
     const uIdx = parts.indexOf('u')
     return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
-  } catch (e) {
+  } catch (_e) {
     return '0'
   }
 }
@@ -209,15 +209,17 @@ const TASK = {
 const ARCHIVABLE_STATES = new Set([3, 9]) // 3=completed, 9=failed
 
 function parseTask(raw) {
+  const source = raw[TASK.SOURCE] || ''
+  const parts = source.split('/')
   return {
     id: raw[TASK.ID],
     title: raw[TASK.DISPLAY_TITLE] || raw[TASK.SHORT_TITLE] || '(untitled)',
-    source: raw[TASK.SOURCE] || '',
+    source,
     state: raw[TASK.STATE],
     statusCode: raw[TASK.STATUS_CODE],
-    repo: (raw[TASK.SOURCE] || '').replace(/^github\//, ''),
-    owner: (raw[TASK.SOURCE] || '').split('/')[1] || '',
-    repoName: (raw[TASK.SOURCE] || '').split('/')[2] || ''
+    repo: source.startsWith('github/') ? source.slice(7) : source,
+    owner: parts[1] || '',
+    repoName: parts[2] || ''
   }
 }
 
