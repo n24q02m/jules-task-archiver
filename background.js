@@ -16,7 +16,7 @@ function extractAccountNum(url) {
     const parts = new URL(url).pathname.split('/')
     const uIdx = parts.indexOf('u')
     return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
-  } catch (e) {
+  } catch (_e) {
     return '0'
   }
 }
@@ -664,39 +664,51 @@ function getTabLabel(tab) {
 }
 
 async function ensureContentScript(tabId) {
-  const checkOrigin = async () => {
-    const tab = await chrome.tabs.get(tabId)
-    if (!tab.url) return false
+  const checkOriginAndGetDocId = async () => {
     try {
-      const url = new URL(tab.url)
-      return url.origin === JULES_ORIGIN
+      const frame = await chrome.webNavigation.getFrame({ tabId, frameId: 0 })
+      if (!frame?.url || !frame.documentId) return { valid: false }
+
+      const url = new URL(frame.url)
+      if (url.origin !== JULES_ORIGIN) return { valid: false }
+
+      return { valid: true, documentId: frame.documentId }
     } catch {
-      return false
+      return { valid: false }
     }
   }
 
-  if (!(await checkOrigin())) {
+  const { valid, documentId } = await checkOriginAndGetDocId()
+  if (!valid || !documentId) {
     throw new Error('Security Error: Cannot inject script into non-Jules tab')
   }
 
+  const sendMessageOpts = { documentId }
+
   try {
-    await chrome.tabs.sendMessage(tabId, { action: 'PING' })
+    await chrome.tabs.sendMessage(tabId, { action: 'PING' }, sendMessageOpts)
   } catch {
     // Re-verify immediately before injection to prevent TOCTOU
-    if (!(await checkOrigin())) {
+    const recheck = await checkOriginAndGetDocId()
+    if (!recheck.valid || !recheck.documentId) {
       throw new Error('Security Error: Cannot inject script into non-Jules tab')
     }
 
+    // Use the potentially updated documentId
+    const currentDocId = recheck.documentId
+    const target = { tabId, documentIds: [currentDocId] }
+
     await chrome.scripting.executeScript({
-      target: { tabId },
+      target,
       files: ['content.js']
     })
 
+    const newSendMessageOpts = { documentId: currentDocId }
     const deadline = Date.now() + 3000
     while (Date.now() < deadline) {
       try {
         await new Promise((r) => setTimeout(r, 100))
-        await chrome.tabs.sendMessage(tabId, { action: 'PING' })
+        await chrome.tabs.sendMessage(tabId, { action: 'PING' }, newSendMessageOpts)
         return
       } catch {
         // Keep waiting
