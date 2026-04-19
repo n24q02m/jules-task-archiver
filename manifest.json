@@ -3,7 +3,7 @@
   "name": "Jules Task Archiver",
   "version": "2.0.0",
   "description": "Bulk archive Jules tasks and start code suggestions via batchexecute API",
-  "permissions": ["storage", "tabs", "scripting"],
+  "permissions": ["storage", "tabs", "scripting", "webNavigation"],
   "host_permissions": ["https://jules.google.com/*", "https://api.github.com/*"],
   "background": {
     "service_worker": "background.js"

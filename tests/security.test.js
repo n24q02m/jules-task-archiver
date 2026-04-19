@@ -144,6 +144,12 @@ function setupEnvironment(initialTabs = {}) {
       executeScript: async ({ target, files }) => {
         chromeMock.scripting.lastCall = { target, files }
       }
+    },
+    webNavigation: {
+      getFrame: async ({ tabId, _frameId }) => {
+        const tab = await chromeMock.tabs.get(tabId)
+        return { documentId: `doc-${tabId}`, url: tab.url }
+      }
     }
   }
 
