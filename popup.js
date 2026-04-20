@@ -112,7 +112,7 @@ startBtn.addEventListener('click', async () => {
 
   // Reset UI
   startBtn.disabled = true
-  startBtn.textContent = 'Running...'
+  startBtn.innerHTML = '<span class="spinner" aria-hidden="true"></span>Running...'
   resetBtn.style.display = 'none'
   progressSection.style.display = 'block'
   summarySection.style.display = 'none'
@@ -127,7 +127,7 @@ startBtn.addEventListener('click', async () => {
 resetBtn.addEventListener('click', () => {
   chrome.runtime.sendMessage({ action: 'RESET' })
   startBtn.disabled = false
-  startBtn.textContent = 'Start'
+  startBtn.innerHTML = 'Start'
   resetBtn.style.display = 'none'
   progressSection.style.display = 'none'
   summarySection.style.display = 'none'
@@ -168,7 +168,7 @@ function renderState(state) {
   // Done or error
   if (state.status === 'done' || state.status === 'error') {
     startBtn.disabled = false
-    startBtn.textContent = 'Start'
+    startBtn.innerHTML = 'Start'
     resetBtn.style.display = 'block'
     progressFill.style.width = '100%'
     progressFill.parentElement.setAttribute('aria-valuenow', '100')
@@ -215,7 +215,7 @@ chrome.runtime.sendMessage({ action: 'GET_STATE' }, (state) => {
     renderState(state)
     if (state.status === 'running') {
       startBtn.disabled = true
-      startBtn.textContent = 'Running...'
+      startBtn.innerHTML = '<span class="spinner" aria-hidden="true"></span>Running...'
     } else {
       resetBtn.style.display = 'block'
     }
