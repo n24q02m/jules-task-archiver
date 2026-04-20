@@ -16,7 +16,7 @@ function extractAccountNum(url) {
     const parts = new URL(url).pathname.split('/')
     const uIdx = parts.indexOf('u')
     return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
-  } catch (e) {
+  } catch (_e) {
     return '0'
   }
 }
@@ -131,28 +131,35 @@ function fixJsonControlChars(str) {
  * Handles control chars inside strings by skipping them.
  */
 function findJsonEnd(str) {
+  // ⚡ Bolt Optimization: Use native string search to jump past string literals instead of
+  // iterating character-by-character. This prevents the event loop from being blocked
+  // as long when processing huge JSON chunks, significantly speeding up parsing.
   let depth = 0
-  let inStr = false
-  let esc = false
 
   for (let i = 0; i < str.length; i++) {
-    const ch = str[i]
+    const code = str.charCodeAt(i)
 
-    if (esc) {
-      esc = false
+    if (code === 34) {
+      // '"'
+      i = str.indexOf('"', i + 1)
+      // Handle escaped quotes correctly
+      while (i !== -1 && str.charCodeAt(i - 1) === 92) {
+        let slashes = 0
+        let j = i - 1
+        while (j >= 0 && str.charCodeAt(j) === 92) {
+          slashes++
+          j--
+        }
+        if (slashes % 2 === 0) break // Even number of slashes means quote is not escaped
+        i = str.indexOf('"', i + 1)
+      }
+      if (i === -1) return -1
       continue
     }
-    if (inStr) {
-      if (ch === '\\') esc = true
-      else if (ch === '"') inStr = false
-      continue
-    }
-    if (ch === '"') {
-      inStr = true
-      continue
-    }
-    if (ch === '[') depth++
-    if (ch === ']') {
+    if (code === 91)
+      depth++ // '['
+    else if (code === 93) {
+      // ']'
       depth--
       if (depth === 0) return i + 1
     }
