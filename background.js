@@ -16,7 +16,7 @@ function extractAccountNum(url) {
     const parts = new URL(url).pathname.split('/')
     const uIdx = parts.indexOf('u')
     return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
-  } catch (e) {
+  } catch (_e) {
     return '0'
   }
 }
@@ -140,7 +140,8 @@ function findJsonEnd(str) {
   for (let i = 0; i < len; i++) {
     const code = str.charCodeAt(i)
 
-    if (code === 34) { // '"'
+    if (code === 34) {
+      // '"'
       i++
       while (i < len) {
         i = str.indexOf('"', i)
@@ -149,7 +150,8 @@ function findJsonEnd(str) {
         // Count consecutive backslashes before the quote to see if it's escaped
         let backslashCount = 0
         let j = i - 1
-        while (j >= 0 && str.charCodeAt(j) === 92) { // '\\'
+        while (j >= 0 && str.charCodeAt(j) === 92) {
+          // '\\'
           backslashCount++
           j--
         }
@@ -160,9 +162,11 @@ function findJsonEnd(str) {
         }
         i++ // Escaped quote, continue searching
       }
-    } else if (code === 91) { // '['
+    } else if (code === 91) {
+      // '['
       depth++
-    } else if (code === 93) { // ']'
+    } else if (code === 93) {
+      // ']'
       depth--
       if (depth === 0) return i + 1
     }
