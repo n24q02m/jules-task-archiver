@@ -112,7 +112,7 @@ startBtn.addEventListener('click', async () => {
 
   // Reset UI
   startBtn.disabled = true
-  startBtn.innerHTML = '<span class=\"spinner\" aria-hidden=\"true\"></span>Running...';
+  startBtn.innerHTML = '<span class="spinner" aria-hidden="true"></span>Running...'
   startBtn.classList.add('loading')
   resetBtn.style.display = 'none'
   progressSection.style.display = 'block'
@@ -218,7 +218,7 @@ chrome.runtime.sendMessage({ action: 'GET_STATE' }, (state) => {
     renderState(state)
     if (state.status === 'running') {
       startBtn.disabled = true
-      startBtn.innerHTML = '<span class=\"spinner\" aria-hidden=\"true\"></span>Running...'
+      startBtn.innerHTML = '<span class="spinner" aria-hidden="true"></span>Running...'
       startBtn.classList.add('loading')
     } else {
       resetBtn.style.display = 'block'
