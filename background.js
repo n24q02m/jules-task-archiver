@@ -440,6 +440,8 @@ async function getStartConfig() {
 // Suggestions Orchestrator
 // =============================================================================
 
+const SUGGESTION_CHUNK_SIZE = 5
+
 async function processSuggestionsForTab(tab, options) {
   const label = getTabLabel(tab)
   updateState({ currentTab: label })
@@ -505,29 +507,59 @@ async function processSuggestionsForTab(tab, options) {
     addLog(`\n[${label}] ${repo}: Found ${suggestions.length} suggestions`)
     updateState({ currentRepo: repo.replace(/^github\//, '') })
 
-    for (const s of suggestions) {
+    // Process suggestions in chunks to maximize throughput while avoiding rate limits.
+    // We use a "Concurrent Request, Sequential State" pattern: requests within a chunk
+    // run concurrently, but their results are logged and state is updated sequentially
+    // to maintain UI consistency.
+    for (let i = 0; i < suggestions.length; i += SUGGESTION_CHUNK_SIZE) {
       if (state.status === 'cancelled') break
 
+      const chunk = suggestions.slice(i, i + SUGGESTION_CHUNK_SIZE)
+
       if (options.dryRun) {
-        addLog(`  [DRY] Would start: ${s.title} (${s.categorySlug})`)
+        for (const s of chunk) {
+          addLog(`  [DRY] Would start: ${s.title} (${s.categorySlug})`)
+          updateState({
+            progress: {
+              archived: totalStarted,
+              skipped: state.progress.skipped,
+              total: state.progress.total + 1
+            }
+          })
+        }
       } else {
-        addLog(`  Starting: ${s.title}...`)
-        try {
-          await startSuggestion(s, repo, config, startConfig)
-          addLog(`  Started: ${s.title}`)
-          totalStarted++
-        } catch (err) {
-          addLog(`  [!] Failed to start "${s.title}": ${err.message}`)
+        // Log "Starting..." sequentially before starting the chunk
+        for (const s of chunk) {
+          addLog(`  Starting: ${s.title}...`)
+        }
+
+        // Execute requests concurrently
+        const results = await Promise.all(
+          chunk.map((s) =>
+            startSuggestion(s, repo, config, startConfig)
+              .then(() => ({ success: true, suggestion: s }))
+              .catch((err) => ({ success: false, suggestion: s, error: err }))
+          )
+        )
+
+        // Process results sequentially for state updates and logging
+        for (const result of results) {
+          if (result.success) {
+            addLog(`  Started: ${result.suggestion.title}`)
+            totalStarted++
+          } else {
+            addLog(`  [!] Failed to start "${result.suggestion.title}": ${result.error.message}`)
+          }
+
+          updateState({
+            progress: {
+              archived: totalStarted,
+              skipped: state.progress.skipped,
+              total: state.progress.total + 1
+            }
+          })
         }
       }
-
-      updateState({
-        progress: {
-          archived: totalStarted,
-          skipped: state.progress.skipped,
-          total: state.progress.total + 1
-        }
-      })
     }
   }
 
