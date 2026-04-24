@@ -132,12 +132,21 @@ function setupEnvironment(initialTabs = {}) {
         if (initialTabs[id]) return initialTabs[id]
         return { id, url: 'https://jules.google.com/u/0/' }
       },
-      sendMessage: async (_tabId, message) => {
+      sendMessage: async (_tabId, message, _options) => {
         if (message.action === 'PING') {
           // Simulate script not loaded by throwing
           throw new Error('Could not establish connection. Receiving end does not exist.')
         }
         return {}
+      }
+    },
+    webNavigation: {
+      getFrame: async ({ tabId, frameId }) => {
+        if (frameId !== 0) return null
+        const tab = initialTabs[tabId] || { id: tabId, url: 'https://jules.google.com/u/0/' }
+        if (!tab.url) return null
+        // mock a consistent documentId for the url
+        return { url: tab.url, documentId: `doc-${tabId}-${tab.url}` }
       }
     },
     scripting: {
@@ -187,16 +196,14 @@ describe('ensureContentScript Security', () => {
     const { sandbox, chromeMock } = setupEnvironment()
 
     let callCount = 0
-    chromeMock.tabs.get = async (id) => {
+    chromeMock.webNavigation.getFrame = async ({ tabId }) => {
       callCount++
       if (callCount === 1) {
-        return { id, url: 'https://jules.google.com/u/0/' }
+        return { url: 'https://jules.google.com/u/0/', documentId: `doc-${tabId}-jules` }
       }
-      return { id, url: 'https://evil.com/' }
+      return { url: 'https://evil.com/', documentId: `doc-${tabId}-evil` }
     }
 
-    // This is expected to fail CURRENTLY because ensureContentScript doesn't re-check the URL
-    // We WANT it to fail to prove the vulnerability exists.
     await assert.rejects(sandbox.test_ensureContentScript(123), {
       message: /Security Error: Cannot inject script into non-Jules tab/
     })
