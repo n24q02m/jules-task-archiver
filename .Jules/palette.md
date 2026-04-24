@@ -1,3 +1,6 @@
 ## 2025-04-03 - Progressive Disclosure for Multi-Mode UIs
 **Learning:** In a multi-mode UI (like Archive vs Suggestions), showing all settings at once creates cognitive overload, especially when settings like GitHub tokens are only relevant to one mode.
 **Action:** Use progressive disclosure in `popup.js` to hide mode-specific settings (like the `.settings` section and `force` checkbox) when they are not relevant to the currently selected mode, keeping the UI clean and focused.
+## 2024-05-18 - Visual Feedback for Async Operations
+**Learning:** Adding a subtle, animated visual indicator (like a loading spinner) alongside text changes (e.g., changing "Start" to "Running...") during asynchronous operations significantly improves perceived responsiveness and reassures the user that background tasks are executing, especially in Chrome extension popups where native browser feedback mechanisms are often absent. Flexbox layout combined with `gap` provides clean, consistent alignment for such elements.
+**Action:** When implementing or reviewing buttons that trigger asynchronous actions, always ensure a distinct visual state change occurs. Use flexbox on the button to easily integrate an animated icon (like a CSS spinner) next to the status text.
