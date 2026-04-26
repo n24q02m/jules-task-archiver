@@ -42,6 +42,11 @@ function setupEnvironment(initialStorage = {}) {
         account: 'default'
       })
     },
+    webNavigation: {
+      getFrame: async ({ tabId, frameId }) => {
+        return { url: 'https://jules.google.com/u/0/session', documentId: `doc-${tabId}` }
+      }
+    },
     scripting: {
       executeScript: async () => {}
     }

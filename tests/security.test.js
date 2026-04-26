@@ -132,16 +132,29 @@ function setupEnvironment(initialTabs = {}) {
         if (initialTabs[id]) return initialTabs[id]
         return { id, url: 'https://jules.google.com/u/0/' }
       },
-      sendMessage: async (_tabId, message) => {
+      sendMessage: async (_tabId, message, targetArgs) => {
         if (message.action === 'PING') {
+          if (!targetArgs || !targetArgs.documentId) {
+            throw new Error('Missing documentId in sendMessage pinning')
+          }
           // Simulate script not loaded by throwing
           throw new Error('Could not establish connection. Receiving end does not exist.')
         }
         return {}
       }
     },
+    webNavigation: {
+      getFrame: async ({ tabId, frameId }) => {
+        if (frameId !== 0) throw new Error('Expected frameId 0')
+        const tab = initialTabs[tabId] || { url: 'https://jules.google.com/u/0/' }
+        return { url: tab.url, documentId: `doc-${tabId}` }
+      }
+    },
     scripting: {
       executeScript: async ({ target, files }) => {
+        if (!target.documentIds || !target.documentIds.length) {
+          throw new Error('Missing documentIds in executeScript pinning')
+        }
         chromeMock.scripting.lastCall = { target, files }
       }
     }
@@ -186,19 +199,27 @@ describe('ensureContentScript Security', () => {
   it('should block injection if URL changes to non-Jules origin (TOCTOU)', async () => {
     const { sandbox, chromeMock } = setupEnvironment()
 
-    let callCount = 0
-    chromeMock.tabs.get = async (id) => {
-      callCount++
-      if (callCount === 1) {
-        return { id, url: 'https://jules.google.com/u/0/' }
-      }
-      return { id, url: 'https://evil.com/' }
+    // Simulate TOCTOU: getFrame returns a valid Jules URL and documentId
+    chromeMock.webNavigation.getFrame = async () => {
+      return { url: 'https://jules.google.com/u/0/', documentId: 'safe-doc' }
     }
 
-    // This is expected to fail CURRENTLY because ensureContentScript doesn't re-check the URL
-    // We WANT it to fail to prove the vulnerability exists.
+    // But when we try to executeScript with that documentId, it fails
+    // because the user navigated away and the documentId is no longer valid.
+    chromeMock.scripting.executeScript = async ({ target }) => {
+      if (target.documentIds[0] === 'safe-doc') {
+        throw new Error('No frame with documentId safe-doc')
+      }
+    }
+
+    chromeMock.tabs.sendMessage = async (_tabId, _msg, targetArgs) => {
+      if (targetArgs?.documentId === 'safe-doc') {
+        throw new Error('No frame with documentId safe-doc')
+      }
+    }
+
     await assert.rejects(sandbox.test_ensureContentScript(123), {
-      message: /Security Error: Cannot inject script into non-Jules tab/
+      message: /No frame with documentId safe-doc/
     })
   })
 
@@ -209,8 +230,9 @@ describe('ensureContentScript Security', () => {
 
     // Mock successful sendMessage after injection to stop the loop
     let injected = false
-    chromeMock.tabs.sendMessage = async (_tabId, message) => {
+    chromeMock.tabs.sendMessage = async (_tabId, message, targetArgs) => {
       if (message.action === 'PING') {
+        if (!targetArgs || !targetArgs.documentId) throw new Error('missing docId')
         if (injected) return { status: 'ok' }
         throw new Error('Not loaded')
       }
