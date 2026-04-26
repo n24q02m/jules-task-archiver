@@ -664,31 +664,27 @@ function getTabLabel(tab) {
 }
 
 async function ensureContentScript(tabId) {
-  const checkOrigin = async () => {
-    const tab = await chrome.tabs.get(tabId)
-    if (!tab.url) return false
-    try {
-      const url = new URL(tab.url)
-      return url.origin === JULES_ORIGIN
-    } catch {
-      return false
-    }
+  // Use getFrame to pin to specific document instance, preventing TOCTOU attacks
+  const frame = await chrome.webNavigation.getFrame({ tabId, frameId: 0 })
+  if (!frame?.url) {
+    throw new Error('Security Error: Could not determine frame URL')
   }
 
-  if (!(await checkOrigin())) {
+  const docId = frame.documentId
+  try {
+    const url = new URL(frame.url)
+    if (url.origin !== JULES_ORIGIN) {
+      throw new Error('Security Error: Cannot inject script into non-Jules tab')
+    }
+  } catch (_e) {
     throw new Error('Security Error: Cannot inject script into non-Jules tab')
   }
 
   try {
-    await chrome.tabs.sendMessage(tabId, { action: 'PING' })
-  } catch {
-    // Re-verify immediately before injection to prevent TOCTOU
-    if (!(await checkOrigin())) {
-      throw new Error('Security Error: Cannot inject script into non-Jules tab')
-    }
-
+    await chrome.tabs.sendMessage(tabId, { action: 'PING' }, { documentId: docId })
+  } catch (_e) {
     await chrome.scripting.executeScript({
-      target: { tabId },
+      target: { tabId, documentIds: [docId] },
       files: ['content.js']
     })
 
@@ -696,9 +692,9 @@ async function ensureContentScript(tabId) {
     while (Date.now() < deadline) {
       try {
         await new Promise((r) => setTimeout(r, 100))
-        await chrome.tabs.sendMessage(tabId, { action: 'PING' })
+        await chrome.tabs.sendMessage(tabId, { action: 'PING' }, { documentId: docId })
         return
-      } catch {
+      } catch (_e) {
         // Keep waiting
       }
     }
