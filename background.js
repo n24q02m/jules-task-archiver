@@ -10,13 +10,14 @@
 // =============================================================================
 
 const JULES_ORIGIN = 'https://jules.google.com'
+const SUGGESTION_CHUNK_SIZE = 5
 
 function extractAccountNum(url) {
   try {
     const parts = new URL(url).pathname.split('/')
     const uIdx = parts.indexOf('u')
     return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
-  } catch (e) {
+  } catch (_e) {
     return '0'
   }
 }
@@ -505,29 +506,51 @@ async function processSuggestionsForTab(tab, options) {
     addLog(`\n[${label}] ${repo}: Found ${suggestions.length} suggestions`)
     updateState({ currentRepo: repo.replace(/^github\//, '') })
 
-    for (const s of suggestions) {
+    // ⚡ Bolt Optimization: Batch requests to prevent rate limits while maximizing throughput
+    for (let i = 0; i < suggestions.length; i += SUGGESTION_CHUNK_SIZE) {
       if (state.status === 'cancelled') break
 
-      if (options.dryRun) {
-        addLog(`  [DRY] Would start: ${s.title} (${s.categorySlug})`)
-      } else {
-        addLog(`  Starting: ${s.title}...`)
-        try {
-          await startSuggestion(s, repo, config, startConfig)
-          addLog(`  Started: ${s.title}`)
-          totalStarted++
-        } catch (err) {
-          addLog(`  [!] Failed to start "${s.title}": ${err.message}`)
-        }
-      }
+      const chunk = suggestions.slice(i, i + SUGGESTION_CHUNK_SIZE)
 
-      updateState({
-        progress: {
-          archived: totalStarted,
-          skipped: state.progress.skipped,
-          total: state.progress.total + 1
+      const results = await Promise.all(
+        chunk.map(async (s) => {
+          if (options.dryRun) {
+            return { s, dryRun: true }
+          }
+          try {
+            await startSuggestion(s, repo, config, startConfig)
+            return { s, success: true }
+          } catch (err) {
+            return { s, success: false, err }
+          }
+        })
+      )
+
+      for (const res of results) {
+        if (state.status === 'cancelled') break
+
+        const { s, dryRun, success, err } = res
+
+        if (dryRun) {
+          addLog(`  [DRY] Would start: ${s.title} (${s.categorySlug})`)
+        } else {
+          addLog(`  Starting: ${s.title}...`)
+          if (success) {
+            addLog(`  Started: ${s.title}`)
+            totalStarted++
+          } else {
+            addLog(`  [!] Failed to start "${s.title}": ${err.message}`)
+          }
         }
-      })
+
+        updateState({
+          progress: {
+            archived: totalStarted,
+            skipped: state.progress.skipped,
+            total: state.progress.total + 1
+          }
+        })
+      }
     }
   }
 
