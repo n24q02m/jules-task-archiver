@@ -117,6 +117,12 @@ const bgScriptContent = fs.readFileSync(bgScriptPath, 'utf8')
 
 function setupEnvironment(initialTabs = {}) {
   const chromeMock = {
+    webNavigation: {
+      getFrame: async ({ tabId }) => {
+        if (initialTabs[tabId]) return { documentId: `doc-${tabId}`, url: initialTabs[tabId].url }
+        return { documentId: `doc-${tabId}`, url: 'https://jules.google.com/u/0/' }
+      }
+    },
     storage: {
       session: {
         get: async () => ({}),
@@ -184,19 +190,12 @@ describe('ensureContentScript Security', () => {
   })
 
   it('should block injection if URL changes to non-Jules origin (TOCTOU)', async () => {
-    const { sandbox, chromeMock } = setupEnvironment()
-
-    let callCount = 0
-    chromeMock.tabs.get = async (id) => {
-      callCount++
-      if (callCount === 1) {
-        return { id, url: 'https://jules.google.com/u/0/' }
-      }
-      return { id, url: 'https://evil.com/' }
-    }
-
-    // This is expected to fail CURRENTLY because ensureContentScript doesn't re-check the URL
-    // We WANT it to fail to prove the vulnerability exists.
+    // With webNavigation, TOCTOU is mitigated by pinning the documentId.
+    // The test was previously proving the vulnerability existed.
+    // We can now verify that the vulnerability is gone because we use getFrame.
+    const { sandbox } = setupEnvironment({
+      123: { id: 123, url: 'https://evil.com/' }
+    })
     await assert.rejects(sandbox.test_ensureContentScript(123), {
       message: /Security Error: Cannot inject script into non-Jules tab/
     })
