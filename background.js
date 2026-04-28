@@ -16,7 +16,7 @@ function extractAccountNum(url) {
     const parts = new URL(url).pathname.split('/')
     const uIdx = parts.indexOf('u')
     return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
-  } catch (e) {
+  } catch (_e) {
     return '0'
   }
 }
@@ -132,32 +132,26 @@ function fixJsonControlChars(str) {
  */
 function findJsonEnd(str) {
   let depth = 0
-  let inStr = false
-  let esc = false
-
   for (let i = 0; i < str.length; i++) {
     const ch = str[i]
-
-    if (esc) {
-      esc = false
-      continue
-    }
-    if (inStr) {
-      if (ch === '\\') esc = true
-      else if (ch === '"') inStr = false
-      continue
-    }
     if (ch === '"') {
-      inStr = true
-      continue
-    }
-    if (ch === '[') depth++
-    if (ch === ']') {
+      // Fast-forward through string literal
+      while (true) {
+        i = str.indexOf('"', i + 1)
+        if (i === -1) return -1
+        let escCount = 0
+        for (let j = i - 1; j >= 0 && str.charCodeAt(j) === 92; j--) {
+          escCount++
+        }
+        if (escCount % 2 === 0) break
+      }
+    } else if (ch === '[') {
+      depth++
+    } else if (ch === ']') {
       depth--
       if (depth === 0) return i + 1
     }
   }
-
   return -1
 }
 
