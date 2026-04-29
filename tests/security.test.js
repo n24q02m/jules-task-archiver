@@ -127,12 +127,21 @@ function setupEnvironment(initialTabs = {}) {
       onMessage: { addListener: () => {} },
       getPlatformInfo: async () => ({})
     },
+    webNavigation: {
+      getFrame: async ({ tabId }) => {
+        if (initialTabs[tabId]) {
+          return { documentId: `doc-${tabId}`, url: initialTabs[tabId].url }
+        }
+        return { documentId: `doc-${tabId}`, url: 'https://jules.google.com/u/0/' }
+      }
+    },
     tabs: {
       get: async (id) => {
         if (initialTabs[id]) return initialTabs[id]
         return { id, url: 'https://jules.google.com/u/0/' }
       },
-      sendMessage: async (_tabId, message) => {
+      sendMessage: async (_tabId, message, options) => {
+        chromeMock.tabs.lastSendMessageOptions = options
         if (message.action === 'PING') {
           // Simulate script not loaded by throwing
           throw new Error('Could not establish connection. Receiving end does not exist.')
@@ -187,16 +196,14 @@ describe('ensureContentScript Security', () => {
     const { sandbox, chromeMock } = setupEnvironment()
 
     let callCount = 0
-    chromeMock.tabs.get = async (id) => {
+    chromeMock.webNavigation.getFrame = async ({ tabId }) => {
       callCount++
       if (callCount === 1) {
-        return { id, url: 'https://jules.google.com/u/0/' }
+        return { documentId: 'doc-valid', url: 'https://jules.google.com/u/0/' }
       }
-      return { id, url: 'https://evil.com/' }
+      return { documentId: 'doc-evil', url: 'https://evil.com/' }
     }
 
-    // This is expected to fail CURRENTLY because ensureContentScript doesn't re-check the URL
-    // We WANT it to fail to prove the vulnerability exists.
     await assert.rejects(sandbox.test_ensureContentScript(123), {
       message: /Security Error: Cannot inject script into non-Jules tab/
     })
@@ -215,11 +222,16 @@ describe('ensureContentScript Security', () => {
         throw new Error('Not loaded')
       }
     }
-    chromeMock.scripting.executeScript = async () => {
+    chromeMock.scripting.executeScript = async (options) => {
+      chromeMock.scripting.lastCall = options
       injected = true
     }
 
     await sandbox.test_ensureContentScript(456)
     assert.strictEqual(injected, true)
+
+    // Deep equal fails because arrays are not reference-equal across the VM boundary.
+    // Use deepEqual or string comparison instead.
+    assert.ok(chromeMock.scripting.lastCall.target.documentIds.includes('doc-456'))
   })
 })

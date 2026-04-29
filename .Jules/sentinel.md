@@ -1,0 +1,4 @@
+## 2026-04-29 - Prevent TOCTOU in ensureContentScript
+**Vulnerability:** A Time-Of-Check to Time-Of-Use (TOCTOU) vulnerability existed in `ensureContentScript` where origin verification via `chrome.tabs.get` occurred before injection, leaving a window where a tab could navigate to an untrusted origin before `chrome.scripting.executeScript` or `chrome.tabs.sendMessage` executed.
+**Learning:** Checking the URL origin and throwing an error is insufficient if the context changes between the check and the use, particularly for isolated world script injection and cross-world communication.
+**Prevention:** Always use `chrome.webNavigation.getFrame` (requires `webNavigation` permission) to obtain the `documentId`. Pin subsequent operations by passing `documentIds: [documentId]` to `executeScript` and `documentId` to `sendMessage` to guarantee execution strictly within the verified document context.
