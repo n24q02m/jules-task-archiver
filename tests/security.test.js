@@ -127,12 +127,18 @@ function setupEnvironment(initialTabs = {}) {
       onMessage: { addListener: () => {} },
       getPlatformInfo: async () => ({})
     },
+    webNavigation: {
+      getFrame: async ({ tabId, frameId }) => {
+        if (initialTabs[tabId]) return { ...initialTabs[tabId], documentId: `doc-${tabId}` }
+        return { url: 'https://jules.google.com/u/0/', documentId: `doc-${tabId}` }
+      }
+    },
     tabs: {
       get: async (id) => {
         if (initialTabs[id]) return initialTabs[id]
         return { id, url: 'https://jules.google.com/u/0/' }
       },
-      sendMessage: async (_tabId, message) => {
+      sendMessage: async (_tabId, message, _options) => {
         if (message.action === 'PING') {
           // Simulate script not loaded by throwing
           throw new Error('Could not establish connection. Receiving end does not exist.')
@@ -187,16 +193,14 @@ describe('ensureContentScript Security', () => {
     const { sandbox, chromeMock } = setupEnvironment()
 
     let callCount = 0
-    chromeMock.tabs.get = async (id) => {
+    chromeMock.webNavigation.getFrame = async ({ tabId }) => {
       callCount++
       if (callCount === 1) {
-        return { id, url: 'https://jules.google.com/u/0/' }
+        return { url: 'https://jules.google.com/u/0/', documentId: 'doc-123' }
       }
-      return { id, url: 'https://evil.com/' }
+      return { url: 'https://evil.com/', documentId: 'doc-evil' }
     }
 
-    // This is expected to fail CURRENTLY because ensureContentScript doesn't re-check the URL
-    // We WANT it to fail to prove the vulnerability exists.
     await assert.rejects(sandbox.test_ensureContentScript(123), {
       message: /Security Error: Cannot inject script into non-Jules tab/
     })
@@ -209,17 +213,24 @@ describe('ensureContentScript Security', () => {
 
     // Mock successful sendMessage after injection to stop the loop
     let injected = false
-    chromeMock.tabs.sendMessage = async (_tabId, message) => {
+    let usedDocumentIds = []
+    let usedDocumentId = null
+    chromeMock.tabs.sendMessage = async (_tabId, message, options) => {
+      if (options?.documentId) usedDocumentId = options.documentId
       if (message.action === 'PING') {
         if (injected) return { status: 'ok' }
         throw new Error('Not loaded')
       }
     }
-    chromeMock.scripting.executeScript = async () => {
+    chromeMock.scripting.executeScript = async ({ target }) => {
       injected = true
+      usedDocumentIds = target.documentIds
     }
 
     await sandbox.test_ensureContentScript(456)
     assert.strictEqual(injected, true)
+    assert.strictEqual(usedDocumentIds.length, 1)
+    assert.strictEqual(usedDocumentIds[0], 'doc-456')
+    assert.strictEqual(usedDocumentId, 'doc-456')
   })
 })
