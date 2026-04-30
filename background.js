@@ -16,7 +16,7 @@ function extractAccountNum(url) {
     const parts = new URL(url).pathname.split('/')
     const uIdx = parts.indexOf('u')
     return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
-  } catch (e) {
+  } catch (_e) {
     return '0'
   }
 }
@@ -665,30 +665,33 @@ function getTabLabel(tab) {
 
 async function ensureContentScript(tabId) {
   const checkOrigin = async () => {
-    const tab = await chrome.tabs.get(tabId)
-    if (!tab.url) return false
     try {
-      const url = new URL(tab.url)
-      return url.origin === JULES_ORIGIN
+      const frame = await chrome.webNavigation.getFrame({ tabId, frameId: 0 })
+      if (!frame?.url) return { valid: false, documentId: null }
+      const url = new URL(frame.url)
+      return { valid: url.origin === JULES_ORIGIN, documentId: frame.documentId }
     } catch {
-      return false
+      return { valid: false, documentId: null }
     }
   }
 
-  if (!(await checkOrigin())) {
+  const { valid, documentId } = await checkOrigin()
+  if (!valid || !documentId) {
     throw new Error('Security Error: Cannot inject script into non-Jules tab')
   }
 
   try {
-    await chrome.tabs.sendMessage(tabId, { action: 'PING' })
+    await chrome.tabs.sendMessage(tabId, { action: 'PING' }, { documentId })
+    return documentId
   } catch {
     // Re-verify immediately before injection to prevent TOCTOU
-    if (!(await checkOrigin())) {
+    const { valid: reValid, documentId: reDocumentId } = await checkOrigin()
+    if (!reValid || !reDocumentId) {
       throw new Error('Security Error: Cannot inject script into non-Jules tab')
     }
 
     await chrome.scripting.executeScript({
-      target: { tabId },
+      target: { tabId, documentIds: [reDocumentId] },
       files: ['content.js']
     })
 
@@ -696,8 +699,8 @@ async function ensureContentScript(tabId) {
     while (Date.now() < deadline) {
       try {
         await new Promise((r) => setTimeout(r, 100))
-        await chrome.tabs.sendMessage(tabId, { action: 'PING' })
-        return
+        await chrome.tabs.sendMessage(tabId, { action: 'PING' }, { documentId: reDocumentId })
+        return reDocumentId
       } catch {
         // Keep waiting
       }
@@ -707,8 +710,8 @@ async function ensureContentScript(tabId) {
 }
 
 async function getTabConfig(tabId) {
-  await ensureContentScript(tabId)
-  const response = await chrome.tabs.sendMessage(tabId, { action: 'GET_CONFIG' })
+  const documentId = await ensureContentScript(tabId)
+  const response = await chrome.tabs.sendMessage(tabId, { action: 'GET_CONFIG' }, { documentId })
   if (!response?.config?.at) {
     throw new Error('Could not extract page config (XSRF token missing). Try refreshing the Jules tab.')
   }
