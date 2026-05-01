@@ -16,7 +16,7 @@ function extractAccountNum(url) {
     const parts = new URL(url).pathname.split('/')
     const uIdx = parts.indexOf('u')
     return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
-  } catch (e) {
+  } catch (_e) {
     return '0'
   }
 }
@@ -128,34 +128,49 @@ function fixJsonControlChars(str) {
 
 /**
  * Find the end of the outermost JSON array using bracket balancing.
- * Handles control chars inside strings by skipping them.
+ * ⚡ Bolt Optimization: Uses indexOf to fast-forward through string literals,
+ * drastically improving performance on large JSON responses by avoiding
+ * character-by-character iteration.
  */
 function findJsonEnd(str) {
   let depth = 0
-  let inStr = false
-  let esc = false
+  let i = 0
+  const len = str.length
 
-  for (let i = 0; i < str.length; i++) {
+  while (i < len) {
     const ch = str[i]
 
-    if (esc) {
-      esc = false
-      continue
-    }
-    if (inStr) {
-      if (ch === '\\') esc = true
-      else if (ch === '"') inStr = false
-      continue
-    }
     if (ch === '"') {
-      inStr = true
-      continue
-    }
-    if (ch === '[') depth++
-    if (ch === ']') {
+      // Fast-forward to the next quote
+      let quoteIdx = i + 1
+      while (true) {
+        quoteIdx = str.indexOf('"', quoteIdx)
+        if (quoteIdx === -1) return -1
+
+        // Check if the quote is escaped by counting preceding backslashes
+        let backslashCount = 0
+        let j = quoteIdx - 1
+        while (j > i && str.charCodeAt(j) === 92) {
+          // 92 is '\\'
+          backslashCount++
+          j--
+        }
+
+        // Even number of backslashes means it's an actual unescaped quote
+        if (backslashCount % 2 === 0) {
+          i = quoteIdx
+          break
+        }
+        // Otherwise, skip the escaped quote and keep searching
+        quoteIdx++
+      }
+    } else if (ch === '[') {
+      depth++
+    } else if (ch === ']') {
       depth--
       if (depth === 0) return i + 1
     }
+    i++
   }
 
   return -1
