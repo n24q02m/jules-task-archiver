@@ -6,5 +6,7 @@
   "scripts": {
     "test": "node --test"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "@types/chrome": "^0.1.40"
+  }
 }
