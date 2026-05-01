@@ -16,7 +16,7 @@ function extractAccountNum(url) {
     const parts = new URL(url).pathname.split('/')
     const uIdx = parts.indexOf('u')
     return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
-  } catch (e) {
+  } catch (_e) {
     return '0'
   }
 }
@@ -667,7 +667,7 @@ async function ensureContentScript(tabId) {
   const getDocumentOriginAndId = async () => {
     try {
       const frame = await chrome.webNavigation.getFrame({ tabId, frameId: 0 })
-      if (!frame || !frame.url) return null
+      if (!frame?.url) return null
       const url = new URL(frame.url)
       if (url.origin === JULES_ORIGIN) {
         return frame.documentId

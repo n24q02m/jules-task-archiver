@@ -133,8 +133,8 @@ function setupEnvironment(initialTabs = {}) {
         return { id, url: 'https://jules.google.com/u/0/' }
       },
       sendMessage: async (_tabId, message, options) => {
-        if (!options || !options.documentId) {
-            throw new Error('sendMessage must specify documentId')
+        if (!options?.documentId) {
+          throw new Error('sendMessage must specify documentId')
         }
         if (message.action === 'PING') {
           // Simulate script not loaded by throwing
@@ -146,7 +146,7 @@ function setupEnvironment(initialTabs = {}) {
     scripting: {
       executeScript: async ({ target, files }) => {
         if (!target.documentIds || target.documentIds.length === 0) {
-            throw new Error('executeScript must specify documentIds')
+          throw new Error('executeScript must specify documentIds')
         }
         chromeMock.scripting.lastCall = { target, files }
       }
@@ -199,7 +199,7 @@ describe('ensureContentScript Security', () => {
     const { sandbox, chromeMock } = setupEnvironment()
 
     let callCount = 0
-    chromeMock.webNavigation.getFrame = async ({ tabId }) => {
+    chromeMock.webNavigation.getFrame = async ({ _tabId }) => {
       callCount++
       if (callCount === 1) {
         return { url: 'https://jules.google.com/u/0/', documentId: 'doc-1' }
@@ -219,15 +219,15 @@ describe('ensureContentScript Security', () => {
     })
 
     // Explicitly mock getFrame to match the provided tab URL
-    chromeMock.webNavigation.getFrame = async ({ tabId }) => {
+    chromeMock.webNavigation.getFrame = async ({ _tabId }) => {
       return { url: 'https://jules.google.com/u/1/', documentId: 'doc-456' }
     }
 
     // Mock successful sendMessage after injection to stop the loop
     let injected = false
     chromeMock.tabs.sendMessage = async (_tabId, message, options) => {
-      if (!options || !options.documentId) {
-          throw new Error('sendMessage must specify documentId')
+      if (!options?.documentId) {
+        throw new Error('sendMessage must specify documentId')
       }
       if (message.action === 'PING') {
         if (injected) return { status: 'ok' }
@@ -236,7 +236,7 @@ describe('ensureContentScript Security', () => {
     }
     chromeMock.scripting.executeScript = async ({ target }) => {
       if (!target.documentIds || target.documentIds.length === 0) {
-          throw new Error('executeScript must specify documentIds')
+        throw new Error('executeScript must specify documentIds')
       }
       injected = true
     }

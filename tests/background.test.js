@@ -47,7 +47,7 @@ function setupEnvironment(initialStorage = {}) {
     },
     webNavigation: {
       getFrame: async ({ tabId }) => {
-        return { url: 'https://jules.google.com/u/0/session', documentId: 'doc-' + tabId }
+        return { url: 'https://jules.google.com/u/0/session', documentId: `doc-${tabId}` }
       }
     }
   }
