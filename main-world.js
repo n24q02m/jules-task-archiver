@@ -26,7 +26,7 @@ function broadcastConfig() {
           }
         : null
     },
-    '*'
+    window.origin
   )
 }
 
@@ -54,7 +54,7 @@ if (!window.__julesArchiver) {
               capturedAt: Date.now()
             }
           },
-          '*'
+          window.origin
         )
       } catch (_e) {
         /* ignore parse errors */
@@ -70,6 +70,7 @@ broadcastConfig()
 // Also listen for explicit re-extract requests from content.js
 window.addEventListener('message', (event) => {
   if (event.source !== window) return
+  if (event.origin !== window.origin) return
   if (event.data?.type === 'JULES_REQUEST_CONFIG') {
     broadcastConfig()
   }
