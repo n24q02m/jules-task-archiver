@@ -34,13 +34,19 @@ function setActiveOpMode(value) {
   // Progressive disclosure: hide archive-specific settings
   const isArchive = value === 'archive'
   const settingsSection = document.querySelector('.settings')
-  const forceCheckboxContainer = forceCheckbox.parentElement
+  const forceCheckboxContainer =
+    typeof forceCheckbox !== 'undefined' && forceCheckbox ? forceCheckbox.parentElement : null
 
   if (settingsSection) {
     settingsSection.style.display = isArchive ? 'block' : 'none'
   }
   if (forceCheckboxContainer) {
     forceCheckboxContainer.style.display = isArchive ? 'flex' : 'none'
+  }
+
+  // Update button text contextually
+  if (startBtn && !startBtn.disabled) {
+    startBtn.textContent = isArchive ? 'Start Archiving' : 'Start Suggestions'
   }
 }
 
@@ -56,6 +62,8 @@ chrome.storage.sync.get(['ghOwner', 'opMode', 'ghToken'], (syncData) => {
   if (syncData.ghOwner) ghOwnerInput.value = syncData.ghOwner
   if (syncData.opMode) {
     setActiveOpMode(syncData.opMode)
+  } else {
+    setActiveOpMode('archive')
   }
 
   // Cleanup legacy insecure storage of token in sync
@@ -112,7 +120,8 @@ startBtn.addEventListener('click', async () => {
 
   // Reset UI
   startBtn.disabled = true
-  startBtn.textContent = 'Running...'
+  startBtn.setAttribute('aria-busy', 'true')
+  startBtn.textContent = `⏳ ${opMode === 'archive' ? 'Archiving...' : 'Suggesting...'}`
   resetBtn.style.display = 'none'
   progressSection.style.display = 'block'
   summarySection.style.display = 'none'
@@ -127,7 +136,8 @@ startBtn.addEventListener('click', async () => {
 resetBtn.addEventListener('click', () => {
   chrome.runtime.sendMessage({ action: 'RESET' })
   startBtn.disabled = false
-  startBtn.textContent = 'Start'
+  startBtn.removeAttribute('aria-busy')
+  setActiveOpMode(opMode)
   resetBtn.style.display = 'none'
   progressSection.style.display = 'none'
   summarySection.style.display = 'none'
@@ -168,7 +178,8 @@ function renderState(state) {
   // Done or error
   if (state.status === 'done' || state.status === 'error') {
     startBtn.disabled = false
-    startBtn.textContent = 'Start'
+    startBtn.removeAttribute('aria-busy')
+    setActiveOpMode(opMode)
     resetBtn.style.display = 'block'
     progressFill.style.width = '100%'
     progressFill.parentElement.setAttribute('aria-valuenow', '100')
@@ -215,7 +226,8 @@ chrome.runtime.sendMessage({ action: 'GET_STATE' }, (state) => {
     renderState(state)
     if (state.status === 'running') {
       startBtn.disabled = true
-      startBtn.textContent = 'Running...'
+      startBtn.setAttribute('aria-busy', 'true')
+      startBtn.textContent = `⏳ ${opMode === 'archive' ? 'Archiving...' : 'Suggesting...'}`
     } else {
       resetBtn.style.display = 'block'
     }

@@ -1,3 +1,6 @@
 ## 2025-04-03 - Progressive Disclosure for Multi-Mode UIs
 **Learning:** In a multi-mode UI (like Archive vs Suggestions), showing all settings at once creates cognitive overload, especially when settings like GitHub tokens are only relevant to one mode.
 **Action:** Use progressive disclosure in `popup.js` to hide mode-specific settings (like the `.settings` section and `force` checkbox) when they are not relevant to the currently selected mode, keeping the UI clean and focused.
+## 2025-05-02 - Context-Aware Async Button States with Native Accessibility
+**Learning:** For async operations in UI popups under "no custom CSS" constraints, using context-aware dynamic text (e.g., "Start Archiving" vs "Start Suggestions") and visually indicating background activity using native emojis (e.g., "⏳ Archiving...") combined with `aria-busy="true"` dramatically improves usability and screen reader accessibility without the need to define or maintain custom CSS animation classes.
+**Action:** When implementing async buttons in strict or constrained environments, always ensure the text reflects the specific action context and explicitly manage `aria-busy` to communicate the background processing state accurately to assistive technologies.
