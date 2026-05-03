@@ -149,7 +149,7 @@ function setupEnvironment(initialTabs = {}) {
       getFrame: async ({ tabId, _frameId }) => {
         const tabUrl = initialTabs[tabId] ? initialTabs[tabId].url : 'https://jules.google.com/u/0/'
         // Generate a pseudo-documentId based on URL
-        const docId = tabUrl.includes('evil.com') ? 'evil-doc-123' : 'jules-doc-456'
+        const docId = new URL(tabUrl).hostname === 'evil.com' ? 'evil-doc-123' : 'jules-doc-456'
         return { documentId: docId, url: tabUrl }
       }
     },
