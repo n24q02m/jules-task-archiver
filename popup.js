@@ -31,6 +31,11 @@ function setActiveOpMode(value) {
   })
   opMode = value
 
+  // Update button text contextually
+  if (startBtn) {
+    startBtn.textContent = value === 'archive' ? 'Start Archiving' : 'Start Suggestions'
+  }
+
   // Progressive disclosure: hide archive-specific settings
   const isArchive = value === 'archive'
   const settingsSection = document.querySelector('.settings')
@@ -112,7 +117,8 @@ startBtn.addEventListener('click', async () => {
 
   // Reset UI
   startBtn.disabled = true
-  startBtn.textContent = 'Running...'
+  startBtn.textContent = '⏳ Running...'
+  startBtn.setAttribute('aria-busy', 'true')
   resetBtn.style.display = 'none'
   progressSection.style.display = 'block'
   summarySection.style.display = 'none'
@@ -127,7 +133,8 @@ startBtn.addEventListener('click', async () => {
 resetBtn.addEventListener('click', () => {
   chrome.runtime.sendMessage({ action: 'RESET' })
   startBtn.disabled = false
-  startBtn.textContent = 'Start'
+  startBtn.textContent = opMode === 'archive' ? 'Start Archiving' : 'Start Suggestions'
+  startBtn.setAttribute('aria-busy', 'false')
   resetBtn.style.display = 'none'
   progressSection.style.display = 'none'
   summarySection.style.display = 'none'
@@ -168,12 +175,14 @@ function renderState(state) {
   // Done or error
   if (state.status === 'done' || state.status === 'error') {
     startBtn.disabled = false
-    startBtn.textContent = 'Start'
+    startBtn.textContent = opMode === 'archive' ? 'Start Archiving' : 'Start Suggestions'
+    startBtn.setAttribute('aria-busy', 'false')
     resetBtn.style.display = 'block'
     progressFill.style.width = '100%'
     progressFill.parentElement.setAttribute('aria-valuenow', '100')
 
     if (state.status === 'done') {
+      startBtn.setAttribute('aria-busy', 'false')
       currentInfo.textContent = 'Complete'
       renderSummary(state.results)
     } else {
@@ -215,7 +224,8 @@ chrome.runtime.sendMessage({ action: 'GET_STATE' }, (state) => {
     renderState(state)
     if (state.status === 'running') {
       startBtn.disabled = true
-      startBtn.textContent = 'Running...'
+      startBtn.textContent = '⏳ Running...'
+      startBtn.setAttribute('aria-busy', 'true')
     } else {
       resetBtn.style.display = 'block'
     }
