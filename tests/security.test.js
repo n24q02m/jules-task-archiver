@@ -132,7 +132,11 @@ function setupEnvironment(initialTabs = {}) {
         if (initialTabs[id]) return initialTabs[id]
         return { id, url: 'https://jules.google.com/u/0/' }
       },
-      sendMessage: async (_tabId, message) => {
+      sendMessage: async (_tabId, message, options = {}) => {
+        // Assert documentId is passed to prevent TOCTOU
+        if (message.action === 'PING' && !options.documentId) {
+          throw new Error('Security test failure: PING missing documentId')
+        }
         if (message.action === 'PING') {
           // Simulate script not loaded by throwing
           throw new Error('Could not establish connection. Receiving end does not exist.')
@@ -140,8 +144,17 @@ function setupEnvironment(initialTabs = {}) {
         return {}
       }
     },
+    webNavigation: {
+      getFrame: async ({ tabId, frameId }) => {
+        const tab = initialTabs[tabId] || { id: tabId, url: 'https://jules.google.com/u/0/' }
+        return { documentId: `doc-${tabId}-${frameId}`, url: tab.url }
+      }
+    },
     scripting: {
       executeScript: async ({ target, files }) => {
+        if (!target.documentIds || target.documentIds.length === 0) {
+          throw new Error('Security test failure: executeScript missing documentIds')
+        }
         chromeMock.scripting.lastCall = { target, files }
       }
     }
@@ -183,23 +196,29 @@ describe('ensureContentScript Security', () => {
     })
   })
 
-  it('should block injection if URL changes to non-Jules origin (TOCTOU)', async () => {
+  it('should prevent TOCTOU by strictly binding to documentId', async () => {
     const { sandbox, chromeMock } = setupEnvironment()
 
-    let callCount = 0
-    chromeMock.tabs.get = async (id) => {
-      callCount++
-      if (callCount === 1) {
-        return { id, url: 'https://jules.google.com/u/0/' }
+    // Mock successful sendMessage after injection to stop the loop
+    let injected = false
+    let passedOptions = null
+    chromeMock.tabs.sendMessage = async (_tabId, message, options = {}) => {
+      if (message.action === 'PING') {
+        passedOptions = options
+        if (injected) return { status: 'ok' }
+        throw new Error('Not loaded')
       }
-      return { id, url: 'https://evil.com/' }
+    }
+    chromeMock.scripting.executeScript = async ({ target }) => {
+      passedOptions = target
+      injected = true
     }
 
-    // This is expected to fail CURRENTLY because ensureContentScript doesn't re-check the URL
-    // We WANT it to fail to prove the vulnerability exists.
-    await assert.rejects(sandbox.test_ensureContentScript(123), {
-      message: /Security Error: Cannot inject script into non-Jules tab/
-    })
+    const returnedDocId = await sandbox.test_ensureContentScript(123)
+
+    // Ensure documentId is returned and used
+    assert.strictEqual(returnedDocId, 'doc-123-0')
+    assert.strictEqual(passedOptions.documentIds?.[0] || passedOptions.documentId, 'doc-123-0')
   })
 
   it('should allow injection into valid Jules origin', async () => {
