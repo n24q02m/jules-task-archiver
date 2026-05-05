@@ -42,6 +42,10 @@ function setActiveOpMode(value) {
   if (forceCheckboxContainer) {
     forceCheckboxContainer.style.display = isArchive ? 'flex' : 'none'
   }
+
+  if (startBtn && !startBtn.disabled) {
+    startBtn.textContent = isArchive ? 'Start Archiving' : 'Start Suggestions'
+  }
 }
 
 document.querySelectorAll('#opMode button').forEach((btn) => {
@@ -50,6 +54,8 @@ document.querySelectorAll('#opMode button').forEach((btn) => {
     chrome.storage.sync.set({ opMode })
   })
 })
+
+setActiveOpMode(opMode) // Initialize UI state
 
 // --- Load saved settings & cleanup insecure storage ---
 chrome.storage.sync.get(['ghOwner', 'opMode', 'ghToken'], (syncData) => {
@@ -112,7 +118,8 @@ startBtn.addEventListener('click', async () => {
 
   // Reset UI
   startBtn.disabled = true
-  startBtn.textContent = 'Running...'
+  startBtn.textContent = '⏳ Running...'
+  startBtn.setAttribute('aria-busy', 'true')
   resetBtn.style.display = 'none'
   progressSection.style.display = 'block'
   summarySection.style.display = 'none'
@@ -127,7 +134,8 @@ startBtn.addEventListener('click', async () => {
 resetBtn.addEventListener('click', () => {
   chrome.runtime.sendMessage({ action: 'RESET' })
   startBtn.disabled = false
-  startBtn.textContent = 'Start'
+  startBtn.textContent = opMode === 'archive' ? 'Start Archiving' : 'Start Suggestions'
+  startBtn.removeAttribute('aria-busy')
   resetBtn.style.display = 'none'
   progressSection.style.display = 'none'
   summarySection.style.display = 'none'
@@ -168,7 +176,8 @@ function renderState(state) {
   // Done or error
   if (state.status === 'done' || state.status === 'error') {
     startBtn.disabled = false
-    startBtn.textContent = 'Start'
+    startBtn.textContent = opMode === 'archive' ? 'Start Archiving' : 'Start Suggestions'
+    startBtn.removeAttribute('aria-busy')
     resetBtn.style.display = 'block'
     progressFill.style.width = '100%'
     progressFill.parentElement.setAttribute('aria-valuenow', '100')
@@ -215,7 +224,8 @@ chrome.runtime.sendMessage({ action: 'GET_STATE' }, (state) => {
     renderState(state)
     if (state.status === 'running') {
       startBtn.disabled = true
-      startBtn.textContent = 'Running...'
+      startBtn.textContent = '⏳ Running...'
+      startBtn.setAttribute('aria-busy', 'true')
     } else {
       resetBtn.style.display = 'block'
     }
