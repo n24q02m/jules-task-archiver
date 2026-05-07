@@ -16,9 +16,32 @@ function extractAccountNum(url) {
     const parts = new URL(url).pathname.split('/')
     const uIdx = parts.indexOf('u')
     return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
-  } catch (e) {
+  } catch (_e) {
     return '0'
   }
+}
+
+// =============================================================================
+// Network Utilities
+// =============================================================================
+
+/**
+ * Standard fetch wrapper with error handling and token injection.
+ */
+async function jFetch(url, options = {}) {
+  const { token, headers = {}, ...rest } = options
+
+  if (token) {
+    if (typeof token !== 'string') throw new Error('Token must be a string')
+    if (/[\r\n]/.test(token)) throw new Error('Invalid token: contains newline')
+    headers.Authorization = `token ${token}`
+  }
+
+  const res = await fetch(url, { headers, ...rest })
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`)
+  }
+  return res
 }
 
 // =============================================================================
@@ -49,21 +72,20 @@ function buildBatchRequest(rpcId, payload, config) {
 
 async function callBatchExecute(rpcId, payload, config) {
   const { url, body } = buildBatchRequest(rpcId, payload, config)
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/x-www-form-urlencoded;charset=UTF-8',
-      'x-same-domain': '1'
-    },
-    credentials: 'include',
-    body
-  })
-
-  if (!res.ok) {
-    throw new Error(`batchexecute ${rpcId} failed: HTTP ${res.status}`)
+  try {
+    const res = await jFetch(url, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded;charset=UTF-8',
+        'x-same-domain': '1'
+      },
+      credentials: 'include',
+      body
+    })
+    return parseResponse(await res.text(), rpcId)
+  } catch (e) {
+    throw new Error(`batchexecute ${rpcId} failed: ${e.message}`)
   }
-
-  return parseResponse(await res.text(), rpcId)
 }
 
 // =============================================================================
@@ -554,19 +576,10 @@ async function getOpenPRs(owner, repo, token) {
     url.searchParams.set('state', 'open')
     url.searchParams.set('per_page', '100')
 
-    const headers = { Accept: 'application/vnd.github+json' }
-    if (token) {
-      if (typeof token !== 'string') throw new Error('Token must be a string')
-      if (/[\r\n]/.test(token)) throw new Error('Invalid token: contains newline')
-      headers.Authorization = `token ${token}`
-    }
-
-    const res = await fetch(url.toString(), { headers })
-    if (!res.ok) {
-      addLog(`  WARNING: GitHub API ${res.status} for ${key}, assuming 0`)
-      prCache.set(key, [])
-      return []
-    }
+    const res = await jFetch(url.toString(), {
+      headers: { Accept: 'application/vnd.github+json' },
+      token
+    })
     const prs = await res.json()
     const mapped = prs.map((pr) => ({ title: pr.title || '', branch: pr.head?.ref || '' }))
     prCache.set(key, mapped)
