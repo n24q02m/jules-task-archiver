@@ -1,0 +1,26 @@
+<<<<<<< SEARCH
+    const results = []
+    for (const tab of tabs) {
+      const label = getTabLabel(tab)
+      try {
+        const count = isSuggestions ? await processSuggestionsForTab(tab, options) : await processTab(tab, options)
+        results.push({ label, count })
+      } catch (e) {
+        addLog(`ERROR [${label}]: ${e.message}`)
+        results.push({ label, count: 0, err: e.message })
+      }
+    }
+=======
+    const results = await Promise.all(
+      tabs.map(async (tab) => {
+        const label = getTabLabel(tab)
+        try {
+          const count = isSuggestions ? await processSuggestionsForTab(tab, options) : await processTab(tab, options)
+          return { label, count }
+        } catch (e) {
+          addLog(`ERROR [${label}]: ${e.message}`)
+          return { label, count: 0, err: e.message }
+        }
+      })
+    )
+>>>>>>> REPLACE

@@ -16,7 +16,7 @@ function extractAccountNum(url) {
     const parts = new URL(url).pathname.split('/')
     const uIdx = parts.indexOf('u')
     return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
-  } catch (e) {
+  } catch (_e) {
     return '0'
   }
 }
@@ -488,6 +488,10 @@ async function processSuggestionsForTab(tab, options) {
   )
   const allSuggestions = await Promise.all(suggestionFetches)
 
+  const totalSuggestions = allSuggestions.reduce((sum, { suggestions }) => sum + (suggestions?.length || 0), 0)
+  state.progress.total += totalSuggestions
+  updateState({})
+
   let totalStarted = 0
   for (const { repo, suggestions, error } of allSuggestions) {
     if (state.status === 'cancelled') break
@@ -510,24 +514,20 @@ async function processSuggestionsForTab(tab, options) {
 
       if (options.dryRun) {
         addLog(`  [DRY] Would start: ${s.title} (${s.categorySlug})`)
+        state.progress.archived++
       } else {
         addLog(`  Starting: ${s.title}...`)
         try {
           await startSuggestion(s, repo, config, startConfig)
           addLog(`  Started: ${s.title}`)
           totalStarted++
+          state.progress.archived++
         } catch (err) {
           addLog(`  [!] Failed to start "${s.title}": ${err.message}`)
+          state.progress.skipped++
         }
       }
-
-      updateState({
-        progress: {
-          archived: totalStarted,
-          skipped: state.progress.skipped,
-          total: state.progress.total + 1
-        }
-      })
+      updateState({})
     }
   }
 
@@ -765,6 +765,9 @@ async function processTab(tab, options) {
     return 0
   }
 
+  state.progress.total += candidates.length
+  updateState({})
+
   // Group candidates by repo
   const byRepo = new Map()
   for (const task of candidates) {
@@ -806,6 +809,8 @@ async function processTab(tab, options) {
         } else if (taskHasOpenPR(task, openPRs)) {
           toSkip.push(task)
           addLog(`    SKIP [${task.id}] ${task.title} (matching open PR)`)
+          state.progress.skipped++
+          updateState({})
         } else {
           toArchive.push(task)
         }
@@ -862,16 +867,12 @@ async function processTab(tab, options) {
         await archiveTask(task.id, config)
         grandTotal++
         addLog(`  Archived: [${task.id}] ${task.title}`)
-
-        updateState({
-          progress: {
-            archived: state.progress.archived + 1,
-            skipped: state.progress.skipped,
-            total: totalTasks
-          }
-        })
+        state.progress.archived++
+        updateState({})
       } catch (e) {
         addLog(`  ERROR archiving ${task.id}: ${e.message}`)
+        state.progress.skipped++
+        updateState({})
       }
     }
   }
@@ -914,18 +915,18 @@ async function startOperation(options) {
 
     addLog(`Found ${tabs.length} Jules tab(s)\n`)
 
-    const results = []
-    for (const tab of tabs) {
-      const label = getTabLabel(tab)
-      try {
-        const count = isSuggestions ? await processSuggestionsForTab(tab, options) : await processTab(tab, options)
-        results.push({ label, count })
-      } catch (e) {
-        addLog(`ERROR [${label}]: ${e.message}`)
-        results.push({ label, count: 0, err: e.message })
-      }
-    }
-
+    const results = await Promise.all(
+      tabs.map(async (tab) => {
+        const label = getTabLabel(tab)
+        try {
+          const count = isSuggestions ? await processSuggestionsForTab(tab, options) : await processTab(tab, options)
+          return { label, count }
+        } catch (e) {
+          addLog(`ERROR [${label}]: ${e.message}`)
+          return { label, count: 0, err: e.message }
+        }
+      })
+    )
     // Summary
     const verb = isSuggestions ? 'started' : 'archived'
     addLog(`\n${'='.repeat(50)}`)
