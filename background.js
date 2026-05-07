@@ -16,7 +16,7 @@ function extractAccountNum(url) {
     const parts = new URL(url).pathname.split('/')
     const uIdx = parts.indexOf('u')
     return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
-  } catch (e) {
+  } catch (_e) {
     return '0'
   }
 }
@@ -505,8 +505,8 @@ async function processSuggestionsForTab(tab, options) {
     addLog(`\n[${label}] ${repo}: Found ${suggestions.length} suggestions`)
     updateState({ currentRepo: repo.replace(/^github\//, '') })
 
-    for (const s of suggestions) {
-      if (state.status === 'cancelled') break
+    await runInPool(suggestions, 5, async (s) => {
+      if (state.status === 'cancelled') return
 
       if (options.dryRun) {
         addLog(`  [DRY] Would start: ${s.title} (${s.categorySlug})`)
@@ -528,7 +528,7 @@ async function processSuggestionsForTab(tab, options) {
           total: state.progress.total + 1
         }
       })
-    }
+    })
   }
 
   addLog(`\n[${label}] TOTAL: ${totalStarted} suggestions started`)
@@ -616,6 +616,30 @@ const stateReadyPromise = chrome.storage.session.get('archiveState').then((data)
 function updateState(patch) {
   Object.assign(state, patch)
   chrome.storage.session.set({ archiveState: state })
+}
+
+/**
+ * Concurrency-limited execution helper.
+ * Processes items in parallel up to the specified limit.
+ *
+ * @param {Array<T>} items - Items to process
+ * @param {number} limit - Concurrency limit
+ * @param {Function} fn - Async function to call for each item
+ */
+async function runInPool(items, limit, fn) {
+  const results = []
+  const executing = new Set()
+  for (const item of items) {
+    const p = Promise.resolve().then(() => fn(item))
+    results.push(p)
+    executing.add(p)
+    const clean = () => executing.delete(p)
+    p.then(clean).catch(clean)
+    if (executing.size >= limit) {
+      await Promise.race(executing)
+    }
+  }
+  return Promise.all(results)
 }
 
 function addLog(message) {
@@ -857,7 +881,7 @@ async function processTab(tab, options) {
     updateState({ currentRepo: repo })
     addLog(`\n[${label}] -> ${repo} (${repoTasks.length} tasks)`)
 
-    for (const task of repoTasks) {
+    await runInPool(repoTasks, 5, async (task) => {
       try {
         await archiveTask(task.id, config)
         grandTotal++
@@ -873,7 +897,7 @@ async function processTab(tab, options) {
       } catch (e) {
         addLog(`  ERROR archiving ${task.id}: ${e.message}`)
       }
-    }
+    })
   }
 
   addLog(`\n[${label}] TOTAL: ${grandTotal} archived`)

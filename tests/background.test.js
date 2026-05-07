@@ -99,6 +99,7 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_SDETAIL = SDETAIL;
     globalThis.test_CATEGORY_CONFIG = CATEGORY_CONFIG;
     globalThis.test_DEFAULT_CATEGORY = DEFAULT_CATEGORY;
+    globalThis.test_runInPool = runInPool;
   `
 
   const script = new vm.Script(scriptContent)
@@ -763,6 +764,39 @@ describe('getTabLabel', () => {
     const { sandbox } = setupEnvironment()
     assert.strictEqual(sandbox.test_getTabLabel({ url: 'https://jules.google.com/u/1/session' }), 'u/1')
     assert.strictEqual(sandbox.test_getTabLabel({ url: 'https://jules.google.com/u/42/tasks' }), 'u/42')
+  })
+})
+
+// =============================================================================
+// Concurrency Helper Tests
+// =============================================================================
+
+describe('runInPool', () => {
+  it('should process all items', async () => {
+    const { sandbox } = setupEnvironment()
+    const items = [1, 2, 3, 4, 5]
+    const processed = []
+    await sandbox.test_runInPool(items, 2, async (item) => {
+      processed.push(item)
+    })
+    assert.strictEqual(processed.length, 5)
+    assert.deepStrictEqual(processed.sort(), [1, 2, 3, 4, 5])
+  })
+
+  it('should respect concurrency limit', async () => {
+    const { sandbox } = setupEnvironment()
+    const items = [1, 2, 3, 4, 5]
+    let activeCount = 0
+    let maxActiveCount = 0
+
+    await sandbox.test_runInPool(items, 2, async (_item) => {
+      activeCount++
+      maxActiveCount = Math.max(maxActiveCount, activeCount)
+      await new Promise((resolve) => setTimeout(resolve, 10))
+      activeCount--
+    })
+
+    assert.strictEqual(maxActiveCount, 2, 'Max active count should be exactly 2')
   })
 })
 
