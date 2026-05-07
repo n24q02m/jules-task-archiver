@@ -99,6 +99,7 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_SDETAIL = SDETAIL;
     globalThis.test_CATEGORY_CONFIG = CATEGORY_CONFIG;
     globalThis.test_DEFAULT_CATEGORY = DEFAULT_CATEGORY;
+    globalThis.test_getStartConfig = getStartConfig;
   `
 
   const script = new vm.Script(scriptContent)
@@ -796,5 +797,20 @@ describe('getJulesTabs', () => {
     assert.strictEqual(tabs.length, 2)
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[0].url), '0')
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[1].url), '1')
+  })
+})
+
+describe('getStartConfig', () => {
+  it('should return cached config from session storage', async () => {
+    const mockConfig = { modelId: 'test-model' }
+    const { sandbox } = setupEnvironment({ startConfig: mockConfig })
+    const result = await sandbox.test_getStartConfig()
+    assert.deepStrictEqual(result, mockConfig)
+  })
+
+  it('should return null when no config is cached', async () => {
+    const { sandbox } = setupEnvironment({})
+    const result = await sandbox.test_getStartConfig()
+    assert.strictEqual(result, null)
   })
 })
