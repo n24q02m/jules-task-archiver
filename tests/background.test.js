@@ -731,6 +731,21 @@ describe('state management', () => {
     assert.strictEqual(sandbox.test_state().status, 'done')
     assert.strictEqual(sessionSetData.length, 1)
   })
+
+  it('should add log messages and persist state', async () => {
+    const { sandbox, sessionSetData } = setupEnvironment({})
+    await sandbox.test_stateReadyPromise
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    sessionSetData.length = 0
+
+    sandbox.test_addLog('Processing task 1')
+    const state = sandbox.test_state()
+    assert.strictEqual(state.log.length, 1)
+    assert.strictEqual(state.log[0], 'Processing task 1')
+    assert.strictEqual(sessionSetData.length, 1)
+    // Use JSON.stringify to avoid cross-VM reference issues with deepStrictEqual
+    assert.strictEqual(JSON.stringify(sessionSetData[0].archiveState.log), JSON.stringify(['Processing task 1']))
+  })
 })
 
 // =============================================================================
