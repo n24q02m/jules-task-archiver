@@ -16,7 +16,7 @@ function extractAccountNum(url) {
     const parts = new URL(url).pathname.split('/')
     const uIdx = parts.indexOf('u')
     return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
-  } catch (e) {
+  } catch (_e) {
     return '0'
   }
 }
@@ -505,30 +505,36 @@ async function processSuggestionsForTab(tab, options) {
     addLog(`\n[${label}] ${repo}: Found ${suggestions.length} suggestions`)
     updateState({ currentRepo: repo.replace(/^github\//, '') })
 
-    for (const s of suggestions) {
-      if (state.status === 'cancelled') break
+    const prevTotal = state.progress.total
+    let processedInRepo = 0
 
-      if (options.dryRun) {
-        addLog(`  [DRY] Would start: ${s.title} (${s.categorySlug})`)
-      } else {
-        addLog(`  Starting: ${s.title}...`)
-        try {
-          await startSuggestion(s, repo, config, startConfig)
-          addLog(`  Started: ${s.title}`)
-          totalStarted++
-        } catch (err) {
-          addLog(`  [!] Failed to start "${s.title}": ${err.message}`)
-        }
-      }
+    await Promise.all(
+      suggestions.map(async (s) => {
+        if (state.status === 'cancelled') return
 
-      updateState({
-        progress: {
-          archived: totalStarted,
-          skipped: state.progress.skipped,
-          total: state.progress.total + 1
+        if (options.dryRun) {
+          addLog(`  [DRY] Would start: ${s.title} (${s.categorySlug})`)
+        } else {
+          addLog(`  Starting: ${s.title}...`)
+          try {
+            await startSuggestion(s, repo, config, startConfig)
+            addLog(`  Started: ${s.title}`)
+            totalStarted++
+          } catch (err) {
+            addLog(`  [!] Failed to start "${s.title}": ${err.message}`)
+          }
         }
+
+        processedInRepo++
+        updateState({
+          progress: {
+            ...state.progress,
+            archived: totalStarted,
+            total: prevTotal + processedInRepo
+          }
+        })
       })
-    }
+    )
   }
 
   addLog(`\n[${label}] TOTAL: ${totalStarted} suggestions started`)
@@ -857,23 +863,25 @@ async function processTab(tab, options) {
     updateState({ currentRepo: repo })
     addLog(`\n[${label}] -> ${repo} (${repoTasks.length} tasks)`)
 
-    for (const task of repoTasks) {
-      try {
-        await archiveTask(task.id, config)
-        grandTotal++
-        addLog(`  Archived: [${task.id}] ${task.title}`)
+    await Promise.all(
+      repoTasks.map(async (task) => {
+        try {
+          await archiveTask(task.id, config)
+          grandTotal++
+          addLog(`  Archived: [${task.id}] ${task.title}`)
 
-        updateState({
-          progress: {
-            archived: state.progress.archived + 1,
-            skipped: state.progress.skipped,
-            total: totalTasks
-          }
-        })
-      } catch (e) {
-        addLog(`  ERROR archiving ${task.id}: ${e.message}`)
-      }
-    }
+          updateState({
+            progress: {
+              ...state.progress,
+              archived: grandTotal,
+              total: totalTasks
+            }
+          })
+        } catch (e) {
+          addLog(`  ERROR archiving ${task.id}: ${e.message}`)
+        }
+      })
+    )
   }
 
   addLog(`\n[${label}] TOTAL: ${grandTotal} archived`)
