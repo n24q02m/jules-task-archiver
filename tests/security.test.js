@@ -223,3 +223,112 @@ describe('ensureContentScript Security', () => {
     assert.strictEqual(injected, true)
   })
 })
+
+describe('Inter-script Communication: postMessage Origin Validation', () => {
+  const mainWorldJs = fs.readFileSync(path.join(__dirname, '../main-world.js'), 'utf8')
+  const contentJs = fs.readFileSync(path.join(__dirname, '../content.js'), 'utf8')
+
+  function setupMessagingSandbox() {
+    const messages = []
+    const sandbox = {
+      window: {
+        location: { origin: 'https://jules.google.com' },
+        postMessage: (data, origin) => {
+          messages.push({ data, origin })
+        },
+        addEventListener: () => {},
+        fetch: async () => ({ ok: true })
+      },
+      document: {
+        createElement: () => ({ src: '', onload: () => {}, remove: () => {} }),
+        head: { appendChild: () => {} },
+        documentElement: { appendChild: () => {} }
+      },
+      chrome: {
+        runtime: {
+          getURL: (path) => `chrome-extension://id/${path}`,
+          sendMessage: () => {},
+          onMessage: { addListener: () => {} }
+        }
+      },
+      console,
+      setTimeout,
+      Date,
+      URL,
+      URLSearchParams,
+      JSON
+    }
+    // Setup self-references often found in browser globals
+    sandbox.window.window = sandbox.window
+    sandbox.location = sandbox.window.location
+
+    vm.createContext(sandbox)
+    return { sandbox, messages }
+  }
+
+  it('should use window.location.origin instead of "*" in main-world.js broadcastConfig', () => {
+    const { sandbox, messages } = setupMessagingSandbox()
+    sandbox.WIZ_global_data = { SNlM0e: 'at', cfb2h: 'bl', FdrFJe: 'fsid' }
+
+    vm.runInContext(mainWorldJs, sandbox)
+
+    const broadcastMsg = messages.find((m) => m.data.type === 'JULES_ARCHIVER_CONFIG')
+    assert.ok(broadcastMsg, 'Should have broadcasted config')
+    assert.strictEqual(broadcastMsg.origin, 'https://jules.google.com', 'Origin should match window.location.origin')
+    assert.notStrictEqual(broadcastMsg.origin, '*', 'Origin should not be wildcard')
+  })
+
+  it('should use window.location.origin instead of "*" in main-world.js fetch observer', async () => {
+    const { sandbox, messages } = setupMessagingSandbox()
+
+    vm.runInContext(mainWorldJs, sandbox)
+
+    // Trigger the fetch observer
+    const body = new URLSearchParams()
+    body.set(
+      'f.req',
+      JSON.stringify([
+        [
+          [
+            'id',
+            JSON.stringify([
+              null,
+              null,
+              'model-config',
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              [null, null, null, null, ['exp1']]
+            ])
+          ]
+        ]
+      ])
+    )
+
+    await sandbox.window.fetch('https://jules.google.com/rpcids=Rja83d', {
+      body: body.toString()
+    })
+
+    const startMsg = messages.find((m) => m.data.type === 'JULES_START_CONFIG')
+    assert.ok(startMsg, 'Should have posted start config')
+    assert.strictEqual(startMsg.origin, 'https://jules.google.com', 'Origin should match window.location.origin')
+    assert.notStrictEqual(startMsg.origin, '*', 'Origin should not be wildcard')
+  })
+
+  it('should use window.location.origin instead of "*" in content.js extractConfig', async () => {
+    const { sandbox, messages } = setupMessagingSandbox()
+
+    vm.runInContext(contentJs, sandbox)
+
+    // content.js defines extractConfig which calls postMessage
+    await sandbox.extractConfig()
+
+    const requestMsg = messages.find((m) => m.data.type === 'JULES_REQUEST_CONFIG')
+    assert.ok(requestMsg, 'Should have requested config')
+    assert.strictEqual(requestMsg.origin, 'https://jules.google.com', 'Origin should match window.location.origin')
+    assert.notStrictEqual(requestMsg.origin, '*', 'Origin should not be wildcard')
+  })
+})
