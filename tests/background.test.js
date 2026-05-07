@@ -322,8 +322,10 @@ describe('getOpenPRs', () => {
     const prs = await sandbox.test_getOpenPRs('owner', 'repo', null)
     assert.strictEqual(prs.length, 2)
     assert.strictEqual(prs[0].title, 'Fix bug')
+    assert.strictEqual(prs[0].titleLower, 'fix bug')
     assert.strictEqual(prs[0].branch, 'fix/bug-123')
     assert.strictEqual(prs[1].title, 'Add feature')
+    assert.strictEqual(prs[1].titleLower, 'add feature')
   })
 
   it('should return cached value on cache hit', async () => {
