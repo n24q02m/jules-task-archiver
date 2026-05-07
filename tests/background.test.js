@@ -87,6 +87,7 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_ARCHIVABLE_STATES = ARCHIVABLE_STATES;
     globalThis.test_JULES_ORIGIN = JULES_ORIGIN;
     globalThis.test_getJulesTabs = getJulesTabs;
+    globalThis.test_groupTasksByRepo = groupTasksByRepo;
     globalThis.test_extractAccountNum = extractAccountNum;
     globalThis.test_getTabLabel = getTabLabel;
     globalThis.test_getOpenPRs = getOpenPRs;
@@ -763,6 +764,18 @@ describe('getTabLabel', () => {
     const { sandbox } = setupEnvironment()
     assert.strictEqual(sandbox.test_getTabLabel({ url: 'https://jules.google.com/u/1/session' }), 'u/1')
     assert.strictEqual(sandbox.test_getTabLabel({ url: 'https://jules.google.com/u/42/tasks' }), 'u/42')
+  })
+})
+
+describe('groupTasksByRepo', () => {
+  it('should group tasks by repo and use (no repo) as fallback', () => {
+    const { sandbox } = setupEnvironment()
+    const tasks = [{ id: '1', repo: 'repo-a' }, { id: '2', repo: 'repo-b' }, { id: '3', repo: 'repo-a' }, { id: '4' }]
+    const grouped = sandbox.test_groupTasksByRepo(tasks)
+    assert.strictEqual(grouped.size, 3)
+    assert.strictEqual(grouped.get('repo-a').length, 2)
+    assert.strictEqual(grouped.get('repo-b').length, 1)
+    assert.strictEqual(grouped.get('(no repo)').length, 1)
   })
 })
 
