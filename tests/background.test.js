@@ -99,6 +99,12 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_SDETAIL = SDETAIL;
     globalThis.test_CATEGORY_CONFIG = CATEGORY_CONFIG;
     globalThis.test_DEFAULT_CATEGORY = DEFAULT_CATEGORY;
+    globalThis.test_initOperationState = initOperationState;
+    globalThis.test_discoverTabs = discoverTabs;
+    globalThis.test_processAllTabs = processAllTabs;
+    globalThis.test_finalizeOperation = finalizeOperation;
+    globalThis.test_handleOperationError = handleOperationError;
+    globalThis.test_startOperation = startOperation;
   `
 
   const script = new vm.Script(scriptContent)
@@ -796,5 +802,81 @@ describe('getJulesTabs', () => {
     assert.strictEqual(tabs.length, 2)
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[0].url), '0')
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[1].url), '1')
+  })
+})
+
+// =============================================================================
+// startOperation Refactor Tests
+// =============================================================================
+
+describe('startOperation refactoring', () => {
+  it('initOperationState should initialize state correctly', () => {
+    const { sandbox } = setupEnvironment()
+    const options = { opMode: 'archive', dryRun: false, force: false }
+    const isSuggestions = sandbox.test_initOperationState(options)
+
+    assert.strictEqual(isSuggestions, false)
+    const state = sandbox.test_state()
+    assert.strictEqual(state.status, 'running')
+    assert.strictEqual(state.log.length, 2) // Archive mode + v2 API
+    assert.ok(state.log[0].includes('ARCHIVE MODE'))
+  })
+
+  it('discoverTabs should handle no tabs found', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.chrome.tabs.query = async () => []
+    const tabs = await sandbox.test_discoverTabs({})
+
+    assert.strictEqual(tabs, null)
+    assert.strictEqual(sandbox.test_state().status, 'error')
+    assert.strictEqual(sandbox.test_state().error, 'No Jules tabs found')
+  })
+
+  it('discoverTabs should return filtered tabs', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.chrome.tabs.query = async () => [
+      { id: 1, url: 'https://jules.google.com/u/0/session' },
+      { id: 2, url: 'https://jules.google.com/u/1/session' }
+    ]
+    const tabs = await sandbox.test_discoverTabs({ scope: 'current', activeTabId: 2 })
+
+    assert.strictEqual(tabs.length, 1)
+    assert.strictEqual(tabs[0].id, 2)
+  })
+
+  it('finalizeOperation should update status to done and log summary', () => {
+    const { sandbox } = setupEnvironment()
+    const results = [{ label: 'u/0', count: 5 }]
+    sandbox.test_finalizeOperation(results, false)
+
+    const state = sandbox.test_state()
+    assert.strictEqual(state.status, 'done')
+    assert.deepStrictEqual(state.results, results)
+    assert.ok(state.log.some((l) => l.includes('GRAND TOTAL: 5 tasks archived')))
+  })
+
+  it('handleOperationError should log error and update status', () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.test_handleOperationError(new Error('Test error'))
+
+    const state = sandbox.test_state()
+    assert.strictEqual(state.status, 'error')
+    assert.strictEqual(state.error, 'Test error')
+    assert.ok(state.log.some((l) => l.includes('FATAL ERROR: Test error')))
+  })
+
+  it('startOperation should orchestrate successfully', async () => {
+    const { sandbox } = setupEnvironment()
+    const options = { opMode: 'archive' }
+
+    // Mock helpers
+    sandbox.chrome.tabs.query = async () => [{ id: 1, url: 'https://jules.google.com/u/0/session' }]
+    sandbox.processTab = async () => 3
+
+    await sandbox.test_startOperation(options)
+
+    const state = sandbox.test_state()
+    assert.strictEqual(state.status, 'done')
+    assert.strictEqual(state.results[0].count, 3)
   })
 })
