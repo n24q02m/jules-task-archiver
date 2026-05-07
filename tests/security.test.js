@@ -113,7 +113,9 @@ describe('Security: ghToken Storage Cleanup', () => {
 
 // --- ensureContentScript Security Tests ---
 const bgScriptPath = path.join(__dirname, '..', 'background.js')
+const utilsScriptPath = path.join(__dirname, '..', 'utils.js')
 const bgScriptContent = fs.readFileSync(bgScriptPath, 'utf8')
+const utilsScriptContent = fs.readFileSync(utilsScriptPath, 'utf8')
 
 function setupEnvironment(initialTabs = {}) {
   const chromeMock = {
@@ -156,12 +158,14 @@ function setupEnvironment(initialTabs = {}) {
     Error,
     console,
     URL,
-    URLSearchParams
+    URLSearchParams,
+    importScripts: () => {}
   }
 
   vm.createContext(sandbox)
 
   const scriptContent =
+    utilsScriptContent +
     bgScriptContent +
     `
     globalThis.test_ensureContentScript = ensureContentScript;
