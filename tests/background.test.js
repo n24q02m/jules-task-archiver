@@ -99,6 +99,8 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_SDETAIL = SDETAIL;
     globalThis.test_CATEGORY_CONFIG = CATEGORY_CONFIG;
     globalThis.test_DEFAULT_CATEGORY = DEFAULT_CATEGORY;
+    globalThis.test_listTasks = listTasks;
+    globalThis.test_callBatchExecute = callBatchExecute;
   `
 
   const script = new vm.Script(scriptContent)
@@ -796,5 +798,80 @@ describe('getJulesTabs', () => {
     assert.strictEqual(tabs.length, 2)
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[0].url), '0')
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[1].url), '1')
+  })
+})
+
+// =============================================================================
+// listTasks API Tests
+// =============================================================================
+
+describe('listTasks', () => {
+  it('should call callBatchExecute with correct rpcId and payload', async () => {
+    const { sandbox } = setupEnvironment()
+    const config = { at: 'at', bl: 'bl', fsid: 'fsid', accountNum: '0' }
+    const filter = ['state', [3, 9]]
+
+    let calledRpcId
+    let calledPayload
+    let calledConfig
+    sandbox.callBatchExecute = async (rpcId, payload, config) => {
+      calledRpcId = rpcId
+      calledPayload = payload
+      calledConfig = config
+      return [
+        [
+          [
+            'task-1',
+            'Title 1',
+            null,
+            null,
+            'github/owner/repo',
+            3,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            200,
+            'Display Title 1'
+          ]
+        ]
+      ]
+    }
+
+    const tasks = await sandbox.test_listTasks(filter, config)
+
+    assert.strictEqual(calledRpcId, 'p1Takd')
+    assert.strictEqual(JSON.stringify(calledPayload), JSON.stringify([filter, 4]))
+    assert.strictEqual(calledConfig, config)
+    assert.strictEqual(tasks.length, 1)
+    assert.strictEqual(tasks[0].id, 'task-1')
+    assert.strictEqual(tasks[0].title, 'Display Title 1')
+  })
+
+  it('should return empty array if callBatchExecute returns null or empty', async () => {
+    const { sandbox } = setupEnvironment()
+
+    sandbox.callBatchExecute = async () => null
+    const tasks1 = await sandbox.test_listTasks([], {})
+    assert.strictEqual(tasks1.length, 0)
+
+    sandbox.callBatchExecute = async () => []
+    const tasks2 = await sandbox.test_listTasks([], {})
+    assert.strictEqual(tasks2.length, 0)
   })
 })
