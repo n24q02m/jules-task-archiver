@@ -89,6 +89,7 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_getJulesTabs = getJulesTabs;
     globalThis.test_extractAccountNum = extractAccountNum;
     globalThis.test_getTabLabel = getTabLabel;
+    globalThis.test_fetchGitHub = fetchGitHub;
     globalThis.test_getOpenPRs = getOpenPRs;
     globalThis.test_prCache = prCache;
     globalThis.test_taskHasOpenPR = taskHasOpenPR;
@@ -308,6 +309,31 @@ describe('getTabLabel', () => {
 // =============================================================================
 // GitHub PR Check Tests (#54)
 // =============================================================================
+
+
+describe('fetchGitHub', () => {
+  it('should construct correct URL with params', async () => {
+    const { sandbox } = setupEnvironment()
+    let capturedUrl = ''
+    sandbox.fetch = async (url) => {
+      capturedUrl = url
+      return { ok: true, json: async () => ({}) }
+    }
+    await sandbox.test_fetchGitHub('repos/o/r/pulls', null, { state: 'open', per_page: '100' })
+    assert.strictEqual(capturedUrl, 'https://api.github.com/repos/o/r/pulls?state=open&per_page=100')
+  })
+
+  it('should include authorization header if token provided', async () => {
+    const { sandbox } = setupEnvironment()
+    let capturedHeaders = {}
+    sandbox.fetch = async (url, options) => {
+      capturedHeaders = options.headers
+      return { ok: true, json: async () => ({}) }
+    }
+    await sandbox.test_fetchGitHub('user', 'my-token')
+    assert.strictEqual(capturedHeaders.Authorization, 'token my-token')
+  })
+})
 
 describe('getOpenPRs', () => {
   it('should return mapped PR titles and branches', async () => {

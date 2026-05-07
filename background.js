@@ -536,6 +536,25 @@ async function processSuggestionsForTab(tab, options) {
 }
 
 // =============================================================================
+// GitHub Utils
+// =============================================================================
+
+async function fetchGitHub(path, token, params = {}) {
+  const url = new URL(`https://api.github.com/${path.replace(/^\//, "")}`)
+  for (const [k, v] of Object.entries(params)) {
+    url.searchParams.set(k, v)
+  }
+
+  const headers = { Accept: "application/vnd.github+json" }
+  if (token) {
+    if (typeof token !== "string") throw new Error("Token must be a string")
+    if (/[\r\n]/.test(token)) throw new Error("Invalid token: contains newline")
+    headers.Authorization = `token ${token}`
+  }
+
+  return fetch(url.toString(), { headers })
+}
+// =============================================================================
 // GitHub PR Check — task-level matching
 // =============================================================================
 
@@ -550,18 +569,11 @@ async function getOpenPRs(owner, repo, token) {
       throw new Error('Owner and repo must be strings')
     }
 
-    const url = new URL(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls`)
-    url.searchParams.set('state', 'open')
-    url.searchParams.set('per_page', '100')
+    const res = await fetchGitHub(`repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls`, token, {
+      state: 'open',
+      per_page: '100'
+    })
 
-    const headers = { Accept: 'application/vnd.github+json' }
-    if (token) {
-      if (typeof token !== 'string') throw new Error('Token must be a string')
-      if (/[\r\n]/.test(token)) throw new Error('Invalid token: contains newline')
-      headers.Authorization = `token ${token}`
-    }
-
-    const res = await fetch(url.toString(), { headers })
     if (!res.ok) {
       addLog(`  WARNING: GitHub API ${res.status} for ${key}, assuming 0`)
       prCache.set(key, [])
@@ -577,7 +589,6 @@ async function getOpenPRs(owner, repo, token) {
     return []
   }
 }
-
 function taskHasOpenPR(task, openPRs) {
   if (openPRs.length === 0) return false
   const taskTitle = (task.title || '').toLowerCase()
