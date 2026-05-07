@@ -87,6 +87,7 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_ARCHIVABLE_STATES = ARCHIVABLE_STATES;
     globalThis.test_JULES_ORIGIN = JULES_ORIGIN;
     globalThis.test_getJulesTabs = getJulesTabs;
+    globalThis.test_getTabConfig = getTabConfig;
     globalThis.test_extractAccountNum = extractAccountNum;
     globalThis.test_getTabLabel = getTabLabel;
     globalThis.test_getOpenPRs = getOpenPRs;
@@ -796,5 +797,32 @@ describe('getJulesTabs', () => {
     assert.strictEqual(tabs.length, 2)
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[0].url), '0')
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[1].url), '1')
+  })
+})
+
+describe('getTabConfig', () => {
+  it('should return config when sendMessage returns valid response', async () => {
+    const { sandbox } = setupEnvironment()
+    const config = await sandbox.test_getTabConfig(1)
+    assert.strictEqual(config.at, 'token')
+    assert.strictEqual(config.bl, 'build')
+    assert.strictEqual(config.accountNum, '0')
+  })
+
+  it('should throw error when XSRF token is missing', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.chrome.tabs.sendMessage = async () => ({
+      config: { bl: 'build' },
+      accountNum: '0'
+    })
+
+    await assert.rejects(sandbox.test_getTabConfig(1), /Could not extract page config \(XSRF token missing\)/)
+  })
+
+  it('should throw error when response is null', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.chrome.tabs.sendMessage = async () => null
+
+    await assert.rejects(sandbox.test_getTabConfig(1), /Could not extract page config \(XSRF token missing\)/)
   })
 })
