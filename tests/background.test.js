@@ -5,7 +5,9 @@ const vm = require('node:vm')
 const path = require('node:path')
 
 const bgScriptPath = path.join(__dirname, '..', 'background.js')
+const utilsScriptPath = path.join(__dirname, '..', 'utils.js')
 const bgScriptContent = fs.readFileSync(bgScriptPath, 'utf8')
+const utilsScriptContent = fs.readFileSync(utilsScriptPath, 'utf8')
 
 function setupEnvironment(initialStorage = {}) {
   const sessionSetData = []
@@ -65,12 +67,14 @@ function setupEnvironment(initialStorage = {}) {
     URL,
     Promise,
     console,
-    parseInt
+    parseInt,
+    importScripts: () => {}
   }
 
   vm.createContext(sandbox)
 
   const scriptContent =
+    utilsScriptContent +
     bgScriptContent +
     `\n
     globalThis.test_stateReadyPromise = stateReadyPromise;
@@ -99,6 +103,13 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_SDETAIL = SDETAIL;
     globalThis.test_CATEGORY_CONFIG = CATEGORY_CONFIG;
     globalThis.test_DEFAULT_CATEGORY = DEFAULT_CATEGORY;
+    globalThis.test_initOperationState = initOperationState;
+    globalThis.test_discoverTabs = discoverTabs;
+    globalThis.test_processAllTabs = processAllTabs;
+    globalThis.test_finalizeOperation = finalizeOperation;
+    globalThis.test_handleOperationError = handleOperationError;
+    globalThis.test_startOperation = startOperation;
+    globalThis.test_listSuggestions = listSuggestions;
   `
 
   const script = new vm.Script(scriptContent)
@@ -414,14 +425,26 @@ describe('taskHasOpenPR', () => {
   it('should match when PR title contains task title', () => {
     const { sandbox } = setupEnvironment()
     const task = { title: 'Fix ReDoS vulnerability' }
-    const prs = [{ title: '[SECURITY] Fix ReDoS vulnerability', branch: 'fix/redos-123' }]
+    const prs = [
+      {
+        title: '[SECURITY] Fix ReDoS vulnerability',
+        titleLower: '[security] fix redos vulnerability',
+        branch: 'fix/redos-123'
+      }
+    ]
     assert.strictEqual(sandbox.test_taskHasOpenPR(task, prs), true)
   })
 
   it('should match when task title contains PR title', () => {
     const { sandbox } = setupEnvironment()
     const task = { title: 'Unused return value from loadAllTasks' }
-    const prs = [{ title: 'Unused return value from loadAllTasks', branch: 'fix-unused-123' }]
+    const prs = [
+      {
+        title: 'Unused return value from loadAllTasks',
+        titleLower: 'unused return value from loadalltasks',
+        branch: 'fix-unused-123'
+      }
+    ]
     assert.strictEqual(sandbox.test_taskHasOpenPR(task, prs), true)
   })
 
@@ -429,8 +452,8 @@ describe('taskHasOpenPR', () => {
     const { sandbox } = setupEnvironment()
     const task = { title: 'Fix SQL injection' }
     const prs = [
-      { title: 'Add unit tests', branch: 'test/unit' },
-      { title: 'Update README', branch: 'docs/readme' }
+      { title: 'Add unit tests', titleLower: 'add unit tests', branch: 'test/unit' },
+      { title: 'Update README', titleLower: 'update readme', branch: 'docs/readme' }
     ]
     assert.strictEqual(sandbox.test_taskHasOpenPR(task, prs), false)
   })
@@ -442,7 +465,7 @@ describe('taskHasOpenPR', () => {
 
   it('should return false for untitled tasks', () => {
     const { sandbox } = setupEnvironment()
-    const prs = [{ title: 'Some PR', branch: 'branch' }]
+    const prs = [{ title: 'Some PR', titleLower: 'some pr', branch: 'branch' }]
     assert.strictEqual(sandbox.test_taskHasOpenPR({ title: '(untitled)' }, prs), false)
     assert.strictEqual(sandbox.test_taskHasOpenPR({ title: '' }, prs), false)
   })
@@ -450,7 +473,13 @@ describe('taskHasOpenPR', () => {
   it('should be case-insensitive', () => {
     const { sandbox } = setupEnvironment()
     const task = { title: 'fix REDOS Vulnerability' }
-    const prs = [{ title: '[Security] Fix ReDoS vulnerability', branch: 'fix-123' }]
+    const prs = [
+      {
+        title: '[Security] Fix ReDoS vulnerability',
+        titleLower: '[security] fix redos vulnerability',
+        branch: 'fix-123'
+      }
+    ]
     assert.strictEqual(sandbox.test_taskHasOpenPR(task, prs), true)
   })
 })
@@ -731,6 +760,21 @@ describe('state management', () => {
     assert.strictEqual(sandbox.test_state().status, 'done')
     assert.strictEqual(sessionSetData.length, 1)
   })
+
+  it('should add log messages and persist state', async () => {
+    const { sandbox, sessionSetData } = setupEnvironment({})
+    await sandbox.test_stateReadyPromise
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    sessionSetData.length = 0
+
+    sandbox.test_addLog('Processing task 1')
+    const state = sandbox.test_state()
+    assert.strictEqual(state.log.length, 1)
+    assert.strictEqual(state.log[0], 'Processing task 1')
+    assert.strictEqual(sessionSetData.length, 1)
+    // Use JSON.stringify to avoid cross-VM reference issues with deepStrictEqual
+    assert.strictEqual(JSON.stringify(sessionSetData[0].archiveState.log), JSON.stringify(['Processing task 1']))
+  })
 })
 
 // =============================================================================
@@ -749,6 +793,13 @@ describe('extractAccountNum', () => {
     assert.strictEqual(sandbox.test_extractAccountNum('https://jules.google.com/tasks'), '0')
     assert.strictEqual(sandbox.test_extractAccountNum('https://google.com'), '0')
     assert.strictEqual(sandbox.test_extractAccountNum(''), '0')
+  })
+
+  it('should handle null, undefined, and malformed URLs gracefully', () => {
+    const { sandbox } = setupEnvironment()
+    assert.strictEqual(sandbox.test_extractAccountNum(null), '0')
+    assert.strictEqual(sandbox.test_extractAccountNum(undefined), '0')
+    assert.strictEqual(sandbox.test_extractAccountNum('not-a-url'), '0')
   })
 })
 
@@ -796,5 +847,79 @@ describe('getJulesTabs', () => {
     assert.strictEqual(tabs.length, 2)
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[0].url), '0')
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[1].url), '1')
+  })
+})
+
+// =============================================================================
+// List Suggestions Tests
+// =============================================================================
+
+describe('listSuggestions', () => {
+  it('should return parsed suggestions on valid response', async () => {
+    const { sandbox } = setupEnvironment()
+    const rawSuggestion = [
+      'id-123',
+      [
+        'Title',
+        'Desc',
+        'https://github.com/o/r/pull/1',
+        'path/to/file.ts',
+        10,
+        0.9,
+        'Rationale',
+        'code',
+        'typescript',
+        'cleanup',
+        1
+      ],
+      'open',
+      [],
+      'cleanup-tab'
+    ]
+
+    sandbox.callBatchExecute = async (rpcId, payload, _config) => {
+      assert.strictEqual(rpcId, 'hQP40d')
+      assert.strictEqual(payload[0], 'owner/repo')
+      return [[rawSuggestion]]
+    }
+
+    const suggestions = await sandbox.test_listSuggestions('owner/repo', {})
+    assert.strictEqual(suggestions.length, 1)
+    assert.strictEqual(suggestions[0].id, 'id-123')
+    assert.strictEqual(suggestions[0].title, 'Title')
+    assert.strictEqual(suggestions[0].categorySlug, 'cleanup')
+  })
+
+  it('should return empty array if result is null', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.callBatchExecute = async () => null
+
+    const suggestions = await sandbox.test_listSuggestions('owner/repo', {})
+    assert.strictEqual(suggestions.length, 0)
+  })
+
+  it('should return empty array if result is not an array', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.callBatchExecute = async () => ({})
+
+    const suggestions = await sandbox.test_listSuggestions('owner/repo', {})
+    assert.strictEqual(suggestions.length, 0)
+  })
+
+  it('should return empty array if result[0] is not an array', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.callBatchExecute = async () => [null]
+
+    const suggestions = await sandbox.test_listSuggestions('owner/repo', {})
+    assert.strictEqual(suggestions.length, 0)
+  })
+
+  it('should filter out null suggestions', async () => {
+    const { sandbox } = setupEnvironment()
+    // [null] and ["invalid"] will result in parseSuggestion returning null
+    sandbox.callBatchExecute = async () => [[[null], ['invalid']]]
+
+    const suggestions = await sandbox.test_listSuggestions('owner/repo', {})
+    assert.strictEqual(suggestions.length, 0)
   })
 })
