@@ -24,12 +24,16 @@ let opMode = 'archive'
 
 // --- Operation mode selector ---
 function setActiveOpMode(value) {
+  opMode = value
+  updateOpModeUI(value)
+}
+
+function updateOpModeUI(value) {
   document.querySelectorAll('#opMode button').forEach((b) => {
     const isActive = b.dataset.value === value
     b.classList.toggle('active', isActive)
     b.setAttribute('aria-pressed', String(isActive))
   })
-  opMode = value
 
   // Progressive disclosure: hide archive-specific settings
   const isArchive = value === 'archive'
