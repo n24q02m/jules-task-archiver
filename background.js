@@ -16,7 +16,7 @@ function extractAccountNum(url) {
     const parts = new URL(url).pathname.split('/')
     const uIdx = parts.indexOf('u')
     return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
-  } catch (e) {
+  } catch (_e) {
     return '0'
   }
 }
@@ -898,6 +898,17 @@ async function startOperation(options) {
   addLog(options.dryRun ? '=== DRY RUN MODE ===' : isSuggestions ? '=== SUGGESTIONS MODE ===' : '=== ARCHIVE MODE ===')
   if (options.force) addLog('=== FORCE MODE (skip PR check) ===')
   addLog('=== v2: batchexecute API ===')
+
+  // Warm up PR cache if we're doing GitHub checks
+  if (options.opMode === 'archive' && !options.force && options.ghOwner && options.ghToken) {
+    addLog(`Warming up PR cache for owner: ${options.ghOwner}...`)
+    try {
+      await getOpenPRs(options.ghOwner, 'dummy', options.ghToken)
+      addLog('PR cache initialized.')
+    } catch (e) {
+      addLog(`Warning: Failed to warm up PR cache: ${e.message}`)
+    }
+  }
 
   try {
     let tabs = await getJulesTabs()

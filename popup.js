@@ -107,7 +107,9 @@ startBtn.addEventListener('click', async () => {
     force: forceCheckbox.checked,
     scope,
     activeTabId,
-    opMode
+    opMode,
+    ghOwner: ghOwnerInput.value.trim(),
+    ghToken: ghTokenInput.value.trim()
   }
 
   // Reset UI
