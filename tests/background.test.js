@@ -90,6 +90,12 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_extractAccountNum = extractAccountNum;
     globalThis.test_getTabLabel = getTabLabel;
     globalThis.test_getOpenPRs = getOpenPRs;
+    globalThis.test_prepareTab = prepareTab;
+    globalThis.test_processTab = processTab;
+    globalThis.test_getTabConfig = getTabConfig;
+    globalThis.test_listTasks = listTasks;
+    globalThis.test_archiveTask = archiveTask;
+    globalThis.test_processSuggestionsForTab = processSuggestionsForTab;
     globalThis.test_prCache = prCache;
     globalThis.test_taskHasOpenPR = taskHasOpenPR;
     globalThis.test_parseSuggestion = parseSuggestion;
@@ -414,14 +420,26 @@ describe('taskHasOpenPR', () => {
   it('should match when PR title contains task title', () => {
     const { sandbox } = setupEnvironment()
     const task = { title: 'Fix ReDoS vulnerability' }
-    const prs = [{ title: '[SECURITY] Fix ReDoS vulnerability', branch: 'fix/redos-123' }]
+    const prs = [
+      {
+        title: '[SECURITY] Fix ReDoS vulnerability',
+        branch: 'fix/redos-123',
+        titleLower: '[security] fix redos vulnerability'
+      }
+    ]
     assert.strictEqual(sandbox.test_taskHasOpenPR(task, prs), true)
   })
 
   it('should match when task title contains PR title', () => {
     const { sandbox } = setupEnvironment()
     const task = { title: 'Unused return value from loadAllTasks' }
-    const prs = [{ title: 'Unused return value from loadAllTasks', branch: 'fix-unused-123' }]
+    const prs = [
+      {
+        title: 'Unused return value from loadAllTasks',
+        branch: 'fix-unused-123',
+        titleLower: 'unused return value from loadalltasks'
+      }
+    ]
     assert.strictEqual(sandbox.test_taskHasOpenPR(task, prs), true)
   })
 
@@ -429,8 +447,8 @@ describe('taskHasOpenPR', () => {
     const { sandbox } = setupEnvironment()
     const task = { title: 'Fix SQL injection' }
     const prs = [
-      { title: 'Add unit tests', branch: 'test/unit' },
-      { title: 'Update README', branch: 'docs/readme' }
+      { title: 'Add unit tests', branch: 'test/unit', titleLower: 'add unit tests' },
+      { title: 'Update README', branch: 'docs/readme', titleLower: 'update readme' }
     ]
     assert.strictEqual(sandbox.test_taskHasOpenPR(task, prs), false)
   })
@@ -442,7 +460,7 @@ describe('taskHasOpenPR', () => {
 
   it('should return false for untitled tasks', () => {
     const { sandbox } = setupEnvironment()
-    const prs = [{ title: 'Some PR', branch: 'branch' }]
+    const prs = [{ title: 'Some PR', branch: 'branch', titleLower: 'some pr' }]
     assert.strictEqual(sandbox.test_taskHasOpenPR({ title: '(untitled)' }, prs), false)
     assert.strictEqual(sandbox.test_taskHasOpenPR({ title: '' }, prs), false)
   })
@@ -450,7 +468,13 @@ describe('taskHasOpenPR', () => {
   it('should be case-insensitive', () => {
     const { sandbox } = setupEnvironment()
     const task = { title: 'fix REDOS Vulnerability' }
-    const prs = [{ title: '[Security] Fix ReDoS vulnerability', branch: 'fix-123' }]
+    const prs = [
+      {
+        title: '[Security] Fix ReDoS vulnerability',
+        branch: 'fix-123',
+        titleLower: '[security] fix redos vulnerability'
+      }
+    ]
     assert.strictEqual(sandbox.test_taskHasOpenPR(task, prs), true)
   })
 })
@@ -796,5 +820,141 @@ describe('getJulesTabs', () => {
     assert.strictEqual(tabs.length, 2)
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[0].url), '0')
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[1].url), '1')
+  })
+})
+
+// =============================================================================
+// Orchestrator Tests (processTab)
+// =============================================================================
+
+describe('processTab', () => {
+  it('should route to processSuggestionsForTab when opMode is "suggestions"', async () => {
+    const { sandbox } = setupEnvironment()
+    let _suggestionsCalled = false
+    sandbox.processSuggestionsForTab = async () => {
+      _suggestionsCalled = true
+      return 42
+    }
+
+    const result = await sandbox.test_processTab({ id: 1, url: 'https://jules.google.com' }, { opMode: 'suggestions' })
+    assert.strictEqual(result, 42)
+  })
+
+  it('should handle successful archival flow', async () => {
+    const { sandbox } = setupEnvironment()
+    const tab = { id: 1, url: 'https://jules.google.com/u/0/' }
+    const options = { opMode: 'archive', dryRun: false, force: true }
+
+    sandbox.chrome.tabs.sendMessage = async (_id, msg) => {
+      if (msg.action === 'PING') return { ok: true }
+      if (msg.action === 'GET_CONFIG') return { config: { at: 'xsrf', bl: 'build_123' }, accountNum: '0' }
+    }
+
+    const tasksPayload = JSON.stringify([
+      [
+        ['t1', 'Title 1', null, null, 'repo1', 3, ...new Array(20).fill(null), 'Title 1'],
+        ['t2', 'Title 2', null, null, 'repo2', 9, ...new Array(20).fill(null), 'Title 2']
+      ]
+    ])
+    const batchResponse = `)]}'\n123\n${JSON.stringify([['wrb.fr', 'p1Takd', tasksPayload]])}`
+
+    sandbox.fetch = async (url) => {
+      if (url.includes('rpcids=p1Takd')) {
+        return {
+          ok: true,
+          text: async () => batchResponse
+        }
+      }
+      if (url.includes('rpcids=Tjmm5c')) {
+        return {
+          ok: true,
+          text: async () => ')]}\'\n123\n[["wrb.fr","Tjmm5c","[null]"]]'
+        }
+      }
+      return { ok: true, text: async () => '' }
+    }
+
+    const count = await sandbox.test_processTab(tab, options)
+    assert.strictEqual(count, 2)
+    const state = sandbox.test_state()
+    assert.strictEqual(state.progress.archived, 2)
+  })
+
+  it('should skip tasks with open PRs when not forced', async () => {
+    const { sandbox } = setupEnvironment()
+    const tab = { id: 1, url: 'https://jules.google.com/u/0/' }
+    const options = { opMode: 'archive', dryRun: false, force: false }
+
+    sandbox.chrome.storage.sync.get = async () => ({ ghOwner: 'owner' })
+    sandbox.chrome.storage.local.get = async () => ({ ghToken: 'token' })
+
+    sandbox.chrome.tabs.sendMessage = async (_id, msg) => {
+      if (msg.action === 'PING') return { ok: true }
+      if (msg.action === 'GET_CONFIG') return { config: { at: 'xsrf', bl: 'build_123' }, accountNum: '0' }
+    }
+
+    const tasksPayload = JSON.stringify([
+      [['t1', 'Title 1', null, null, 'github/owner/repo1', 3, ...new Array(20).fill(null), 'Title 1']]
+    ])
+    const batchResponse = `)]}'\n123\n${JSON.stringify([['wrb.fr', 'p1Takd', tasksPayload]])}`
+
+    sandbox.fetch = async (url) => {
+      if (url.includes('rpcids=p1Takd')) {
+        return {
+          ok: true,
+          text: async () => batchResponse
+        }
+      }
+      if (new URL(url).hostname === 'api.github.com') {
+        return {
+          ok: true,
+          json: async () => [{ title: 'Title 1' }]
+        }
+      }
+      return { ok: true, text: async () => '' }
+    }
+
+    const count = await sandbox.test_processTab(tab, options)
+    assert.strictEqual(count, 0)
+    assert.ok(sandbox.test_state().log.some((l) => l.includes('SKIP [t1] Title 1')))
+  })
+
+  it('should return 0 on getTabConfig error', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.chrome.tabs.sendMessage = async (_id, msg) => {
+      if (msg.action === 'PING') return { ok: true }
+      throw new Error('config fail')
+    }
+    const count = await sandbox.test_processTab({ id: 1, url: 'https://jules.google.com' }, { opMode: 'archive' })
+    assert.strictEqual(count, 0)
+    assert.ok(sandbox.test_state().log.some((l) => l.includes('ERROR: config fail')))
+  })
+
+  it('should handle dry run mode', async () => {
+    const { sandbox } = setupEnvironment()
+    const tab = { id: 1, url: 'https://jules.google.com/u/0/' }
+    const options = { opMode: 'archive', dryRun: true, force: true }
+
+    sandbox.chrome.tabs.sendMessage = async (_id, msg) => {
+      if (msg.action === 'PING') return { ok: true }
+      if (msg.action === 'GET_CONFIG') return { config: { at: 'xsrf', bl: 'build_123' }, accountNum: '0' }
+    }
+
+    const tasksPayload = JSON.stringify([[['t1', 'T1', null, null, 'r1', 3, ...new Array(20).fill(null), 'T1']]])
+    const batchResponse = `)]}'\n123\n${JSON.stringify([['wrb.fr', 'p1Takd', tasksPayload]])}`
+
+    sandbox.fetch = async (url) => {
+      if (url.includes('rpcids=p1Takd')) {
+        return {
+          ok: true,
+          text: async () => batchResponse
+        }
+      }
+      throw new Error('Should not fetch archive in dry run')
+    }
+
+    const count = await sandbox.test_processTab(tab, options)
+    assert.strictEqual(count, 0)
+    assert.ok(sandbox.test_state().log.some((l) => l.includes('DRY RUN')))
   })
 })
