@@ -340,7 +340,7 @@ describe('Button Event Handlers', () => {
     assert.strictEqual(sentMessage.action, 'START')
     assert.strictEqual(sentMessage.options.opMode, 'archive')
     assert.strictEqual(elements['#startBtn'].disabled, true)
-    assert.strictEqual(elements['#startBtn'].textContent, 'Running...')
+    assert.strictEqual(elements['#startBtn'].textContent, '⏳ Running...')
   })
 
   it('should send RESET message when resetBtn is clicked', () => {
@@ -356,7 +356,7 @@ describe('Button Event Handlers', () => {
 
     assert.strictEqual(sentMessage.action, 'RESET')
     assert.strictEqual(elements['#startBtn'].disabled, false)
-    assert.strictEqual(elements['#startBtn'].textContent, 'Start')
+    assert.strictEqual(elements['#startBtn'].textContent, 'Start Archiving')
     assert.strictEqual(elements['#resetBtn'].style.display, 'none')
   })
 })
