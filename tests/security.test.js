@@ -71,6 +71,7 @@ describe('Security: ghToken Storage Cleanup', () => {
         dataset: {},
         classList: { toggle: () => {} },
         setAttribute: () => {},
+        removeAttribute: () => {},
         style: {},
         parentElement: {}
       }),
