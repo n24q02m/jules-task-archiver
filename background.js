@@ -1,3 +1,4 @@
+importScripts('utils.js')
 /**
  * Jules Task Archiver v2 — Background Service Worker
  *
@@ -16,9 +17,32 @@ function extractAccountNum(url) {
     const parts = new URL(url).pathname.split('/')
     const uIdx = parts.indexOf('u')
     return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
-  } catch (e) {
+  } catch (_e) {
     return '0'
   }
+}
+
+// =============================================================================
+// Network Utilities
+// =============================================================================
+
+/**
+ * Standard fetch wrapper with error handling and token injection.
+ */
+async function jFetch(url, options = {}) {
+  const { token, headers = {}, ...rest } = options
+
+  if (token) {
+    if (typeof token !== 'string') throw new Error('Token must be a string')
+    if (/[\r\n]/.test(token)) throw new Error('Invalid token: contains newline')
+    headers.Authorization = `token ${token}`
+  }
+
+  const res = await fetch(url, { headers, ...rest })
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`)
+  }
+  return res
 }
 
 // =============================================================================
@@ -49,21 +73,20 @@ function buildBatchRequest(rpcId, payload, config) {
 
 async function callBatchExecute(rpcId, payload, config) {
   const { url, body } = buildBatchRequest(rpcId, payload, config)
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/x-www-form-urlencoded;charset=UTF-8',
-      'x-same-domain': '1'
-    },
-    credentials: 'include',
-    body
-  })
-
-  if (!res.ok) {
-    throw new Error(`batchexecute ${rpcId} failed: HTTP ${res.status}`)
+  try {
+    const res = await jFetch(url, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded;charset=UTF-8',
+        'x-same-domain': '1'
+      },
+      credentials: 'include',
+      body
+    })
+    return parseResponse(await res.text(), rpcId)
+  } catch (e) {
+    throw new Error(`batchexecute ${rpcId} failed: ${e.message}`)
   }
-
-  return parseResponse(await res.text(), rpcId)
 }
 
 // =============================================================================
@@ -71,88 +94,31 @@ async function callBatchExecute(rpcId, payload, config) {
 // =============================================================================
 
 /**
- * Fix literal control characters (CR, LF) inside JSON string values.
- * batchexecute responses can contain raw newlines inside strings which is
- * invalid JSON. This state machine escapes them.
- */
-function fixJsonControlChars(str) {
-  // ⚡ Bolt Optimization: Use chunked string slicing instead of character-by-character
-  // array pushing. This improves performance by ~7-10x for large JSON strings
-  // (e.g. batchexecute responses) by drastically reducing array allocations.
-  let out = null
-  let inStr = false
-  let esc = false
-  let lastIndex = 0
-
-  for (let i = 0; i < str.length; i++) {
-    const ch = str[i]
-    const code = str.charCodeAt(i)
-
-    if (esc) {
-      esc = false
-      continue
-    }
-
-    if (inStr && ch === '\\') {
-      esc = true
-      continue
-    }
-
-    if (ch === '"') {
-      inStr = !inStr
-      continue
-    }
-
-    if (inStr && code < 0x20) {
-      if (!out) out = []
-      if (i > lastIndex) {
-        out.push(str.substring(lastIndex, i))
-      }
-      if (code === 0x0a) out.push('\\n')
-      else if (code === 0x0d) out.push('\\r')
-      else if (code === 0x09) out.push('\\t')
-      else out.push(`\\u${code.toString(16).padStart(4, '0')}`)
-      lastIndex = i + 1
-    }
-  }
-
-  // If no control characters were found, avoid joining entirely
-  if (!out) return str
-
-  if (lastIndex < str.length) {
-    out.push(str.substring(lastIndex))
-  }
-
-  return out.join('')
-}
-
-/**
  * Find the end of the outermost JSON array using bracket balancing.
  * Handles control chars inside strings by skipping them.
  */
 function findJsonEnd(str) {
+  // ⚡ Bolt Optimization: Use String.prototype.indexOf('"') to fast-forward
+  // through string literals instead of character-by-character iteration.
+  // This avoids huge JS overhead for large string payloads.
   let depth = 0
-  let inStr = false
-  let esc = false
-
   for (let i = 0; i < str.length; i++) {
     const ch = str[i]
-
-    if (esc) {
-      esc = false
-      continue
-    }
-    if (inStr) {
-      if (ch === '\\') esc = true
-      else if (ch === '"') inStr = false
-      continue
-    }
     if (ch === '"') {
-      inStr = true
-      continue
-    }
-    if (ch === '[') depth++
-    if (ch === ']') {
+      while (true) {
+        i = str.indexOf('"', i + 1)
+        if (i === -1) return -1
+        let count = 0
+        let k = i - 1
+        while (k >= 0 && str.charCodeAt(k) === 92) {
+          count++
+          k--
+        }
+        if (count % 2 === 0) break
+      }
+    } else if (ch === '[') {
+      depth++
+    } else if (ch === ']') {
       depth--
       if (depth === 0) return i + 1
     }
@@ -163,12 +129,19 @@ function findJsonEnd(str) {
 
 function parseResponse(text, rpcId) {
   // Strip XSS protection prefix: )]}'
-  const cleaned = text.replace(/^\)\]\}'\s*/, '')
+  let pos = 0
+  if (text.startsWith(")]}'")) {
+    pos = 4
+  }
+  // Skip leading whitespace
+  while (pos < text.length && /\s/.test(text[pos])) {
+    pos++
+  }
 
   // Skip byte-length line
-  const firstNewline = cleaned.indexOf('\n')
+  const firstNewline = text.indexOf('\n', pos)
   if (firstNewline === -1) throw new Error('Invalid batchexecute response')
-  const data = cleaned.substring(firstNewline + 1)
+  const data = text.substring(firstNewline + 1)
 
   // Find valid JSON boundary
   const jsonEnd = findJsonEnd(data)
@@ -209,15 +182,17 @@ const TASK = {
 const ARCHIVABLE_STATES = new Set([3, 9]) // 3=completed, 9=failed
 
 function parseTask(raw) {
+  const source = raw[TASK.SOURCE] || ''
+  const parts = source.split('/')
   return {
     id: raw[TASK.ID],
     title: raw[TASK.DISPLAY_TITLE] || raw[TASK.SHORT_TITLE] || '(untitled)',
-    source: raw[TASK.SOURCE] || '',
+    source,
     state: raw[TASK.STATE],
     statusCode: raw[TASK.STATUS_CODE],
-    repo: (raw[TASK.SOURCE] || '').replace(/^github\//, ''),
-    owner: (raw[TASK.SOURCE] || '').split('/')[1] || '',
-    repoName: (raw[TASK.SOURCE] || '').split('/')[2] || ''
+    repo: source.startsWith('github/') ? source.slice(7) : source,
+    owner: parts[1] || '',
+    repoName: parts[2] || ''
   }
 }
 
@@ -285,9 +260,19 @@ function parseSuggestion(raw) {
 }
 
 async function listSuggestions(repo, config) {
-  const result = await callBatchExecute('hQP40d', [repo], config)
-  if (!result || !Array.isArray(result) || !Array.isArray(result[0])) return []
-  return result[0].map(parseSuggestion).filter(Boolean)
+  const payload = [2, repo, 10]
+  const result = await callBatchExecute('Q0gixc', payload, config)
+  if (!result?.[0]) return []
+
+  return result[0]
+    .map(parseSuggestion)
+    .filter(Boolean)
+    .sort((a, b) => {
+      // Group by category, then by ID
+      const catCompare = a.categorySlug.localeCompare(b.categorySlug)
+      if (catCompare !== 0) return catCompare
+      return a.id.localeCompare(b.id)
+    })
 }
 
 // =============================================================================
@@ -441,20 +426,9 @@ async function getStartConfig() {
 // =============================================================================
 
 async function processSuggestionsForTab(tab, options) {
-  const label = getTabLabel(tab)
-  updateState({ currentTab: label })
-  addLog(`\n${'='.repeat(50)}`)
-  addLog(`${label}: ${tab.url}`)
-  addLog(`${'='.repeat(50)}`)
-
-  let config
-  try {
-    config = await getTabConfig(tab.id)
-    addLog(`[${label}] Config extracted (bl: ${config.bl.split('_').pop()})`)
-  } catch (e) {
-    addLog(`[${label}] ERROR: ${e.message}`)
-    return 0
-  }
+  const prepared = await prepareTab(tab)
+  if (!prepared) return 0
+  const { label, config } = prepared
 
   const startConfig = await getStartConfig()
   if (!startConfig) {
@@ -505,30 +479,36 @@ async function processSuggestionsForTab(tab, options) {
     addLog(`\n[${label}] ${repo}: Found ${suggestions.length} suggestions`)
     updateState({ currentRepo: repo.replace(/^github\//, '') })
 
-    for (const s of suggestions) {
-      if (state.status === 'cancelled') break
+    const prevTotal = state.progress.total
+    let processedInRepo = 0
 
-      if (options.dryRun) {
-        addLog(`  [DRY] Would start: ${s.title} (${s.categorySlug})`)
-      } else {
-        addLog(`  Starting: ${s.title}...`)
-        try {
-          await startSuggestion(s, repo, config, startConfig)
-          addLog(`  Started: ${s.title}`)
-          totalStarted++
-        } catch (err) {
-          addLog(`  [!] Failed to start "${s.title}": ${err.message}`)
-        }
-      }
+    await Promise.all(
+      suggestions.map(async (s) => {
+        if (state.status === 'cancelled') return
 
-      updateState({
-        progress: {
-          archived: totalStarted,
-          skipped: state.progress.skipped,
-          total: state.progress.total + 1
+        if (options.dryRun) {
+          addLog(`  [DRY] Would start: ${s.title} (${s.categorySlug})`)
+        } else {
+          addLog(`  Starting: ${s.title}...`)
+          try {
+            await startSuggestion(s, repo, config, startConfig)
+            addLog(`  Started: ${s.title}`)
+            totalStarted++
+          } catch (err) {
+            addLog(`  [!] Failed to start "${s.title}": ${err.message}`)
+          }
         }
+
+        processedInRepo++
+        updateState({
+          progress: {
+            ...state.progress,
+            archived: totalStarted,
+            total: prevTotal + processedInRepo
+          }
+        })
       })
-    }
+    )
   }
 
   addLog(`\n[${label}] TOTAL: ${totalStarted} suggestions started`)
@@ -554,21 +534,16 @@ async function getOpenPRs(owner, repo, token) {
     url.searchParams.set('state', 'open')
     url.searchParams.set('per_page', '100')
 
-    const headers = { Accept: 'application/vnd.github+json' }
-    if (token) {
-      if (typeof token !== 'string') throw new Error('Token must be a string')
-      if (/[\r\n]/.test(token)) throw new Error('Invalid token: contains newline')
-      headers.Authorization = `token ${token}`
-    }
-
-    const res = await fetch(url.toString(), { headers })
-    if (!res.ok) {
-      addLog(`  WARNING: GitHub API ${res.status} for ${key}, assuming 0`)
-      prCache.set(key, [])
-      return []
-    }
+    const res = await jFetch(url.toString(), {
+      headers: { Accept: 'application/vnd.github+json' },
+      token
+    })
     const prs = await res.json()
-    const mapped = prs.map((pr) => ({ title: pr.title || '', branch: pr.head?.ref || '' }))
+    const mapped = prs.map((pr) => ({
+      title: pr.title || '',
+      titleLower: (pr.title || '').toLowerCase(),
+      branch: pr.head?.ref || ''
+    }))
     prCache.set(key, mapped)
     return mapped
   } catch (e) {
@@ -582,7 +557,7 @@ function taskHasOpenPR(task, openPRs) {
   if (openPRs.length === 0) return false
   const taskTitle = (task.title || '').toLowerCase()
   if (!taskTitle || taskTitle === '(untitled)') return false
-  return openPRs.some((pr) => pr.title.toLowerCase().includes(taskTitle) || taskTitle.includes(pr.title.toLowerCase()))
+  return openPRs.some((pr) => pr.titleLower.includes(taskTitle) || taskTitle.includes(pr.titleLower))
 }
 
 // =============================================================================
@@ -663,32 +638,46 @@ function getTabLabel(tab) {
   return num !== '0' ? `u/${num}` : 'default'
 }
 
-async function ensureContentScript(tabId) {
-  const checkOrigin = async () => {
-    const tab = await chrome.tabs.get(tabId)
-    if (!tab.url) return false
-    try {
-      const url = new URL(tab.url)
-      return url.origin === JULES_ORIGIN
-    } catch {
-      return false
-    }
-  }
+async function prepareTab(tab) {
+  const label = getTabLabel(tab)
+  updateState({ currentTab: label })
+  addLog(`\n${'='.repeat(50)}`)
+  addLog(`${label}: ${tab.url}`)
+  addLog(`${'='.repeat(50)}`)
 
-  if (!(await checkOrigin())) {
-    throw new Error('Security Error: Cannot inject script into non-Jules tab')
+  try {
+    const config = await getTabConfig(tab.id)
+    addLog(`[${label}] Config extracted (bl: ${config.bl.split('_').pop()})`)
+    return { label, config }
+  } catch (e) {
+    addLog(`[${label}] ERROR: ${e.message}`)
+    return null
+  }
+}
+
+async function ensureContentScript(tabId) {
+  const frame = await chrome.webNavigation.getFrame({ tabId, frameId: 0 })
+  if (!frame?.url) {
+    throw new Error('Security Error: Cannot verify tab origin')
   }
 
   try {
-    await chrome.tabs.sendMessage(tabId, { action: 'PING' })
-  } catch {
-    // Re-verify immediately before injection to prevent TOCTOU
-    if (!(await checkOrigin())) {
+    const url = new URL(frame.url)
+    if (url.origin !== JULES_ORIGIN) {
       throw new Error('Security Error: Cannot inject script into non-Jules tab')
     }
+  } catch {
+    throw new Error('Security Error: Cannot inject script into non-Jules tab')
+  }
 
+  const documentId = frame.documentId
+  const target = { tabId, documentIds: [documentId] }
+
+  try {
+    await chrome.tabs.sendMessage(tabId, { action: 'PING' }, { documentId })
+  } catch {
     await chrome.scripting.executeScript({
-      target: { tabId },
+      target,
       files: ['content.js']
     })
 
@@ -696,19 +685,22 @@ async function ensureContentScript(tabId) {
     while (Date.now() < deadline) {
       try {
         await new Promise((r) => setTimeout(r, 100))
-        await chrome.tabs.sendMessage(tabId, { action: 'PING' })
-        return
+        await chrome.tabs.sendMessage(tabId, { action: 'PING' }, { documentId })
+        break
       } catch {
         // Keep waiting
       }
     }
-    throw new Error('Content script failed to initialize within 3s')
+    if (Date.now() >= deadline) {
+      throw new Error('Content script failed to initialize within 3s')
+    }
   }
+  return documentId
 }
 
 async function getTabConfig(tabId) {
-  await ensureContentScript(tabId)
-  const response = await chrome.tabs.sendMessage(tabId, { action: 'GET_CONFIG' })
+  const documentId = await ensureContentScript(tabId)
+  const response = await chrome.tabs.sendMessage(tabId, { action: 'GET_CONFIG' }, { documentId })
   if (!response?.config?.at) {
     throw new Error('Could not extract page config (XSRF token missing). Try refreshing the Jules tab.')
   }
@@ -723,21 +715,9 @@ async function getTabConfig(tabId) {
 // =============================================================================
 
 async function processTab(tab, options) {
-  const label = getTabLabel(tab)
-  updateState({ currentTab: label })
-  addLog(`\n${'='.repeat(50)}`)
-  addLog(`${label}: ${tab.url}`)
-  addLog(`${'='.repeat(50)}`)
-
-  // Get page config (tokens for batchexecute)
-  let config
-  try {
-    config = await getTabConfig(tab.id)
-    addLog(`[${label}] Config extracted (bl: ${config.bl.split('_').pop()})`)
-  } catch (e) {
-    addLog(`[${label}] ERROR: ${e.message}`)
-    return 0
-  }
+  const prepared = await prepareTab(tab)
+  if (!prepared) return 0
+  const { label, config } = prepared
 
   // List all active tasks via API
   addLog(`[${label}] Fetching tasks via API...`)
@@ -857,30 +837,32 @@ async function processTab(tab, options) {
     updateState({ currentRepo: repo })
     addLog(`\n[${label}] -> ${repo} (${repoTasks.length} tasks)`)
 
-    for (const task of repoTasks) {
-      try {
-        await archiveTask(task.id, config)
-        grandTotal++
-        addLog(`  Archived: [${task.id}] ${task.title}`)
+    await Promise.all(
+      repoTasks.map(async (task) => {
+        try {
+          await archiveTask(task.id, config)
+          grandTotal++
+          addLog(`  Archived: [${task.id}] ${task.title}`)
 
-        updateState({
-          progress: {
-            archived: state.progress.archived + 1,
-            skipped: state.progress.skipped,
-            total: totalTasks
-          }
-        })
-      } catch (e) {
-        addLog(`  ERROR archiving ${task.id}: ${e.message}`)
-      }
-    }
+          updateState({
+            progress: {
+              ...state.progress,
+              archived: grandTotal,
+              total: totalTasks
+            }
+          })
+        } catch (e) {
+          addLog(`  ERROR archiving ${task.id}: ${e.message}`)
+        }
+      })
+    )
   }
 
   addLog(`\n[${label}] TOTAL: ${grandTotal} archived`)
   return grandTotal
 }
 
-async function startOperation(options) {
+function initOperationState(options) {
   prCache.clear()
   reqCounter = Math.floor(Math.random() * 900000) + 100000
   startKeepAlive()
@@ -898,50 +880,72 @@ async function startOperation(options) {
   addLog(options.dryRun ? '=== DRY RUN MODE ===' : isSuggestions ? '=== SUGGESTIONS MODE ===' : '=== ARCHIVE MODE ===')
   if (options.force) addLog('=== FORCE MODE (skip PR check) ===')
   addLog('=== v2: batchexecute API ===')
+  return isSuggestions
+}
+
+async function discoverTabs(options) {
+  let tabs = await getJulesTabs()
+
+  if (options.scope === 'current' && options.activeTabId) {
+    tabs = tabs.filter((t) => t.id === options.activeTabId)
+  }
+
+  if (tabs.length === 0) {
+    addLog('No Jules tabs found. Open jules.google.com first.')
+    updateState({ status: 'error', error: 'No Jules tabs found' })
+    return null
+  }
+
+  addLog(`Found ${tabs.length} Jules tab(s)\n`)
+  return tabs
+}
+
+async function processAllTabs(tabs, options, isSuggestions) {
+  const results = []
+  for (const tab of tabs) {
+    const label = getTabLabel(tab)
+    try {
+      const count = isSuggestions ? await processSuggestionsForTab(tab, options) : await processTab(tab, options)
+      results.push({ label, count })
+    } catch (e) {
+      addLog(`ERROR [${label}]: ${e.message}`)
+      results.push({ label, count: 0, err: e.message })
+    }
+  }
+  return results
+}
+
+function finalizeOperation(results, isSuggestions) {
+  const verb = isSuggestions ? 'started' : 'archived'
+  addLog(`\n${'='.repeat(50)}`)
+  addLog('SUMMARY')
+  addLog(`${'='.repeat(50)}`)
+  let grand = 0
+  results.forEach((r) => {
+    grand += r.count
+    addLog(`  ${r.label}: ${r.err ? `ERROR: ${r.err}` : `${r.count} ${verb}`}`)
+  })
+  addLog(`\n  GRAND TOTAL: ${grand} tasks ${verb}`)
+
+  updateState({ status: 'done', results })
+}
+
+function handleOperationError(e) {
+  addLog(`FATAL ERROR: ${e.message}`)
+  updateState({ status: 'error', error: e.message })
+}
+
+async function startOperation(options) {
+  const isSuggestions = initOperationState(options)
 
   try {
-    let tabs = await getJulesTabs()
+    const tabs = await discoverTabs(options)
+    if (!tabs) return
 
-    if (options.scope === 'current' && options.activeTabId) {
-      tabs = tabs.filter((t) => t.id === options.activeTabId)
-    }
-
-    if (tabs.length === 0) {
-      addLog('No Jules tabs found. Open jules.google.com first.')
-      updateState({ status: 'error', error: 'No Jules tabs found' })
-      return
-    }
-
-    addLog(`Found ${tabs.length} Jules tab(s)\n`)
-
-    const results = []
-    for (const tab of tabs) {
-      const label = getTabLabel(tab)
-      try {
-        const count = isSuggestions ? await processSuggestionsForTab(tab, options) : await processTab(tab, options)
-        results.push({ label, count })
-      } catch (e) {
-        addLog(`ERROR [${label}]: ${e.message}`)
-        results.push({ label, count: 0, err: e.message })
-      }
-    }
-
-    // Summary
-    const verb = isSuggestions ? 'started' : 'archived'
-    addLog(`\n${'='.repeat(50)}`)
-    addLog('SUMMARY')
-    addLog(`${'='.repeat(50)}`)
-    let grand = 0
-    results.forEach((r) => {
-      grand += r.count
-      addLog(`  ${r.label}: ${r.err ? `ERROR: ${r.err}` : `${r.count} ${verb}`}`)
-    })
-    addLog(`\n  GRAND TOTAL: ${grand} tasks ${verb}`)
-
-    updateState({ status: 'done', results })
+    const results = await processAllTabs(tabs, options, isSuggestions)
+    finalizeOperation(results, isSuggestions)
   } catch (e) {
-    addLog(`FATAL ERROR: ${e.message}`)
-    updateState({ status: 'error', error: e.message })
+    handleOperationError(e)
   } finally {
     stopKeepAlive()
   }

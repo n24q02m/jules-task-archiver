@@ -5,7 +5,9 @@ const vm = require('node:vm')
 const path = require('node:path')
 
 const bgScriptPath = path.join(__dirname, '..', 'background.js')
+const utilsScriptPath = path.join(__dirname, '..', 'utils.js')
 const bgScriptContent = fs.readFileSync(bgScriptPath, 'utf8')
+const utilsScriptContent = fs.readFileSync(utilsScriptPath, 'utf8')
 
 function setupEnvironment(initialStorage = {}) {
   const sessionSetData = []
@@ -65,12 +67,14 @@ function setupEnvironment(initialStorage = {}) {
     URL,
     Promise,
     console,
-    parseInt
+    parseInt,
+    importScripts: () => {}
   }
 
   vm.createContext(sandbox)
 
   const scriptContent =
+    utilsScriptContent +
     bgScriptContent +
     `\n
     globalThis.test_stateReadyPromise = stateReadyPromise;
@@ -99,6 +103,13 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_SDETAIL = SDETAIL;
     globalThis.test_CATEGORY_CONFIG = CATEGORY_CONFIG;
     globalThis.test_DEFAULT_CATEGORY = DEFAULT_CATEGORY;
+    globalThis.test_listSuggestions = listSuggestions;
+    globalThis.test_initOperationState = initOperationState;
+    globalThis.test_discoverTabs = discoverTabs;
+    globalThis.test_processAllTabs = processAllTabs;
+    globalThis.test_finalizeOperation = finalizeOperation;
+    globalThis.test_handleOperationError = handleOperationError;
+    globalThis.test_startOperation = startOperation;
   `
 
   const script = new vm.Script(scriptContent)
@@ -414,14 +425,26 @@ describe('taskHasOpenPR', () => {
   it('should match when PR title contains task title', () => {
     const { sandbox } = setupEnvironment()
     const task = { title: 'Fix ReDoS vulnerability' }
-    const prs = [{ title: '[SECURITY] Fix ReDoS vulnerability', branch: 'fix/redos-123' }]
+    const prs = [
+      {
+        title: '[SECURITY] Fix ReDoS vulnerability',
+        titleLower: '[security] fix redos vulnerability',
+        branch: 'fix/redos-123'
+      }
+    ]
     assert.strictEqual(sandbox.test_taskHasOpenPR(task, prs), true)
   })
 
   it('should match when task title contains PR title', () => {
     const { sandbox } = setupEnvironment()
     const task = { title: 'Unused return value from loadAllTasks' }
-    const prs = [{ title: 'Unused return value from loadAllTasks', branch: 'fix-unused-123' }]
+    const prs = [
+      {
+        title: 'Unused return value from loadAllTasks',
+        titleLower: 'unused return value from loadalltasks',
+        branch: 'fix-unused-123'
+      }
+    ]
     assert.strictEqual(sandbox.test_taskHasOpenPR(task, prs), true)
   })
 
@@ -429,8 +452,8 @@ describe('taskHasOpenPR', () => {
     const { sandbox } = setupEnvironment()
     const task = { title: 'Fix SQL injection' }
     const prs = [
-      { title: 'Add unit tests', branch: 'test/unit' },
-      { title: 'Update README', branch: 'docs/readme' }
+      { title: 'Add unit tests', titleLower: 'add unit tests', branch: 'test/unit' },
+      { title: 'Update README', titleLower: 'update readme', branch: 'docs/readme' }
     ]
     assert.strictEqual(sandbox.test_taskHasOpenPR(task, prs), false)
   })
@@ -442,7 +465,7 @@ describe('taskHasOpenPR', () => {
 
   it('should return false for untitled tasks', () => {
     const { sandbox } = setupEnvironment()
-    const prs = [{ title: 'Some PR', branch: 'branch' }]
+    const prs = [{ title: 'Some PR', titleLower: 'some pr', branch: 'branch' }]
     assert.strictEqual(sandbox.test_taskHasOpenPR({ title: '(untitled)' }, prs), false)
     assert.strictEqual(sandbox.test_taskHasOpenPR({ title: '' }, prs), false)
   })
@@ -450,7 +473,13 @@ describe('taskHasOpenPR', () => {
   it('should be case-insensitive', () => {
     const { sandbox } = setupEnvironment()
     const task = { title: 'fix REDOS Vulnerability' }
-    const prs = [{ title: '[Security] Fix ReDoS vulnerability', branch: 'fix-123' }]
+    const prs = [
+      {
+        title: '[Security] Fix ReDoS vulnerability',
+        titleLower: '[security] fix redos vulnerability',
+        branch: 'fix-123'
+      }
+    ]
     assert.strictEqual(sandbox.test_taskHasOpenPR(task, prs), true)
   })
 })
@@ -731,6 +760,21 @@ describe('state management', () => {
     assert.strictEqual(sandbox.test_state().status, 'done')
     assert.strictEqual(sessionSetData.length, 1)
   })
+
+  it('should add log messages and persist state', async () => {
+    const { sandbox, sessionSetData } = setupEnvironment({})
+    await sandbox.test_stateReadyPromise
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    sessionSetData.length = 0
+
+    sandbox.test_addLog('Processing task 1')
+    const state = sandbox.test_state()
+    assert.strictEqual(state.log.length, 1)
+    assert.strictEqual(state.log[0], 'Processing task 1')
+    assert.strictEqual(sessionSetData.length, 1)
+    // Use JSON.stringify to avoid cross-VM reference issues with deepStrictEqual
+    assert.strictEqual(JSON.stringify(sessionSetData[0].archiveState.log), JSON.stringify(['Processing task 1']))
+  })
 })
 
 // =============================================================================
@@ -749,6 +793,13 @@ describe('extractAccountNum', () => {
     assert.strictEqual(sandbox.test_extractAccountNum('https://jules.google.com/tasks'), '0')
     assert.strictEqual(sandbox.test_extractAccountNum('https://google.com'), '0')
     assert.strictEqual(sandbox.test_extractAccountNum(''), '0')
+  })
+
+  it('should handle null, undefined, and malformed URLs gracefully', () => {
+    const { sandbox } = setupEnvironment()
+    assert.strictEqual(sandbox.test_extractAccountNum(null), '0')
+    assert.strictEqual(sandbox.test_extractAccountNum(undefined), '0')
+    assert.strictEqual(sandbox.test_extractAccountNum('not-a-url'), '0')
   })
 })
 
@@ -796,5 +847,231 @@ describe('getJulesTabs', () => {
     assert.strictEqual(tabs.length, 2)
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[0].url), '0')
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[1].url), '1')
+  })
+})
+
+// =============================================================================
+// startOperation Refactor Tests
+// =============================================================================
+
+describe('startOperation refactoring', () => {
+  it('initOperationState should initialize state correctly', () => {
+    const { sandbox } = setupEnvironment()
+    const options = { opMode: 'archive', dryRun: false, force: false }
+    const isSuggestions = sandbox.test_initOperationState(options)
+
+    assert.strictEqual(isSuggestions, false)
+    const state = sandbox.test_state()
+    assert.strictEqual(state.status, 'running')
+    assert.strictEqual(state.log.length, 2) // Archive mode + v2 API
+    assert.ok(state.log[0].includes('ARCHIVE MODE'))
+  })
+
+  it('discoverTabs should handle no tabs found', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.chrome.tabs.query = async () => []
+    const tabs = await sandbox.test_discoverTabs({})
+
+    assert.strictEqual(tabs, null)
+    assert.strictEqual(sandbox.test_state().status, 'error')
+    assert.strictEqual(sandbox.test_state().error, 'No Jules tabs found')
+  })
+
+  it('discoverTabs should return filtered tabs', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.chrome.tabs.query = async () => [
+      { id: 1, url: 'https://jules.google.com/u/0/session' },
+      { id: 2, url: 'https://jules.google.com/u/1/session' }
+    ]
+    const tabs = await sandbox.test_discoverTabs({ scope: 'current', activeTabId: 2 })
+
+    assert.strictEqual(tabs.length, 1)
+    assert.strictEqual(tabs[0].id, 2)
+  })
+
+  it('finalizeOperation should update status to done and log summary', () => {
+    const { sandbox } = setupEnvironment()
+    const results = [{ label: 'u/0', count: 5 }]
+    sandbox.test_finalizeOperation(results, false)
+
+    const state = sandbox.test_state()
+    assert.strictEqual(state.status, 'done')
+    assert.deepStrictEqual(state.results, results)
+    assert.ok(state.log.some((l) => l.includes('GRAND TOTAL: 5 tasks archived')))
+  })
+
+  it('handleOperationError should log error and update status', () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.test_handleOperationError(new Error('Test error'))
+
+    const state = sandbox.test_state()
+    assert.strictEqual(state.status, 'error')
+    assert.strictEqual(state.error, 'Test error')
+    assert.ok(state.log.some((l) => l.includes('FATAL ERROR: Test error')))
+  })
+
+  it('startOperation should orchestrate successfully', async () => {
+    const { sandbox } = setupEnvironment()
+    const options = { opMode: 'archive' }
+
+    // Mock helpers
+    sandbox.chrome.tabs.query = async () => [{ id: 1, url: 'https://jules.google.com/u/0/session' }]
+    sandbox.processTab = async () => 3
+
+    await sandbox.test_startOperation(options)
+
+    const state = sandbox.test_state()
+    assert.strictEqual(state.status, 'done')
+    assert.strictEqual(state.results[0].count, 3)
+  })
+})
+
+// =============================================================================
+// listSuggestions Tests
+// =============================================================================
+
+describe('listSuggestions', () => {
+  it('should call callBatchExecute with correct RPC ID and payload', async () => {
+    let capturedRpcId, capturedPayload
+    const { sandbox } = setupEnvironment()
+    sandbox.fetch = async (url, options) => {
+      const u = new URL(url)
+      capturedRpcId = u.searchParams.get('rpcids')
+
+      const bodyParams = new URLSearchParams(options.body)
+      const reqStr = bodyParams.get('f.req')
+      const req = JSON.parse(reqStr)
+      capturedPayload = JSON.parse(req[0][0][1])
+
+      const innerJson = JSON.stringify([[]])
+      const outerJson = JSON.stringify([['wrb.fr', 'Q0gixc', innerJson]])
+      return {
+        ok: true,
+        text: async () => `)]}'\n${outerJson.length}\n${outerJson}`
+      }
+    }
+
+    await sandbox.test_listSuggestions('owner/repo', { at: 'at', bl: 'bl', fsid: 'fsid', accountNum: '0' })
+    assert.strictEqual(capturedRpcId, 'Q0gixc')
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(capturedPayload)), [2, 'owner/repo', 10])
+  })
+
+  it('should map, filter, and sort suggestions', async () => {
+    const { sandbox } = setupEnvironment()
+    const mockSuggestions = [
+      // Suggestion 1: Category B, ID 2
+      [
+        'id-2',
+        ['Title 2', 'Desc 2', 'url', 'file', 1, 0.9, 'reason', 'code', 'js', 'category-b', 1],
+        'status',
+        null,
+        'tab'
+      ],
+      // Suggestion 2: Category A, ID 1
+      [
+        'id-1',
+        ['Title 1', 'Desc 1', 'url', 'file', 1, 0.9, 'reason', 'code', 'js', 'category-a', 1],
+        'status',
+        null,
+        'tab'
+      ],
+      // Suggestion 3: Category B, ID 1
+      [
+        'id-1-b',
+        ['Title 1b', 'Desc 1b', 'url', 'file', 1, 0.9, 'reason', 'code', 'js', 'category-b', 1],
+        'status',
+        null,
+        'tab'
+      ]
+    ]
+
+    sandbox.fetch = async () => {
+      const innerJson = JSON.stringify([mockSuggestions])
+      const outerJson = JSON.stringify([['wrb.fr', 'Q0gixc', innerJson]])
+      return {
+        ok: true,
+        text: async () => `)]}'\n${outerJson.length}\n${outerJson}`
+      }
+    }
+
+    const suggestions = await sandbox.test_listSuggestions('repo', {
+      at: 'at',
+      bl: 'bl',
+      fsid: 'fsid',
+      accountNum: '0'
+    })
+    const normalized = JSON.parse(JSON.stringify(suggestions))
+    assert.strictEqual(normalized.length, 3)
+    assert.strictEqual(normalized[0].categorySlug, 'category-a')
+    assert.strictEqual(normalized[1].categorySlug, 'category-b')
+    assert.strictEqual(normalized[1].id, 'id-1-b')
+    assert.strictEqual(normalized[2].categorySlug, 'category-b')
+    assert.strictEqual(normalized[2].id, 'id-2')
+  })
+
+  it('should return empty array on malformed or empty response', async () => {
+    const { sandbox } = setupEnvironment()
+
+    // Empty result[0]
+    sandbox.fetch = async () => {
+      const innerJson = JSON.stringify([[]])
+      const outerJson = JSON.stringify([['wrb.fr', 'Q0gixc', innerJson]])
+      return {
+        ok: true,
+        text: async () => `)]}'\n${outerJson.length}\n${outerJson}`
+      }
+    }
+    let res = await sandbox.test_listSuggestions('repo', { at: 'at', bl: 'bl', fsid: 'fsid', accountNum: '0' })
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(res)), [])
+
+    // Missing result[0]
+    sandbox.fetch = async () => {
+      const innerJson = JSON.stringify([])
+      const outerJson = JSON.stringify([['wrb.fr', 'Q0gixc', innerJson]])
+      return {
+        ok: true,
+        text: async () => `)]}'\n${outerJson.length}\n${outerJson}`
+      }
+    }
+    res = await sandbox.test_listSuggestions('repo', { at: 'at', bl: 'bl', fsid: 'fsid', accountNum: '0' })
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(res)), [])
+  })
+})
+
+describe('listSuggestions (integration)', () => {
+  it('should work with real callBatchExecute and mocked fetch', async () => {
+    const { sandbox } = setupEnvironment()
+
+    sandbox.fetch = async () => {
+      const mockResult = [
+        [
+          [
+            's1',
+            ['Title 1', 'Desc 1', 'url', 'file', 1, 0.9, 'reason', 'code', 'js', 'cat-a', 1],
+            'status',
+            null,
+            'tab'
+          ]
+        ]
+      ]
+      const innerJson = JSON.stringify(mockResult)
+      const outerJson = JSON.stringify([['wrb.fr', 'Q0gixc', innerJson]])
+      return {
+        ok: true,
+        text: async () => `)]}'\n${outerJson.length}\n${outerJson}`
+      }
+    }
+
+    const suggestions = await sandbox.test_listSuggestions('owner/repo', {
+      at: 'at',
+      bl: 'bl',
+      fsid: 'fsid',
+      accountNum: '0'
+    })
+
+    const normalized = JSON.parse(JSON.stringify(suggestions))
+    assert.strictEqual(normalized.length, 1)
+    assert.strictEqual(normalized[0].id, 's1')
+    assert.strictEqual(normalized[0].title, 'Title 1')
   })
 })
