@@ -12,6 +12,22 @@ function setupEnvironment(initialStorage = {}) {
   let currentStorage = { ...initialStorage }
 
   const chromeMock = {
+    alarms: {
+      create: (name, info) => {
+        chromeMock.alarms._lastCreated = { name, info }
+      },
+      clear: (name) => {
+        chromeMock.alarms._lastCleared = name
+      },
+      onAlarm: {
+        addListener: (callback) => {
+          chromeMock.alarms._listener = callback
+        }
+      },
+      _lastCreated: null,
+      _lastCleared: null,
+      _listener: null
+    },
     storage: {
       session: {
         get: async (key) => {
@@ -73,6 +89,9 @@ function setupEnvironment(initialStorage = {}) {
   const scriptContent =
     bgScriptContent +
     `\n
+    globalThis.test_startKeepAlive = startKeepAlive;
+    globalThis.test_stopKeepAlive = stopKeepAlive;
+    globalThis.test_onAlarmListener = () => chrome.alarms.onAlarm.addListener;
     globalThis.test_stateReadyPromise = stateReadyPromise;
     globalThis.test_state = () => state;
     globalThis.test_updateState = updateState;
@@ -796,5 +815,44 @@ describe('getJulesTabs', () => {
     assert.strictEqual(tabs.length, 2)
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[0].url), '0')
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[1].url), '1')
+  })
+})
+
+// =============================================================================
+// KeepAlive Tests
+// =============================================================================
+
+describe('keepAlive', () => {
+  it('should create keepAlive alarm on startKeepAlive', () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.test_startKeepAlive()
+    const lastCreated = sandbox.chrome.alarms._lastCreated
+    assert.strictEqual(lastCreated.name, 'keepAlive')
+    assert.strictEqual(lastCreated.info.periodInMinutes, 0.5)
+  })
+
+  it('should clear keepAlive alarm on stopKeepAlive', () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.test_stopKeepAlive()
+    assert.strictEqual(sandbox.chrome.alarms._lastCleared, 'keepAlive')
+  })
+
+  it('should call getPlatformInfo when keepAlive alarm fires', async () => {
+    const { sandbox } = setupEnvironment()
+    let platformInfoCalled = false
+    sandbox.chrome.runtime.getPlatformInfo = async () => {
+      platformInfoCalled = true
+      return {}
+    }
+
+    const listener = sandbox.chrome.alarms._listener
+    assert.ok(listener, 'Alarm listener should be registered')
+
+    await listener({ name: 'keepAlive' })
+    assert.strictEqual(platformInfoCalled, true)
+
+    platformInfoCalled = false
+    await listener({ name: 'otherAlarm' })
+    assert.strictEqual(platformInfoCalled, false)
   })
 })

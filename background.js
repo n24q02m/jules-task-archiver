@@ -16,7 +16,7 @@ function extractAccountNum(url) {
     const parts = new URL(url).pathname.split('/')
     const uIdx = parts.indexOf('u')
     return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
-  } catch (e) {
+  } catch (_e) {
     return '0'
   }
 }
@@ -627,21 +627,19 @@ function addLog(message) {
 // KeepAlive (unchanged from v1)
 // =============================================================================
 
-let keepAliveInterval = null
-
 function startKeepAlive() {
-  if (keepAliveInterval) return
-  keepAliveInterval = setInterval(() => {
-    chrome.runtime.getPlatformInfo()
-  }, 25000)
+  chrome.alarms.create('keepAlive', { periodInMinutes: 0.5 })
 }
 
 function stopKeepAlive() {
-  if (keepAliveInterval) {
-    clearInterval(keepAliveInterval)
-    keepAliveInterval = null
-  }
+  chrome.alarms.clear('keepAlive')
 }
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === 'keepAlive') {
+    chrome.runtime.getPlatformInfo()
+  }
+})
 
 // =============================================================================
 // Tab Management
