@@ -71,6 +71,7 @@ describe('Security: ghToken Storage Cleanup', () => {
         dataset: {},
         classList: { toggle: () => {} },
         setAttribute: () => {},
+        removeAttribute: () => {},
         style: {},
         parentElement: {}
       }),
@@ -113,7 +114,11 @@ describe('Security: ghToken Storage Cleanup', () => {
 
 // --- ensureContentScript Security Tests ---
 const bgScriptPath = path.join(__dirname, '..', 'background.js')
+const utilsScriptPath = path.join(__dirname, '..', 'utils.js')
 const bgScriptContent = fs.readFileSync(bgScriptPath, 'utf8')
+const utilsScriptPath = path.join(__dirname, '..', 'utils.js')
+const utilsScriptContent = fs.readFileSync(utilsScriptPath, 'utf8')
+const utilsScriptContent = fs.readFileSync(utilsScriptPath, 'utf8')
 
 function setupEnvironment(initialTabs = {}) {
   const chromeMock = {
@@ -128,16 +133,19 @@ function setupEnvironment(initialTabs = {}) {
       getPlatformInfo: async () => ({})
     },
     tabs: {
-      get: async (id) => {
-        if (initialTabs[id]) return initialTabs[id]
-        return { id, url: 'https://jules.google.com/u/0/' }
-      },
-      sendMessage: async (_tabId, message) => {
+      sendMessage: async (_tabId, message, options) => {
+        chromeMock.tabs.lastMessageOptions = options
         if (message.action === 'PING') {
           // Simulate script not loaded by throwing
           throw new Error('Could not establish connection. Receiving end does not exist.')
         }
         return {}
+      }
+    },
+    webNavigation: {
+      getFrame: async ({ tabId }) => {
+        if (initialTabs[tabId]) return initialTabs[tabId]
+        return { documentId: 'doc_default', url: 'https://jules.google.com/u/0/' }
       }
     },
     scripting: {
@@ -156,12 +164,14 @@ function setupEnvironment(initialTabs = {}) {
     Error,
     console,
     URL,
-    URLSearchParams
+    URLSearchParams,
+    importScripts: () => {}
   }
 
   vm.createContext(sandbox)
 
   const scriptContent =
+    utilsScriptContent +
     bgScriptContent +
     `
     globalThis.test_ensureContentScript = ensureContentScript;
@@ -183,23 +193,29 @@ describe('ensureContentScript Security', () => {
     })
   })
 
-  it('should block injection if URL changes to non-Jules origin (TOCTOU)', async () => {
-    const { sandbox, chromeMock } = setupEnvironment()
+  it('should pin execution to documentId to prevent TOCTOU', async () => {
+    const { sandbox, chromeMock } = setupEnvironment({
+      789: { documentId: 'doc_789', url: 'https://jules.google.com/u/0/' }
+    })
 
-    let callCount = 0
-    chromeMock.tabs.get = async (id) => {
-      callCount++
-      if (callCount === 1) {
-        return { id, url: 'https://jules.google.com/u/0/' }
+    let injected = false
+    chromeMock.tabs.sendMessage = async (_tabId, message, options) => {
+      chromeMock.tabs.lastMessageOptions = options
+      if (message.action === 'PING') {
+        if (injected) return { status: 'ok' }
+        throw new Error('Not loaded')
       }
-      return { id, url: 'https://evil.com/' }
+    }
+    chromeMock.scripting.executeScript = async ({ target, files }) => {
+      chromeMock.scripting.lastCall = { target, files }
+      injected = true
     }
 
-    // This is expected to fail CURRENTLY because ensureContentScript doesn't re-check the URL
-    // We WANT it to fail to prove the vulnerability exists.
-    await assert.rejects(sandbox.test_ensureContentScript(123), {
-      message: /Security Error: Cannot inject script into non-Jules tab/
-    })
+    const docId = await sandbox.test_ensureContentScript(789)
+
+    assert.strictEqual(docId, 'doc_789')
+    assert.strictEqual(chromeMock.scripting.lastCall.target.documentIds[0], 'doc_789')
+    assert.strictEqual(chromeMock.tabs.lastMessageOptions.documentId, 'doc_789')
   })
 
   it('should allow injection into valid Jules origin', async () => {
