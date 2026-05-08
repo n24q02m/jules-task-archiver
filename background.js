@@ -162,12 +162,19 @@ function findJsonEnd(str) {
 
 function parseResponse(text, rpcId) {
   // Strip XSS protection prefix: )]}'
-  const cleaned = text.replace(/^\)\]\}'\s*/, '')
+  let pos = 0
+  if (text.startsWith(")]}'")) {
+    pos = 4
+  }
+  // Skip leading whitespace
+  while (pos < text.length && /\s/.test(text[pos])) {
+    pos++
+  }
 
   // Skip byte-length line
-  const firstNewline = cleaned.indexOf('\n')
+  const firstNewline = text.indexOf('\n', pos)
   if (firstNewline === -1) throw new Error('Invalid batchexecute response')
-  const data = cleaned.substring(firstNewline + 1)
+  const data = text.substring(firstNewline + 1)
 
   // Find valid JSON boundary
   const jsonEnd = findJsonEnd(data)
