@@ -1,0 +1,4 @@
+## 2026-04-09 - Secure Cross-Origin Messaging and Safe URL Parsing
+**Vulnerability:** window.postMessage was using the wildcard "*" targetOrigin and listeners lacked origin verification, allowing potential interception of sensitive configurations. URL parsing used "new URL()" without try/catch, leading to potential unhandled exceptions for invalid URLs (DoS).
+**Learning:** Browser extension content scripts and injected web-world scripts (like main-world.js) require explicit, strict origin bounds for IPC to prevent cross-origin tracking or injection from untrusted iframes. Unhandled exceptions in synchronous parsing functions can disrupt the entire message listener lifecycle.
+**Prevention:** Always use "window.origin" for "targetOrigin" in postMessage. Always verify "event.origin === window.origin" in message event listeners. Wrap standard library parsing logic (like new URL()) in try/catch to ensure graceful degradation when input is malformed.
