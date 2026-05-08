@@ -42,6 +42,7 @@ function setupEnvironment(initialStorage = {}) {
 
   const sandbox = {
     chrome: chromeMock,
+    importScripts: () => {},
     fetch: async () => ({ ok: true, text: async () => ")]}'\n\n4\n[[]]" }),
     setTimeout,
     setInterval,

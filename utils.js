@@ -3,7 +3,11 @@
  * batchexecute responses can contain raw newlines inside strings which is
  * invalid JSON. This state machine escapes them.
  */
+// biome-ignore lint/correctness/noUnusedVariables: Used globally via importScripts
 function fixJsonControlChars(str) {
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: Intentionally matching control characters for performance optimization.
+  if (!/[\x00-\x1F]/.test(str)) return str
+
   // ⚡ Bolt Optimization: Use chunked string slicing instead of character-by-character
   // array pushing. This improves performance by ~7-10x for large JSON strings
   // (e.g. batchexecute responses) by drastically reducing array allocations.
