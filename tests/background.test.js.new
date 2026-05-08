@@ -1,0 +1,29 @@
+<<<<<<< SEARCH
+    tabs: {
+      query: async () => [],
+      get: async (id) => ({ id, url: 'https://jules.google.com/u/0/session' }),
+      sendMessage: async () => ({
+        config: { at: 'token', bl: 'build', fsid: '123' },
+        accountNum: '0',
+        account: 'default'
+      })
+    },
+=======
+    tabs: {
+      query: async () => [],
+      get: async (id) => ({ id, url: 'https://jules.google.com/u/0/session' }),
+      sendMessage: async (_id, msg) => {
+        if (msg.action === 'GET_CONFIG') {
+          return {
+            config: { at: 'token', bl: 'build', fsid: '123' },
+            accountNum: '0',
+            account: 'default'
+          }
+        }
+        return {}
+      }
+    },
+    webNavigation: {
+      getFrame: async () => ({ url: 'https://jules.google.com/u/0/session', documentId: 'doc1' })
+    },
+>>>>>>> REPLACE
