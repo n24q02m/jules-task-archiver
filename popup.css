@@ -146,7 +146,10 @@ input:focus-visible {
 }
 
 button.primary {
-  display: block;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
   width: 100%;
   padding: 8px;
   background: #4ade80;
@@ -157,6 +160,22 @@ button.primary {
   font-weight: 600;
   cursor: pointer;
   margin-bottom: 12px;
+}
+
+.spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(15, 23, 42, 0.3);
+  border-radius: 50%;
+  border-top-color: #0f172a;
+  animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 button.primary:hover {
