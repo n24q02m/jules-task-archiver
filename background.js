@@ -131,28 +131,27 @@ function fixJsonControlChars(str) {
  * Handles control chars inside strings by skipping them.
  */
 function findJsonEnd(str) {
+  // ⚡ Bolt Optimization: Use String.prototype.indexOf('"') to fast-forward
+  // through string literals instead of character-by-character iteration.
+  // This avoids huge JS overhead for large string payloads.
   let depth = 0
-  let inStr = false
-  let esc = false
-
   for (let i = 0; i < str.length; i++) {
     const ch = str[i]
-
-    if (esc) {
-      esc = false
-      continue
-    }
-    if (inStr) {
-      if (ch === '\\') esc = true
-      else if (ch === '"') inStr = false
-      continue
-    }
     if (ch === '"') {
-      inStr = true
-      continue
-    }
-    if (ch === '[') depth++
-    if (ch === ']') {
+      while (true) {
+        i = str.indexOf('"', i + 1)
+        if (i === -1) return -1
+        let count = 0
+        let k = i - 1
+        while (k >= 0 && str.charCodeAt(k) === 92) {
+          count++
+          k--
+        }
+        if (count % 2 === 0) break
+      }
+    } else if (ch === '[') {
+      depth++
+    } else if (ch === ']') {
       depth--
       if (depth === 0) return i + 1
     }
