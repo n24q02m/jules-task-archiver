@@ -24,12 +24,16 @@ let opMode = 'archive'
 
 // --- Operation mode selector ---
 function setActiveOpMode(value) {
+  opMode = value
+  updateOpModeUI(value)
+}
+
+function updateOpModeUI(value) {
   document.querySelectorAll('#opMode button').forEach((b) => {
     const isActive = b.dataset.value === value
     b.classList.toggle('active', isActive)
     b.setAttribute('aria-pressed', String(isActive))
   })
-  opMode = value
 
   // Progressive disclosure: hide archive-specific settings
   const isArchive = value === 'archive'
@@ -41,6 +45,11 @@ function setActiveOpMode(value) {
   }
   if (forceCheckboxContainer) {
     forceCheckboxContainer.style.display = isArchive ? 'flex' : 'none'
+  }
+
+  // Context-aware start button text
+  if (!startBtn.disabled) {
+    startBtn.textContent = isArchive ? 'Start Archiving' : 'Start Suggestions'
   }
 }
 
@@ -112,7 +121,8 @@ startBtn.addEventListener('click', async () => {
 
   // Reset UI
   startBtn.disabled = true
-  startBtn.textContent = 'Running...'
+  startBtn.setAttribute('aria-busy', 'true')
+  startBtn.textContent = '⏳ Running...'
   resetBtn.style.display = 'none'
   progressSection.style.display = 'block'
   summarySection.style.display = 'none'
@@ -127,7 +137,8 @@ startBtn.addEventListener('click', async () => {
 resetBtn.addEventListener('click', () => {
   chrome.runtime.sendMessage({ action: 'RESET' })
   startBtn.disabled = false
-  startBtn.textContent = 'Start'
+  startBtn.removeAttribute('aria-busy')
+  startBtn.textContent = opMode === 'archive' ? 'Start Archiving' : 'Start Suggestions'
   resetBtn.style.display = 'none'
   progressSection.style.display = 'none'
   summarySection.style.display = 'none'
@@ -168,7 +179,8 @@ function renderState(state) {
   // Done or error
   if (state.status === 'done' || state.status === 'error') {
     startBtn.disabled = false
-    startBtn.textContent = 'Start'
+    startBtn.removeAttribute('aria-busy')
+    startBtn.textContent = opMode === 'archive' ? 'Start Archiving' : 'Start Suggestions'
     resetBtn.style.display = 'block'
     progressFill.style.width = '100%'
     progressFill.parentElement.setAttribute('aria-valuenow', '100')
@@ -215,7 +227,8 @@ chrome.runtime.sendMessage({ action: 'GET_STATE' }, (state) => {
     renderState(state)
     if (state.status === 'running') {
       startBtn.disabled = true
-      startBtn.textContent = 'Running...'
+      startBtn.setAttribute('aria-busy', 'true')
+      startBtn.textContent = '⏳ Running...'
     } else {
       resetBtn.style.display = 'block'
     }
