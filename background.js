@@ -16,7 +16,7 @@ function extractAccountNum(url) {
     const parts = new URL(url).pathname.split('/')
     const uIdx = parts.indexOf('u')
     return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
-  } catch (e) {
+  } catch (_e) {
     return '0'
   }
 }
@@ -463,12 +463,13 @@ async function processSuggestionsForTab(tab, options) {
   }
 
   // Get repos from existing tasks
-  addLog(`[${label}] Fetching task list to discover repos...`)
-  let tasks
+  let tasks = []
   try {
-    tasks = await listTasks('', config)
+    addLog(`[${label}] Fetching currently open tasks...`)
+    tasks = await listTasks(1, config)
+    addLog(`[${label}] Found ${tasks.length} open tasks.`)
   } catch (e) {
-    addLog(`[${label}] ERROR listing tasks: ${e.message}`)
+    addLog(`[${label}] ERROR fetching tasks: ${e.message}`)
     return 0
   }
 
