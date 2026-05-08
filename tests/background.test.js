@@ -5,7 +5,9 @@ const vm = require('node:vm')
 const path = require('node:path')
 
 const bgScriptPath = path.join(__dirname, '..', 'background.js')
+const utilsScriptPath = path.join(__dirname, '..', 'utils.js')
 const bgScriptContent = fs.readFileSync(bgScriptPath, 'utf8')
+const utilsScriptContent = fs.readFileSync(utilsScriptPath, 'utf8')
 
 function setupEnvironment(initialStorage = {}) {
   const sessionSetData = []
@@ -44,6 +46,12 @@ function setupEnvironment(initialStorage = {}) {
     },
     scripting: {
       executeScript: async () => {}
+    },
+    webNavigation: {
+      getFrame: async ({ tabId }) => ({
+        url: 'https://jules.google.com/u/0/session',
+        documentId: 'test-doc-id'
+      })
     }
   }
 
@@ -65,12 +73,14 @@ function setupEnvironment(initialStorage = {}) {
     URL,
     Promise,
     console,
-    parseInt
+    parseInt,
+    importScripts: () => {}
   }
 
   vm.createContext(sandbox)
 
   const scriptContent =
+    utilsScriptContent +
     bgScriptContent +
     `\n
     globalThis.test_stateReadyPromise = stateReadyPromise;
@@ -87,6 +97,7 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_ARCHIVABLE_STATES = ARCHIVABLE_STATES;
     globalThis.test_JULES_ORIGIN = JULES_ORIGIN;
     globalThis.test_getJulesTabs = getJulesTabs;
+    globalThis.test_getTabConfig = getTabConfig;
     globalThis.test_extractAccountNum = extractAccountNum;
     globalThis.test_getTabLabel = getTabLabel;
     globalThis.test_getOpenPRs = getOpenPRs;
@@ -99,6 +110,12 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_SDETAIL = SDETAIL;
     globalThis.test_CATEGORY_CONFIG = CATEGORY_CONFIG;
     globalThis.test_DEFAULT_CATEGORY = DEFAULT_CATEGORY;
+    globalThis.test_initOperationState = initOperationState;
+    globalThis.test_discoverTabs = discoverTabs;
+    globalThis.test_processAllTabs = processAllTabs;
+    globalThis.test_finalizeOperation = finalizeOperation;
+    globalThis.test_handleOperationError = handleOperationError;
+    globalThis.test_startOperation = startOperation;
   `
 
   const script = new vm.Script(scriptContent)
@@ -414,14 +431,26 @@ describe('taskHasOpenPR', () => {
   it('should match when PR title contains task title', () => {
     const { sandbox } = setupEnvironment()
     const task = { title: 'Fix ReDoS vulnerability' }
-    const prs = [{ title: '[SECURITY] Fix ReDoS vulnerability', branch: 'fix/redos-123' }]
+    const prs = [
+      {
+        title: '[SECURITY] Fix ReDoS vulnerability',
+        titleLower: '[security] fix redos vulnerability',
+        branch: 'fix/redos-123'
+      }
+    ]
     assert.strictEqual(sandbox.test_taskHasOpenPR(task, prs), true)
   })
 
   it('should match when task title contains PR title', () => {
     const { sandbox } = setupEnvironment()
     const task = { title: 'Unused return value from loadAllTasks' }
-    const prs = [{ title: 'Unused return value from loadAllTasks', branch: 'fix-unused-123' }]
+    const prs = [
+      {
+        title: 'Unused return value from loadAllTasks',
+        titleLower: 'unused return value from loadalltasks',
+        branch: 'fix-unused-123'
+      }
+    ]
     assert.strictEqual(sandbox.test_taskHasOpenPR(task, prs), true)
   })
 
@@ -429,8 +458,8 @@ describe('taskHasOpenPR', () => {
     const { sandbox } = setupEnvironment()
     const task = { title: 'Fix SQL injection' }
     const prs = [
-      { title: 'Add unit tests', branch: 'test/unit' },
-      { title: 'Update README', branch: 'docs/readme' }
+      { title: 'Add unit tests', titleLower: 'add unit tests', branch: 'test/unit' },
+      { title: 'Update README', titleLower: 'update readme', branch: 'docs/readme' }
     ]
     assert.strictEqual(sandbox.test_taskHasOpenPR(task, prs), false)
   })
@@ -442,7 +471,7 @@ describe('taskHasOpenPR', () => {
 
   it('should return false for untitled tasks', () => {
     const { sandbox } = setupEnvironment()
-    const prs = [{ title: 'Some PR', branch: 'branch' }]
+    const prs = [{ title: 'Some PR', titleLower: 'some pr', branch: 'branch' }]
     assert.strictEqual(sandbox.test_taskHasOpenPR({ title: '(untitled)' }, prs), false)
     assert.strictEqual(sandbox.test_taskHasOpenPR({ title: '' }, prs), false)
   })
@@ -450,7 +479,13 @@ describe('taskHasOpenPR', () => {
   it('should be case-insensitive', () => {
     const { sandbox } = setupEnvironment()
     const task = { title: 'fix REDOS Vulnerability' }
-    const prs = [{ title: '[Security] Fix ReDoS vulnerability', branch: 'fix-123' }]
+    const prs = [
+      {
+        title: '[Security] Fix ReDoS vulnerability',
+        titleLower: '[security] fix redos vulnerability',
+        branch: 'fix-123'
+      }
+    ]
     assert.strictEqual(sandbox.test_taskHasOpenPR(task, prs), true)
   })
 })
@@ -731,6 +766,21 @@ describe('state management', () => {
     assert.strictEqual(sandbox.test_state().status, 'done')
     assert.strictEqual(sessionSetData.length, 1)
   })
+
+  it('should add log messages and persist state', async () => {
+    const { sandbox, sessionSetData } = setupEnvironment({})
+    await sandbox.test_stateReadyPromise
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    sessionSetData.length = 0
+
+    sandbox.test_addLog('Processing task 1')
+    const state = sandbox.test_state()
+    assert.strictEqual(state.log.length, 1)
+    assert.strictEqual(state.log[0], 'Processing task 1')
+    assert.strictEqual(sessionSetData.length, 1)
+    // Use JSON.stringify to avoid cross-VM reference issues with deepStrictEqual
+    assert.strictEqual(JSON.stringify(sessionSetData[0].archiveState.log), JSON.stringify(['Processing task 1']))
+  })
 })
 
 // =============================================================================
@@ -749,6 +799,13 @@ describe('extractAccountNum', () => {
     assert.strictEqual(sandbox.test_extractAccountNum('https://jules.google.com/tasks'), '0')
     assert.strictEqual(sandbox.test_extractAccountNum('https://google.com'), '0')
     assert.strictEqual(sandbox.test_extractAccountNum(''), '0')
+  })
+
+  it('should handle null, undefined, and malformed URLs gracefully', () => {
+    const { sandbox } = setupEnvironment()
+    assert.strictEqual(sandbox.test_extractAccountNum(null), '0')
+    assert.strictEqual(sandbox.test_extractAccountNum(undefined), '0')
+    assert.strictEqual(sandbox.test_extractAccountNum('not-a-url'), '0')
   })
 })
 
@@ -796,5 +853,32 @@ describe('getJulesTabs', () => {
     assert.strictEqual(tabs.length, 2)
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[0].url), '0')
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[1].url), '1')
+  })
+})
+
+describe('getTabConfig', () => {
+  it('should return config when sendMessage returns valid response', async () => {
+    const { sandbox } = setupEnvironment()
+    const config = await sandbox.test_getTabConfig(1)
+    assert.strictEqual(config.at, 'token')
+    assert.strictEqual(config.bl, 'build')
+    assert.strictEqual(config.accountNum, '0')
+  })
+
+  it('should throw error when XSRF token is missing', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.chrome.tabs.sendMessage = async () => ({
+      config: { bl: 'build' },
+      accountNum: '0'
+    })
+
+    await assert.rejects(sandbox.test_getTabConfig(1), /Could not extract page config \(XSRF token missing\)/)
+  })
+
+  it('should throw error when response is null', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.chrome.tabs.sendMessage = async () => null
+
+    await assert.rejects(sandbox.test_getTabConfig(1), /Could not extract page config \(XSRF token missing\)/)
   })
 })
