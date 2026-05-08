@@ -900,7 +900,7 @@ async function processTab(tab, options) {
   return grandTotal
 }
 
-async function startOperation(options) {
+function initOperationState(options) {
   prCache.clear()
   reqCounter = Math.floor(Math.random() * 900000) + 100000
   startKeepAlive()
@@ -918,50 +918,72 @@ async function startOperation(options) {
   addLog(options.dryRun ? '=== DRY RUN MODE ===' : isSuggestions ? '=== SUGGESTIONS MODE ===' : '=== ARCHIVE MODE ===')
   if (options.force) addLog('=== FORCE MODE (skip PR check) ===')
   addLog('=== v2: batchexecute API ===')
+  return isSuggestions
+}
+
+async function discoverTabs(options) {
+  let tabs = await getJulesTabs()
+
+  if (options.scope === 'current' && options.activeTabId) {
+    tabs = tabs.filter((t) => t.id === options.activeTabId)
+  }
+
+  if (tabs.length === 0) {
+    addLog('No Jules tabs found. Open jules.google.com first.')
+    updateState({ status: 'error', error: 'No Jules tabs found' })
+    return null
+  }
+
+  addLog(`Found ${tabs.length} Jules tab(s)\n`)
+  return tabs
+}
+
+async function processAllTabs(tabs, options, isSuggestions) {
+  const results = []
+  for (const tab of tabs) {
+    const label = getTabLabel(tab)
+    try {
+      const count = isSuggestions ? await processSuggestionsForTab(tab, options) : await processTab(tab, options)
+      results.push({ label, count })
+    } catch (e) {
+      addLog(`ERROR [${label}]: ${e.message}`)
+      results.push({ label, count: 0, err: e.message })
+    }
+  }
+  return results
+}
+
+function finalizeOperation(results, isSuggestions) {
+  const verb = isSuggestions ? 'started' : 'archived'
+  addLog(`\n${'='.repeat(50)}`)
+  addLog('SUMMARY')
+  addLog(`${'='.repeat(50)}`)
+  let grand = 0
+  results.forEach((r) => {
+    grand += r.count
+    addLog(`  ${r.label}: ${r.err ? `ERROR: ${r.err}` : `${r.count} ${verb}`}`)
+  })
+  addLog(`\n  GRAND TOTAL: ${grand} tasks ${verb}`)
+
+  updateState({ status: 'done', results })
+}
+
+function handleOperationError(e) {
+  addLog(`FATAL ERROR: ${e.message}`)
+  updateState({ status: 'error', error: e.message })
+}
+
+async function startOperation(options) {
+  const isSuggestions = initOperationState(options)
 
   try {
-    let tabs = await getJulesTabs()
+    const tabs = await discoverTabs(options)
+    if (!tabs) return
 
-    if (options.scope === 'current' && options.activeTabId) {
-      tabs = tabs.filter((t) => t.id === options.activeTabId)
-    }
-
-    if (tabs.length === 0) {
-      addLog('No Jules tabs found. Open jules.google.com first.')
-      updateState({ status: 'error', error: 'No Jules tabs found' })
-      return
-    }
-
-    addLog(`Found ${tabs.length} Jules tab(s)\n`)
-
-    const results = []
-    for (const tab of tabs) {
-      const label = getTabLabel(tab)
-      try {
-        const count = isSuggestions ? await processSuggestionsForTab(tab, options) : await processTab(tab, options)
-        results.push({ label, count })
-      } catch (e) {
-        addLog(`ERROR [${label}]: ${e.message}`)
-        results.push({ label, count: 0, err: e.message })
-      }
-    }
-
-    // Summary
-    const verb = isSuggestions ? 'started' : 'archived'
-    addLog(`\n${'='.repeat(50)}`)
-    addLog('SUMMARY')
-    addLog(`${'='.repeat(50)}`)
-    let grand = 0
-    results.forEach((r) => {
-      grand += r.count
-      addLog(`  ${r.label}: ${r.err ? `ERROR: ${r.err}` : `${r.count} ${verb}`}`)
-    })
-    addLog(`\n  GRAND TOTAL: ${grand} tasks ${verb}`)
-
-    updateState({ status: 'done', results })
+    const results = await processAllTabs(tabs, options, isSuggestions)
+    finalizeOperation(results, isSuggestions)
   } catch (e) {
-    addLog(`FATAL ERROR: ${e.message}`)
-    updateState({ status: 'error', error: e.message })
+    handleOperationError(e)
   } finally {
     stopKeepAlive()
   }
