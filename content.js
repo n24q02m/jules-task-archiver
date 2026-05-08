@@ -41,7 +41,7 @@ function extractConfig() {
 
   return new Promise((resolve) => {
     // Ask main-world.js to re-broadcast config
-    window.postMessage({ type: 'JULES_REQUEST_CONFIG' }, '*')
+    window.postMessage({ type: 'JULES_REQUEST_CONFIG' }, window.location.origin)
 
     const timeout = setTimeout(() => resolve(cachedConfig), 2000)
     const handler = (event) => {
