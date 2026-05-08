@@ -26,7 +26,7 @@ function broadcastConfig() {
           }
         : null
     },
-    '*'
+    window.location.origin
   )
 }
 
@@ -54,7 +54,7 @@ if (!window.__julesArchiver) {
               capturedAt: Date.now()
             }
           },
-          '*'
+          window.location.origin
         )
       } catch (_e) {
         /* ignore parse errors */
