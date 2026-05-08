@@ -31,7 +31,7 @@
           <button type="button" data-value="suggestions" aria-pressed="false">Start Suggestions</button>
         </div>
       </div>
-      <div class="radio-group">
+      <div class="radio-group" role="radiogroup" aria-label="Execution Mode">
         <label><input type="radio" name="mode" value="dry" checked /> Dry Run</label>
         <label><input type="radio" name="mode" value="run" /> Run</label>
       </div>
@@ -39,13 +39,13 @@
         <input type="checkbox" id="force" />
         Force (skip PR check)
       </label>
-      <div class="radio-group">
+      <div class="radio-group" role="radiogroup" aria-label="Scope">
         <label><input type="radio" name="scope" value="current" /> Current tab</label>
         <label><input type="radio" name="scope" value="all" checked /> All Jules tabs</label>
       </div>
     </section>
 
-    <button type="button" id="startBtn" class="primary">Start</button>
+    <button type="button" id="startBtn" class="primary">Start Archiving</button>
     <button type="button" id="resetBtn" class="secondary" style="display: none">Reset</button>
 
     <section id="progressSection" style="display: none">
