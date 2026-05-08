@@ -99,6 +99,7 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_SDETAIL = SDETAIL;
     globalThis.test_CATEGORY_CONFIG = CATEGORY_CONFIG;
     globalThis.test_DEFAULT_CATEGORY = DEFAULT_CATEGORY;
+    globalThis.test_archiveTask = archiveTask;
   `
 
   const script = new vm.Script(scriptContent)
@@ -796,5 +797,32 @@ describe('getJulesTabs', () => {
     assert.strictEqual(tabs.length, 2)
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[0].url), '0')
     assert.strictEqual(sandbox.test_extractAccountNum(tabs[1].url), '1')
+  })
+})
+
+// =============================================================================
+// Archive API Tests
+// =============================================================================
+
+describe('archiveTask', () => {
+  it('should call callBatchExecute with correct parameters', async () => {
+    const { sandbox } = setupEnvironment()
+    let calledArgs = null
+
+    // Mock callBatchExecute
+    sandbox.callBatchExecute = async (...args) => {
+      calledArgs = args
+      return []
+    }
+
+    const taskId = 'task-123'
+    const config = { accountNum: '0', at: 'token' }
+
+    await sandbox.test_archiveTask(taskId, config)
+
+    assert.strictEqual(calledArgs[0], 'Tjmm5c')
+    // Use JSON stringify to avoid cross-VM reference issues with Array
+    assert.strictEqual(JSON.stringify(calledArgs[1]), JSON.stringify([[taskId], 1]))
+    assert.strictEqual(calledArgs[2], config)
   })
 })
