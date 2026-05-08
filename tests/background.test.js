@@ -5,7 +5,9 @@ const vm = require('node:vm')
 const path = require('node:path')
 
 const bgScriptPath = path.join(__dirname, '..', 'background.js')
+const utilsScriptPath = path.join(__dirname, '..', 'utils.js')
 const bgScriptContent = fs.readFileSync(bgScriptPath, 'utf8')
+const utilsScriptContent = fs.readFileSync(utilsScriptPath, 'utf8')
 
 function setupEnvironment(initialStorage = {}) {
   const sessionSetData = []
@@ -65,12 +67,14 @@ function setupEnvironment(initialStorage = {}) {
     URL,
     Promise,
     console,
-    parseInt
+    parseInt,
+    importScripts: () => {}
   }
 
   vm.createContext(sandbox)
 
   const scriptContent =
+    utilsScriptContent +
     bgScriptContent +
     `\n
     globalThis.test_stateReadyPromise = stateReadyPromise;
