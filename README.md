@@ -31,6 +31,19 @@
 </details>
 <!-- END: AUTO-GENERATED-CROSS-PROMO -->
 
+## Table of contents
+
+- [Features](#features)
+- [Installation](#installation)
+- [Usage](#usage)
+- [How It Works](#how-it-works)
+- [Permissions](#permissions)
+- [Development](#development)
+- [Related Projects](#related-projects)
+- [Contributing](#contributing)
+- [License](#license)
+
+
 
 ## Features
 
