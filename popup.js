@@ -128,6 +128,7 @@ startBtn.addEventListener('click', async () => {
   summarySection.style.display = 'none'
   currentInfo.textContent = 'Starting...'
   progressFill.style.width = '0%'
+  progressFill.style.background = '' // Reset error color if present
   logPre.textContent = ''
 
   chrome.runtime.sendMessage({ action: 'START', options })
