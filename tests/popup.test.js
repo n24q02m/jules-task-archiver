@@ -67,6 +67,7 @@ function setupPopupSandbox() {
       },
       querySelectorAll: (_sel) => [],
       querySelector: (_sel) => null,
+      focus: () => {},
       textContent: '',
       value: '',
       checked: false,
