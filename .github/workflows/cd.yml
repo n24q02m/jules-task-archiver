@@ -10,6 +10,16 @@ on:
         options:
           - beta
           - stable
+      force:
+        description: "Force release level (when no version-worthy commits)"
+        required: false
+        type: choice
+        default: "none"
+        options:
+          - none
+          - patch
+          - minor
+          - major
 
 permissions:
   contents: write
@@ -51,6 +61,7 @@ jobs:
           config_file: semantic-release.toml
           prerelease: ${{ inputs.release_type == 'beta' }}
           prerelease_token: beta
+          force: ${{ inputs.force != 'none' && inputs.force || '' }}
 
       - uses: python-semantic-release/publish-action@310a9983a0ae878b29f3aac778d7c77c1db27378 # v10
         if: steps.release.outputs.released == 'true'
