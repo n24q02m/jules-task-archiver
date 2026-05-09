@@ -61,7 +61,8 @@ function getAccountNum() {
   try {
     const parts = new URL(location.href).pathname.split('/')
     const uIdx = parts.indexOf('u')
-    return uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+    const val = uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
+    return /^\d+$/.test(val) ? val : '0'
   } catch (_e) {
     return '0'
   }
