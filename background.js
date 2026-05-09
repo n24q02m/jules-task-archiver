@@ -134,8 +134,13 @@ function parseResponse(text, rpcId) {
     pos = 4
   }
   // Skip leading whitespace
-  while (pos < text.length && /\s/.test(text[pos])) {
-    pos++
+  while (pos < text.length) {
+    const code = text.charCodeAt(pos)
+    if (code === 0x20 || code === 0x09 || code === 0x0a || code === 0x0d) {
+      pos++
+    } else {
+      break
+    }
   }
 
   // Skip byte-length line
