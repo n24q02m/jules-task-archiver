@@ -141,6 +141,7 @@ resetBtn.addEventListener('click', () => {
   startBtn.removeAttribute('aria-busy')
   startBtn.textContent = opMode === 'archive' ? 'Start Archiving' : 'Start Suggestions'
   resetBtn.style.display = 'none'
+  startBtn.focus() // Maintain keyboard flow
   progressSection.style.display = 'none'
   summarySection.style.display = 'none'
 })
