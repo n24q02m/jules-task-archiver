@@ -4,3 +4,6 @@
 ## 2025-05-08 - Transient Error State Visuals & Input Noise
 **Learning:** Error state visual indicators (like turning a progress bar red) must be explicitly cleared when the user initiates a new operation. Failing to do so carries over the negative visual feedback, causing immediate anxiety on retry. Additionally, browsers aggressively spellcheck technical inputs (like GitHub usernames and tokens), adding distracting visual noise.
 **Action:** Always verify that state reset functions clear *all* dynamically applied error styles, not just structural changes like width or text. Apply `spellcheck="false"` to non-prose inputs.
+## 2025-10-24 - Focus Management on Hidden Elements
+**Learning:** Hiding an interactive element (e.g., `display: none` on `resetBtn`) that currently holds keyboard focus causes the browser to reset focus back to the document body, breaking the user's keyboard navigation flow.
+**Action:** When programmatically hiding the focused element, always manually shift focus (`element.focus()`) to the next logical element in the workflow (e.g., `startBtn`) to maintain accessibility. Ensure testing mock elements support `.focus()`.
