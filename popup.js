@@ -143,6 +143,7 @@ resetBtn.addEventListener('click', () => {
   resetBtn.style.display = 'none'
   progressSection.style.display = 'none'
   summarySection.style.display = 'none'
+  startBtn.focus()
 })
 
 // --- Listen for state changes ---
