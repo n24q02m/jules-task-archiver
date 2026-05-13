@@ -70,7 +70,7 @@ function setupEnvironment() {
     location: window.location,
     // Helpers for testing
     fireMessage: (data) => {
-      const event = { source: window, data }
+      const event = { source: window, origin: window.location.origin, data }
       const handlers = [...(listeners.get('message') || [])]
       handlers.forEach((fn) => {
         fn(event)
