@@ -478,33 +478,31 @@ async function processSuggestionsForTab(tab, options) {
     const prevTotal = state.progress.total
     let processedInRepo = 0
 
-    await Promise.all(
-      suggestions.map(async (s) => {
-        if (state.status === 'cancelled') return
+    await runInPool(suggestions, 5, async (s) => {
+      if (state.status === 'cancelled') return
 
-        if (options.dryRun) {
-          addLog(`  [DRY] Would start: ${s.title} (${s.categorySlug})`)
-        } else {
-          addLog(`  Starting: ${s.title}...`)
-          try {
-            await startSuggestion(s, repo, config, startConfig)
-            addLog(`  Started: ${s.title}`)
-            totalStarted++
-          } catch (err) {
-            addLog(`  [!] Failed to start "${s.title}": ${err.message}`)
-          }
+      if (options.dryRun) {
+        addLog(`  [DRY] Would start: ${s.title} (${s.categorySlug})`)
+      } else {
+        addLog(`  Starting: ${s.title}...`)
+        try {
+          await startSuggestion(s, repo, config, startConfig)
+          addLog(`  Started: ${s.title}`)
+          totalStarted++
+        } catch (err) {
+          addLog(`  [!] Failed to start "${s.title}": ${err.message}`)
         }
+      }
 
-        processedInRepo++
-        updateState({
-          progress: {
-            ...state.progress,
-            archived: totalStarted,
-            total: prevTotal + processedInRepo
-          }
-        })
+      processedInRepo++
+      updateState({
+        progress: {
+          ...state.progress,
+          archived: totalStarted,
+          total: prevTotal + processedInRepo
+        }
       })
-    )
+    })
   }
 
   addLog(`\n[${label}] TOTAL: ${totalStarted} suggestions started`)
@@ -706,6 +704,45 @@ async function getTabConfig(tabId) {
   }
 }
 
+// ⚡ Bolt Optimization: Concurrency pool for API calls
+// Replaces unbound Promise.all which can overwhelm the network/API and cause rate limits.
+function runInPool(items, limit, fn) {
+  return new Promise((resolve, reject) => {
+    let index = 0
+    let running = 0
+    let completed = 0
+    const results = []
+    let hasError = false
+
+    if (items.length === 0) return resolve(results)
+
+    function next() {
+      if (hasError) return
+      if (completed === items.length) return resolve(results)
+
+      while (running < limit && index < items.length) {
+        const currentIndex = index++
+        const item = items[currentIndex]
+        running++
+
+        Promise.resolve(fn(item, currentIndex))
+          .then((result) => {
+            results[currentIndex] = result
+            completed++
+            running--
+            next()
+          })
+          .catch((err) => {
+            hasError = true
+            reject(err)
+          })
+      }
+    }
+
+    next()
+  })
+}
+
 // =============================================================================
 // Orchestrator
 // =============================================================================
@@ -833,25 +870,23 @@ async function processTab(tab, options) {
     updateState({ currentRepo: repo })
     addLog(`\n[${label}] -> ${repo} (${repoTasks.length} tasks)`)
 
-    await Promise.all(
-      repoTasks.map(async (task) => {
-        try {
-          await archiveTask(task.id, config)
-          grandTotal++
-          addLog(`  Archived: [${task.id}] ${task.title}`)
+    await runInPool(repoTasks, 5, async (task) => {
+      try {
+        await archiveTask(task.id, config)
+        grandTotal++
+        addLog(`  Archived: [${task.id}] ${task.title}`)
 
-          updateState({
-            progress: {
-              ...state.progress,
-              archived: grandTotal,
-              total: totalTasks
-            }
-          })
-        } catch (e) {
-          addLog(`  ERROR archiving ${task.id}: ${e.message}`)
-        }
-      })
-    )
+        updateState({
+          progress: {
+            ...state.progress,
+            archived: grandTotal,
+            total: totalTasks
+          }
+        })
+      } catch (e) {
+        addLog(`  ERROR archiving ${task.id}: ${e.message}`)
+      }
+    })
   }
 
   addLog(`\n[${label}] TOTAL: ${grandTotal} archived`)
