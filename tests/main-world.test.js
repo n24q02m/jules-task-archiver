@@ -35,6 +35,10 @@ function setupSandbox(initialWizData = {}) {
   }
 
   // Circular reference common in browsers
+    // Mock location.origin
+    windowMock.location = { origin: 'https://jules.google.com' }
+
+    // Circular reference common in browsers
   windowMock.window = windowMock
 
   const sandbox = {
@@ -103,6 +107,7 @@ describe('main-world.js', () => {
     // Simulate request message
     const event = {
       source: windowMock,
+      origin: sandbox.window.location.origin,
       data: { type: 'JULES_REQUEST_CONFIG' }
     }
     listeners.message.forEach((l) => {
@@ -124,6 +129,7 @@ describe('main-world.js', () => {
     // Simulate request message from wrong source
     const event = {
       source: {}, // Not window
+      origin: sandbox.window.location.origin,
       data: { type: 'JULES_REQUEST_CONFIG' }
     }
     listeners.message.forEach((l) => {
