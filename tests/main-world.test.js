@@ -34,11 +34,10 @@ function setupSandbox(initialWizData = {}) {
     }
   }
 
-  // Circular reference common in browsers
-    // Mock location.origin
-    windowMock.location = { origin: 'https://jules.google.com' }
+  // Mock location.origin
+  windowMock.location = { origin: 'https://jules.google.com' }
 
-    // Circular reference common in browsers
+  // Circular reference common in browsers
   windowMock.window = windowMock
 
   const sandbox = {
