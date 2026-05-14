@@ -72,7 +72,10 @@ function setupPopupSandbox() {
       checked: false,
       disabled: false,
       scrollHeight: 0,
-      scrollTop: 0
+      scrollTop: 0,
+      focus: () => {
+        element.focused = true
+      }
     }
     return element
   }

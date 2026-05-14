@@ -143,6 +143,7 @@ resetBtn.addEventListener('click', () => {
   resetBtn.style.display = 'none'
   progressSection.style.display = 'none'
   summarySection.style.display = 'none'
+  startBtn.focus() // Shift focus to prevent drop when resetBtn is hidden
 })
 
 // --- Listen for state changes ---
