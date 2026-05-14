@@ -1,0 +1,3 @@
+## 2025-02-28 - Bound API Concurrency with runInPool
+**Learning:** Sequential API calls in loops (like `startSuggestion` in `processSuggestionsForTab` and archiving tasks in `processTab`) were using unbounded `Promise.all` which can cause severe connection exhaustion, API rate limiting, and poor performance when processing huge arrays. Standard arrays with `.map()` can launch thousands of concurrent HTTP requests at once, bringing down browser network internals.
+**Action:** Always parallelize bulk network operations via an explicit concurrency pool utility (like `runInPool` using `Promise.race` and a `Set` to track executing promises) with a fixed limit (e.g. 5) to balance throughput while ensuring robustness against API rate limits and preventing memory spikes.
