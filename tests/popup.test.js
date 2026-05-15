@@ -72,7 +72,10 @@ function setupPopupSandbox() {
       checked: false,
       disabled: false,
       scrollHeight: 0,
-      scrollTop: 0
+      scrollTop: 0,
+      focus: () => {
+        element.focused = true
+      }
     }
     return element
   }
@@ -358,5 +361,6 @@ describe('Button Event Handlers', () => {
     assert.strictEqual(elements['#startBtn'].disabled, false)
     assert.strictEqual(elements['#startBtn'].textContent, 'Start Archiving')
     assert.strictEqual(elements['#resetBtn'].style.display, 'none')
+    assert.strictEqual(elements['#startBtn'].focused, true)
   })
 })

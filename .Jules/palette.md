@@ -4,3 +4,6 @@
 ## 2025-05-08 - Transient Error State Visuals & Input Noise
 **Learning:** Error state visual indicators (like turning a progress bar red) must be explicitly cleared when the user initiates a new operation. Failing to do so carries over the negative visual feedback, causing immediate anxiety on retry. Additionally, browsers aggressively spellcheck technical inputs (like GitHub usernames and tokens), adding distracting visual noise.
 **Action:** Always verify that state reset functions clear *all* dynamically applied error styles, not just structural changes like width or text. Apply `spellcheck="false"` to non-prose inputs.
+## 2026-05-15 - Focus Management on Transient Elements and ARIA hints
+**Learning:** Hiding an element that currently has keyboard focus (like clicking a reset button that then sets its own display to 'none') causes the focus to drop back to the document body. This breaks the user's keyboard navigation flow. Additionally, visual hints next to inputs should be explicitly linked via `aria-describedby` so screen readers announce them.
+**Action:** Whenever a focused interactive element is hidden or removed, programmatically shift focus to the next logical element (e.g., the primary action button). Always link visual hint text to inputs using `aria-describedby`.
