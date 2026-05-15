@@ -81,4 +81,54 @@ describe('Origin Validation Security', () => {
     const wildcards = postMessages.filter((m) => m.origin === '*')
     assert.strictEqual(wildcards.length, 0, 'Found wildcard origin in main-world.js postMessage')
   })
+
+  it('content.js should reject messages with invalid origin', () => {
+    const { sandbox } = setupSandbox()
+    vm.runInContext(contentJs, sandbox)
+
+    const listeners = sandbox.window.listeners?.message ? [sandbox.window.listeners.message] : []
+
+    // Also capture any handlers added dynamically (e.g. inside extractConfig)
+    if (sandbox.listeners?.message) {
+      listeners.push(sandbox.listeners.message)
+    }
+
+    assert.ok(listeners.length > 0, 'Should have message listeners in content.js')
+
+    // Simulate cross-origin message
+    const event = {
+      source: sandbox.window,
+      origin: 'https://malicious.com',
+      data: { type: 'JULES_ARCHIVER_CONFIG', config: { at: 'fake' } }
+    }
+
+    for (const handler of listeners) {
+      handler(event)
+    }
+
+    // In our simplified test sandbox, if cachedConfig was not set by the event handler, it will remain undefined.
+    assert.strictEqual(sandbox.cachedConfig, undefined, 'Should ignore cross-origin config messages')
+  })
+
+  it('main-world.js should reject messages with invalid origin', () => {
+    const { sandbox, postMessages } = setupSandbox()
+    vm.runInContext(mainWorldJs, sandbox)
+
+    const initialPostMessagesLength = postMessages.length
+
+    const listener = sandbox.window.listeners?.message
+    assert.ok(listener, 'Should have message listener in main-world.js')
+
+    // Simulate cross-origin request
+    const event = {
+      source: sandbox.window,
+      origin: 'https://malicious.com',
+      data: { type: 'JULES_REQUEST_CONFIG' }
+    }
+
+    listener(event)
+
+    // No new postMessage should have been triggered
+    assert.strictEqual(postMessages.length, initialPostMessagesLength, 'Should ignore cross-origin config requests')
+  })
 })
