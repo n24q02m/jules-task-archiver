@@ -36,6 +36,7 @@ function setupSandbox(initialWizData = {}) {
 
   // Circular reference common in browsers
   windowMock.window = windowMock
+  windowMock.location = { origin: 'https://jules.google.com' }
 
   const sandbox = {
     window: windowMock,
@@ -103,6 +104,7 @@ describe('main-world.js', () => {
     // Simulate request message
     const event = {
       source: windowMock,
+      origin: 'https://jules.google.com',
       data: { type: 'JULES_REQUEST_CONFIG' }
     }
     listeners.message.forEach((l) => {
