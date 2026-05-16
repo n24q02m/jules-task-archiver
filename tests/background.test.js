@@ -179,6 +179,12 @@ describe('findJsonEnd', () => {
     const { sandbox } = setupEnvironment()
     assert.strictEqual(sandbox.test_findJsonEnd('[["a"'), -1)
   })
+
+  it('should handle startPos parameter', () => {
+    const { sandbox } = setupEnvironment()
+    // Find the array skipping the prefix
+    assert.strictEqual(sandbox.test_findJsonEnd('prefix[["a","b"]]extra', 6), 17)
+  })
 })
 
 describe('parseResponse', () => {

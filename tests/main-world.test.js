@@ -12,6 +12,7 @@ function setupSandbox(initialWizData = {}) {
 
   const windowMock = {
     WIZ_global_data: initialWizData,
+    location: { origin: 'http://localhost' },
     postMessage: (data, targetOrigin) => {
       messages.push({ data, targetOrigin })
     },
