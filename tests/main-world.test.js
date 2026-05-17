@@ -21,6 +21,9 @@ function setupSandbox(initialWizData = {}) {
     },
     fetch: async () => ({ ok: true }),
     __julesArchiver: undefined,
+    location: {
+      origin: 'https://jules.google.com'
+    },
     Date: {
       now: () => 1234567890
     },
@@ -103,6 +106,7 @@ describe('main-world.js', () => {
     // Simulate request message
     const event = {
       source: windowMock,
+      origin: windowMock.location.origin,
       data: { type: 'JULES_REQUEST_CONFIG' }
     }
     listeners.message.forEach((l) => {
@@ -114,7 +118,7 @@ describe('main-world.js', () => {
   })
 
   it('should ignore JULES_REQUEST_CONFIG from other sources', () => {
-    const { sandbox, messages, listeners } = setupSandbox({
+    const { sandbox, messages, listeners, windowMock } = setupSandbox({
       SNlM0e: 'at-token'
     })
 
@@ -124,6 +128,28 @@ describe('main-world.js', () => {
     // Simulate request message from wrong source
     const event = {
       source: {}, // Not window
+      origin: windowMock.location.origin,
+      data: { type: 'JULES_REQUEST_CONFIG' }
+    }
+    listeners.message.forEach((l) => {
+      l(event)
+    })
+
+    assert.strictEqual(messages.length, 1)
+  })
+
+  it('should ignore JULES_REQUEST_CONFIG with wrong origin', () => {
+    const { sandbox, messages, listeners, windowMock } = setupSandbox({
+      SNlM0e: 'at-token'
+    })
+
+    vm.runInContext(mainWorldJs, sandbox)
+    assert.strictEqual(messages.length, 1)
+
+    // Simulate request message with wrong origin
+    const event = {
+      source: windowMock,
+      origin: 'https://evil.com',
       data: { type: 'JULES_REQUEST_CONFIG' }
     }
     listeners.message.forEach((l) => {

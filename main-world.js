@@ -69,7 +69,7 @@ broadcastConfig()
 
 // Also listen for explicit re-extract requests from content.js
 window.addEventListener('message', (event) => {
-  if (event.source !== window) return
+  if (event.source !== window || event.origin !== window.location.origin) return
   if (event.data?.type === 'JULES_REQUEST_CONFIG') {
     broadcastConfig()
   }
