@@ -3,6 +3,7 @@
  * batchexecute responses can contain raw newlines inside strings which is
  * invalid JSON. This state machine escapes them.
  */
+// biome-ignore lint/correctness/noUnusedVariables: Used globally via importScripts
 function fixJsonControlChars(str) {
   // ⚡ Bolt Optimization: Bypass character-by-character processing loops with a
   // fast regex test for rare conditions (like JSON control characters).
