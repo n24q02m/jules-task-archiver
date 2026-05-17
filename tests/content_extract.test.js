@@ -53,7 +53,8 @@ function setupEnvironment() {
       lastPostMessage = data
     },
     location: {
-      href: 'https://jules.google.com/u/0/session'
+      href: 'https://jules.google.com/u/0/session',
+      origin: 'https://jules.google.com'
     }
   }
 
@@ -70,7 +71,7 @@ function setupEnvironment() {
     location: window.location,
     // Helpers for testing
     fireMessage: (data) => {
-      const event = { source: window, data }
+      const event = { source: window, origin: window.location.origin, data }
       const handlers = [...(listeners.get('message') || [])]
       handlers.forEach((fn) => {
         fn(event)
@@ -191,5 +192,33 @@ describe('content.js extractConfig', () => {
 
     const result = await promise
     assert.strictEqual(result, null)
+  })
+
+  it('should ignore message from wrong origin', async () => {
+    const sandbox = setupEnvironment()
+    const now = Date.now()
+    const config = { at: 'test-token', timestamp: now }
+
+    const event = {
+      source: sandbox.window,
+      origin: 'https://evil.com',
+      data: { type: 'JULES_ARCHIVER_CONFIG', config }
+    }
+    const handlers = [...(sandbox.window.listeners?.get('message') || [])]
+    for (const fn of handlers) {
+      fn(event)
+    }
+
+    sandbox.resetPostMessage()
+    // It should request a fresh config because the evil origin was ignored
+    const promise = sandbox.extractConfig()
+
+    assert.strictEqual(sandbox.wasPostMessageCalled(), true)
+
+    // Fulfill the request properly
+    sandbox.fireMessage({ type: 'JULES_ARCHIVER_CONFIG', config })
+    const result = await promise
+
+    assert.deepStrictEqual(normalize(result), config)
   })
 })
