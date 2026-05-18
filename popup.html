@@ -17,8 +17,8 @@
         <input type="text" id="ghOwner" placeholder="your-github-username" spellcheck="false" autocomplete="username" />
       </label>
       <label for="ghToken">
-        GitHub Token <span class="hint">(optional, for private repos)</span>
-        <input type="password" id="ghToken" placeholder="ghp_..." spellcheck="false" autocomplete="current-password" />
+        GitHub Token <span id="ghTokenHint" class="hint">(optional, for private repos)</span>
+        <input type="password" id="ghToken" aria-describedby="ghTokenHint" placeholder="ghp_..." spellcheck="false" autocomplete="current-password" />
       </label>
     </section>
 
