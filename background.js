@@ -46,6 +46,31 @@ async function jFetch(url, options = {}) {
   return res
 }
 
+/**
+ * ⚡ Bolt Optimization: Concurrency bounding pool.
+ * Prevents overwhelming rate limits or socket exhaustion when making
+ * many API calls concurrently (e.g., archiving hundreds of tasks).
+ */
+async function runInPool(items, limit = 5, fn) {
+  const results = []
+  const executing = new Set()
+
+  for (const item of items) {
+    const p = Promise.resolve().then(() => fn(item))
+    results.push(p)
+
+    executing.add(p)
+    const clean = () => executing.delete(p)
+    p.then(clean).catch(clean)
+
+    if (executing.size >= limit) {
+      await Promise.race(executing)
+    }
+  }
+
+  return Promise.all(results)
+}
+
 // =============================================================================
 // batchexecute Client
 // =============================================================================
@@ -478,33 +503,31 @@ async function processSuggestionsForTab(tab, options) {
     const prevTotal = state.progress.total
     let processedInRepo = 0
 
-    await Promise.all(
-      suggestions.map(async (s) => {
-        if (state.status === 'cancelled') return
+    await runInPool(suggestions, 5, async (s) => {
+      if (state.status === 'cancelled') return
 
-        if (options.dryRun) {
-          addLog(`  [DRY] Would start: ${s.title} (${s.categorySlug})`)
-        } else {
-          addLog(`  Starting: ${s.title}...`)
-          try {
-            await startSuggestion(s, repo, config, startConfig)
-            addLog(`  Started: ${s.title}`)
-            totalStarted++
-          } catch (err) {
-            addLog(`  [!] Failed to start "${s.title}": ${err.message}`)
-          }
+      if (options.dryRun) {
+        addLog(`  [DRY] Would start: ${s.title} (${s.categorySlug})`)
+      } else {
+        addLog(`  Starting: ${s.title}...`)
+        try {
+          await startSuggestion(s, repo, config, startConfig)
+          addLog(`  Started: ${s.title}`)
+          totalStarted++
+        } catch (err) {
+          addLog(`  [!] Failed to start "${s.title}": ${err.message}`)
         }
+      }
 
-        processedInRepo++
-        updateState({
-          progress: {
-            ...state.progress,
-            archived: totalStarted,
-            total: prevTotal + processedInRepo
-          }
-        })
+      processedInRepo++
+      updateState({
+        progress: {
+          ...state.progress,
+          archived: totalStarted,
+          total: prevTotal + processedInRepo
+        }
       })
-    )
+    })
   }
 
   addLog(`\n[${label}] TOTAL: ${totalStarted} suggestions started`)
@@ -833,25 +856,23 @@ async function processTab(tab, options) {
     updateState({ currentRepo: repo })
     addLog(`\n[${label}] -> ${repo} (${repoTasks.length} tasks)`)
 
-    await Promise.all(
-      repoTasks.map(async (task) => {
-        try {
-          await archiveTask(task.id, config)
-          grandTotal++
-          addLog(`  Archived: [${task.id}] ${task.title}`)
+    await runInPool(repoTasks, 5, async (task) => {
+      try {
+        await archiveTask(task.id, config)
+        grandTotal++
+        addLog(`  Archived: [${task.id}] ${task.title}`)
 
-          updateState({
-            progress: {
-              ...state.progress,
-              archived: grandTotal,
-              total: totalTasks
-            }
-          })
-        } catch (e) {
-          addLog(`  ERROR archiving ${task.id}: ${e.message}`)
-        }
-      })
-    )
+        updateState({
+          progress: {
+            ...state.progress,
+            archived: grandTotal,
+            total: totalTasks
+          }
+        })
+      } catch (e) {
+        addLog(`  ERROR archiving ${task.id}: ${e.message}`)
+      }
+    })
   }
 
   addLog(`\n[${label}] TOTAL: ${grandTotal} archived`)
