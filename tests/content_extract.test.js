@@ -53,6 +53,7 @@ function setupEnvironment() {
       lastPostMessage = data
     },
     location: {
+      origin: 'https://jules.google.com',
       href: 'https://jules.google.com/u/0/session'
     }
   }
@@ -70,7 +71,7 @@ function setupEnvironment() {
     location: window.location,
     // Helpers for testing
     fireMessage: (data) => {
-      const event = { source: window, data }
+      const event = { source: window, origin: 'https://jules.google.com', data }
       const handlers = [...(listeners.get('message') || [])]
       handlers.forEach((fn) => {
         fn(event)
