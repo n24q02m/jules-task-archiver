@@ -58,6 +58,42 @@ function setupSandbox() {
 }
 
 describe('Origin Validation Security', () => {
+  it('content.js should ignore messages from different origin', () => {
+    const { sandbox, postMessages } = setupSandbox()
+
+    vm.runInContext(contentJs, sandbox)
+
+    const initialCount = postMessages.length
+
+    // Simulate request message from incorrect origin
+    const event = {
+      source: sandbox.window,
+      origin: 'https://evil.com',
+      data: { type: 'JULES_REQUEST_CONFIG' }
+    }
+    sandbox.window.listeners.message(event)
+
+    assert.strictEqual(postMessages.length, initialCount, 'Should ignore message from incorrect origin')
+  })
+
+  it('main-world.js should ignore messages from different origin', () => {
+    const { sandbox, postMessages } = setupSandbox()
+
+    vm.runInContext(mainWorldJs, sandbox)
+
+    const initialCount = postMessages.length
+
+    // Simulate request message from incorrect origin
+    const event = {
+      source: sandbox.window,
+      origin: 'https://evil.com',
+      data: { type: 'JULES_REQUEST_CONFIG' }
+    }
+    sandbox.window.listeners.message(event)
+
+    assert.strictEqual(postMessages.length, initialCount, 'Should ignore message from incorrect origin')
+  })
+
   it('content.js should not use wildcard origin in postMessage', () => {
     const { sandbox, postMessages } = setupSandbox()
 
