@@ -143,6 +143,7 @@ resetBtn.addEventListener('click', () => {
   resetBtn.style.display = 'none'
   progressSection.style.display = 'none'
   summarySection.style.display = 'none'
+  startBtn.focus() // Shift focus to the next logical element after hiding the active reset button
 })
 
 // --- Listen for state changes ---
