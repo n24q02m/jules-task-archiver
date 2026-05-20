@@ -39,7 +39,8 @@ function setupContentSandbox(initialUrl = 'https://jules.google.com/u/0/') {
   }
 
   const location = {
-    href: initialUrl
+    href: initialUrl,
+    origin: 'https://jules.google.com'
   }
 
   const sandbox = {

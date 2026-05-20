@@ -20,7 +20,8 @@ injectMainWorldScript()
 
 // Listen for messages from MAIN world script
 window.addEventListener('message', (event) => {
-  if (event.source !== window) return
+  // Security: Prevent cross-origin message spoofing
+  if (event.source !== window || event.origin !== window.location.origin) return
   if (event.data?.type === 'JULES_ARCHIVER_CONFIG') {
     cachedConfig = event.data.config
   }
@@ -45,7 +46,8 @@ function extractConfig() {
 
     const timeout = setTimeout(() => resolve(cachedConfig), 2000)
     const handler = (event) => {
-      if (event.source !== window) return
+      // Security: Prevent cross-origin message spoofing
+      if (event.source !== window || event.origin !== window.location.origin) return
       if (event.data?.type !== 'JULES_ARCHIVER_CONFIG') return
       window.removeEventListener('message', handler)
       clearTimeout(timeout)

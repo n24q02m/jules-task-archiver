@@ -31,6 +31,9 @@ function setupSandbox(initialWizData = {}) {
       get(name) {
         return this.params.get(name)
       }
+    },
+    location: {
+      origin: 'https://jules.google.com'
     }
   }
 
@@ -103,6 +106,7 @@ describe('main-world.js', () => {
     // Simulate request message
     const event = {
       source: windowMock,
+      origin: 'https://jules.google.com',
       data: { type: 'JULES_REQUEST_CONFIG' }
     }
     listeners.message.forEach((l) => {
@@ -124,6 +128,7 @@ describe('main-world.js', () => {
     // Simulate request message from wrong source
     const event = {
       source: {}, // Not window
+      origin: 'https://jules.google.com',
       data: { type: 'JULES_REQUEST_CONFIG' }
     }
     listeners.message.forEach((l) => {
