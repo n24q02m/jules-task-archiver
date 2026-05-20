@@ -1,0 +1,512 @@
+TAP version 13
+# Subtest: buildBatchRequest
+    # Subtest: should format correct URL and body
+    ok 1 - should format correct URL and body
+      ---
+      duration_ms: 5.328465
+      type: 'test'
+      ...
+    1..1
+ok 1 - buildBatchRequest
+  ---
+  duration_ms: 6.625459
+  type: 'suite'
+  ...
+# Subtest: fixJsonControlChars
+    # Subtest: should escape CR/LF inside JSON strings
+    ok 1 - should escape CR/LF inside JSON strings
+      ---
+      duration_ms: 1.84359
+      type: 'test'
+      ...
+    # Subtest: should not modify CR/LF outside strings
+    ok 2 - should not modify CR/LF outside strings
+      ---
+      duration_ms: 1.294509
+      type: 'test'
+      ...
+    # Subtest: should handle escaped quotes correctly
+    ok 3 - should handle escaped quotes correctly
+      ---
+      duration_ms: 1.363583
+      type: 'test'
+      ...
+    1..3
+ok 2 - fixJsonControlChars
+  ---
+  duration_ms: 4.85999
+  type: 'suite'
+  ...
+# Subtest: findJsonEnd
+    # Subtest: should find end of balanced array
+    ok 1 - should find end of balanced array
+      ---
+      duration_ms: 1.580849
+      type: 'test'
+      ...
+    # Subtest: should handle strings with brackets
+    ok 2 - should handle strings with brackets
+      ---
+      duration_ms: 2.43105
+      type: 'test'
+      ...
+    # Subtest: should return -1 for unbalanced input
+    ok 3 - should return -1 for unbalanced input
+      ---
+      duration_ms: 1.594189
+      type: 'test'
+      ...
+    1..3
+ok 3 - findJsonEnd
+  ---
+  duration_ms: 5.969007
+  type: 'suite'
+  ...
+# Subtest: parseResponse
+    # Subtest: should extract payload from batchexecute response
+    ok 1 - should extract payload from batchexecute response
+      ---
+      duration_ms: 2.205823
+      type: 'test'
+      ...
+    1..1
+ok 4 - parseResponse
+  ---
+  duration_ms: 2.424861
+  type: 'suite'
+  ...
+# Subtest: parseTask
+    # Subtest: should map array indices to named fields
+    ok 1 - should map array indices to named fields
+      ---
+      duration_ms: 1.774865
+      type: 'test'
+      ...
+    # Subtest: should fallback to short title when display title is null
+    ok 2 - should fallback to short title when display title is null
+      ---
+      duration_ms: 1.626739
+      type: 'test'
+      ...
+    # Subtest: should handle missing source gracefully
+    ok 3 - should handle missing source gracefully
+      ---
+      duration_ms: 1.387601
+      type: 'test'
+      ...
+    # Subtest: should include statusCode from index 25
+    ok 4 - should include statusCode from index 25
+      ---
+      duration_ms: 1.399193
+      type: 'test'
+      ...
+    1..4
+ok 5 - parseTask
+  ---
+  duration_ms: 6.47198
+  type: 'suite'
+  ...
+# Subtest: isArchivable
+    # Subtest: should return true for completed tasks (state=3)
+    ok 1 - should return true for completed tasks (state=3)
+      ---
+      duration_ms: 1.356343
+      type: 'test'
+      ...
+    # Subtest: should return true for failed tasks (state=9)
+    ok 2 - should return true for failed tasks (state=9)
+      ---
+      duration_ms: 1.404659
+      type: 'test'
+      ...
+    # Subtest: should return false for active/in-progress tasks
+    ok 3 - should return false for active/in-progress tasks
+      ---
+      duration_ms: 1.321394
+      type: 'test'
+      ...
+    1..3
+ok 6 - isArchivable
+  ---
+  duration_ms: 4.283853
+  type: 'suite'
+  ...
+# Subtest: JULES_ORIGIN
+    # Subtest: should be the Jules base URL
+    ok 1 - should be the Jules base URL
+      ---
+      duration_ms: 1.343847
+      type: 'test'
+      ...
+    1..1
+ok 7 - JULES_ORIGIN
+  ---
+  duration_ms: 1.537072
+  type: 'suite'
+  ...
+# Subtest: extractAccountNum
+    # Subtest: should extract account number from /u/N paths
+    ok 1 - should extract account number from /u/N paths
+      ---
+      duration_ms: 1.586084
+      type: 'test'
+      ...
+    # Subtest: should return 0 for URLs without /u/N
+    ok 2 - should return 0 for URLs without /u/N
+      ---
+      duration_ms: 1.362443
+      type: 'test'
+      ...
+    1..2
+ok 8 - extractAccountNum
+  ---
+  duration_ms: 4.023845
+  type: 'suite'
+  ...
+# Subtest: getTabLabel
+    # Subtest: should return u/N for account tabs
+    ok 1 - should return u/N for account tabs
+      ---
+      duration_ms: 1.543148
+      type: 'test'
+      ...
+    # Subtest: should return default for tabs without account number
+    ok 2 - should return default for tabs without account number
+      ---
+      duration_ms: 1.255331
+      type: 'test'
+      ...
+    1..2
+ok 9 - getTabLabel
+  ---
+  duration_ms: 2.941723
+  type: 'suite'
+  ...
+# Subtest: getOpenPRs
+    # Subtest: should return mapped PR titles and branches
+    ok 1 - should return mapped PR titles and branches
+      ---
+      duration_ms: 2.154823
+      type: 'test'
+      ...
+    # Subtest: should return cached value on cache hit
+    ok 2 - should return cached value on cache hit
+      ---
+      duration_ms: 1.67157
+      type: 'test'
+      ...
+    # Subtest: should return empty array on HTTP error
+    ok 3 - should return empty array on HTTP error
+      ---
+      duration_ms: 1.60126
+      type: 'test'
+      ...
+    # Subtest: should return empty array on network error
+    ok 4 - should return empty array on network error
+      ---
+      duration_ms: 1.594811
+      type: 'test'
+      ...
+    # Subtest: should encode owner and repo in URL
+    ok 5 - should encode owner and repo in URL
+      ---
+      duration_ms: 2.156187
+      type: 'test'
+      ...
+    # Subtest: should reject tokens with newlines
+    ok 6 - should reject tokens with newlines
+      ---
+      duration_ms: 1.540746
+      type: 'test'
+      ...
+    # Subtest: should use Authorization header when token is provided
+    ok 7 - should use Authorization header when token is provided
+      ---
+      duration_ms: 1.508302
+      type: 'test'
+      ...
+    # Subtest: should handle prCache correctly (integration check)
+    ok 8 - should handle prCache correctly (integration check)
+      ---
+      duration_ms: 2.818952
+      type: 'test'
+      ...
+    1..8
+ok 10 - getOpenPRs
+  ---
+  duration_ms: 15.55936
+  type: 'suite'
+  ...
+# Subtest: taskHasOpenPR
+    # Subtest: should match when PR title contains task title
+    ok 1 - should match when PR title contains task title
+      ---
+      duration_ms: 1.394919
+      type: 'test'
+      ...
+    # Subtest: should match when task title contains PR title
+    ok 2 - should match when task title contains PR title
+      ---
+      duration_ms: 1.14588
+      type: 'test'
+      ...
+    # Subtest: should not match unrelated PR titles
+    ok 3 - should not match unrelated PR titles
+      ---
+      duration_ms: 1.168366
+      type: 'test'
+      ...
+    # Subtest: should return false for empty PR list
+    ok 4 - should return false for empty PR list
+      ---
+      duration_ms: 1.23774
+      type: 'test'
+      ...
+    # Subtest: should return false for untitled tasks
+    ok 5 - should return false for untitled tasks
+      ---
+      duration_ms: 1.207016
+      type: 'test'
+      ...
+    # Subtest: should be case-insensitive
+    ok 6 - should be case-insensitive
+      ---
+      duration_ms: 1.189207
+      type: 'test'
+      ...
+    1..6
+ok 11 - taskHasOpenPR
+  ---
+  duration_ms: 7.673618
+  type: 'suite'
+  ...
+# Subtest: parseSuggestion
+    # Subtest: should parse suggestion from hQP40d response
+    ok 1 - should parse suggestion from hQP40d response
+      ---
+      duration_ms: 1.610928
+      type: 'test'
+      ...
+    # Subtest: should return null for null input
+    ok 2 - should return null for null input
+      ---
+      duration_ms: 1.191302
+      type: 'test'
+      ...
+    # Subtest: should return null for empty array
+    ok 3 - should return null for empty array
+      ---
+      duration_ms: 1.227723
+      type: 'test'
+      ...
+    # Subtest: should return null when details array is missing
+    ok 4 - should return null when details array is missing
+      ---
+      duration_ms: 1.168581
+      type: 'test'
+      ...
+    1..4
+ok 12 - parseSuggestion
+  ---
+  duration_ms: 5.461477
+  type: 'suite'
+  ...
+# Subtest: buildSuggestionPrompt
+    # Subtest: should build security prompt for input-validation category
+    ok 1 - should build security prompt for input-validation category
+      ---
+      duration_ms: 2.402856
+      type: 'test'
+      ...
+    # Subtest: should build testing prompt for untested-function category
+    ok 2 - should build testing prompt for untested-function category
+      ---
+      duration_ms: 1.202498
+      type: 'test'
+      ...
+    # Subtest: should build performance prompt for async-io category
+    ok 3 - should build performance prompt for async-io category
+      ---
+      duration_ms: 1.270456
+      type: 'test'
+      ...
+    # Subtest: should build cleanup prompt for dead-code category
+    ok 4 - should build cleanup prompt for dead-code category
+      ---
+      duration_ms: 1.256909
+      type: 'test'
+      ...
+    # Subtest: should use default config for unknown category
+    ok 5 - should use default config for unknown category
+      ---
+      duration_ms: 1.23582
+      type: 'test'
+      ...
+    1..5
+ok 13 - buildSuggestionPrompt
+  ---
+  duration_ms: 7.642391
+  type: 'suite'
+  ...
+# Subtest: buildStartPayload
+    # Subtest: should build correct Rja83d payload structure
+    ok 1 - should build correct Rja83d payload structure
+      ---
+      duration_ms: 1.468295
+      type: 'test'
+      ...
+    # Subtest: should use config.modelId over startConfig when available
+    ok 2 - should use config.modelId over startConfig when available
+      ---
+      duration_ms: 1.249628
+      type: 'test'
+      ...
+    # Subtest: should use default feature flags when startConfig is null
+    ok 3 - should use default feature flags when startConfig is null
+      ---
+      duration_ms: 1.469107
+      type: 'test'
+      ...
+    1..3
+ok 14 - buildStartPayload
+  ---
+  duration_ms: 4.351936
+  type: 'suite'
+  ...
+# Subtest: state management
+    # Subtest: should initialize cleanly without existing state
+    ok 1 - should initialize cleanly without existing state
+      ---
+      duration_ms: 1.343913
+      type: 'test'
+      ...
+    # Subtest: should handle interrupted running state
+    ok 2 - should handle interrupted running state
+      ---
+      duration_ms: 36.163356
+      type: 'test'
+      ...
+    # Subtest: should persist state on update
+    ok 3 - should persist state on update
+      ---
+      duration_ms: 12.289559
+      type: 'test'
+      ...
+    # Subtest: should add log messages and persist state
+    ok 4 - should add log messages and persist state
+      ---
+      duration_ms: 11.472873
+      type: 'test'
+      ...
+    1..4
+ok 15 - state management
+  ---
+  duration_ms: 61.703868
+  type: 'suite'
+  ...
+# Subtest: extractAccountNum
+    # Subtest: should extract account number from /u/X/ format
+    ok 1 - should extract account number from /u/X/ format
+      ---
+      duration_ms: 1.506715
+      type: 'test'
+      ...
+    # Subtest: should return "0" for URLs without /u/X/ segment
+    ok 2 - should return "0" for URLs without /u/X/ segment
+      ---
+      duration_ms: 1.4351
+      type: 'test'
+      ...
+    # Subtest: should handle null, undefined, and malformed URLs gracefully
+    ok 3 - should handle null, undefined, and malformed URLs gracefully
+      ---
+      duration_ms: 1.270813
+      type: 'test'
+      ...
+    1..3
+ok 16 - extractAccountNum
+  ---
+  duration_ms: 4.388565
+  type: 'suite'
+  ...
+# Subtest: getTabLabel
+    # Subtest: should return "default" for account 0
+    ok 1 - should return "default" for account 0
+      ---
+      duration_ms: 1.263012
+      type: 'test'
+      ...
+    # Subtest: should return "u/X" for other account numbers
+    ok 2 - should return "u/X" for other account numbers
+      ---
+      duration_ms: 1.268586
+      type: 'test'
+      ...
+    1..2
+ok 17 - getTabLabel
+  ---
+  duration_ms: 2.647667
+  type: 'suite'
+  ...
+# Subtest: getJulesTabs
+    # Subtest: should filter out accounts.google tabs and sort by account number
+    ok 1 - should filter out accounts.google tabs and sort by account number
+      ---
+      duration_ms: 1.571322
+      type: 'test'
+      ...
+    # Subtest: should handle tabs without account segments correctly (as 0)
+    ok 2 - should handle tabs without account segments correctly (as 0)
+      ---
+      duration_ms: 1.442978
+      type: 'test'
+      ...
+    1..2
+ok 18 - getJulesTabs
+  ---
+  duration_ms: 3.130497
+  type: 'suite'
+  ...
+# Subtest: startOperation refactoring
+    # Subtest: initOperationState should initialize state correctly
+    ok 1 - initOperationState should initialize state correctly
+      ---
+      duration_ms: 1.554284
+      type: 'test'
+      ...
+    # Subtest: discoverTabs should handle no tabs found
+    ok 2 - discoverTabs should handle no tabs found
+      ---
+      duration_ms: 1.479342
+      type: 'test'
+      ...
+    # Subtest: discoverTabs should return filtered tabs
+    ok 3 - discoverTabs should return filtered tabs
+      ---
+      duration_ms: 1.41753
+      type: 'test'
+      ...
+    # Subtest: finalizeOperation should update status to done and log summary
+    ok 4 - finalizeOperation should update status to done and log summary
+      ---
+      duration_ms: 1.450484
+      type: 'test'
+      ...
+    # Subtest: handleOperationError should log error and update status
+    ok 5 - handleOperationError should log error and update status
+      ---
+      duration_ms: 1.374859
+      type: 'test'
+      ...
+    # Subtest: startOperation should orchestrate successfully
+    ok 6 - startOperation should orchestrate successfully
+      ---
+      duration_ms: 1.800745
+      type: 'test'
+      ...
+    1..6
+ok 19 - startOperation refactoring
+  ---
+  duration_ms: 9.356977
+  type: 'suite'
+  ...
