@@ -11,6 +11,7 @@ function setupSandbox(initialWizData = {}) {
   const listeners = {}
 
   const windowMock = {
+    location: { origin: 'https://jules.google.com' },
     WIZ_global_data: initialWizData,
     postMessage: (data, targetOrigin) => {
       messages.push({ data, targetOrigin })
@@ -103,6 +104,7 @@ describe('main-world.js', () => {
     // Simulate request message
     const event = {
       source: windowMock,
+      origin: 'https://jules.google.com',
       data: { type: 'JULES_REQUEST_CONFIG' }
     }
     listeners.message.forEach((l) => {
