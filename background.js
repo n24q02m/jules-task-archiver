@@ -98,12 +98,12 @@ async function callBatchExecute(rpcId, payload, config) {
  * Find the end of the outermost JSON array using bracket balancing.
  * Handles control chars inside strings by skipping them.
  */
-function findJsonEnd(str) {
+function findJsonEnd(str, startPos = 0) {
   // ⚡ Bolt Optimization: Use String.prototype.indexOf('"') to fast-forward
   // through string literals instead of character-by-character iteration.
   // This avoids huge JS overhead for large string payloads.
   let depth = 0
-  for (let i = 0; i < str.length; i++) {
+  for (let i = startPos; i < str.length; i++) {
     const ch = str[i]
     if (ch === '"') {
       while (true) {
@@ -111,7 +111,7 @@ function findJsonEnd(str) {
         if (i === -1) return -1
         let count = 0
         let k = i - 1
-        while (k >= 0 && str.charCodeAt(k) === 92) {
+        while (k >= startPos && str.charCodeAt(k) === 92) {
           count++
           k--
         }
@@ -147,13 +147,16 @@ function parseResponse(text, rpcId) {
   // Skip byte-length line
   const firstNewline = text.indexOf('\n', pos)
   if (firstNewline === -1) throw new Error('Invalid batchexecute response')
-  const data = text.substring(firstNewline + 1)
+
+  // ⚡ Bolt Optimization: Calculate startPos and pass it to findJsonEnd to avoid
+  // allocating a massive intermediate string via substring(), reducing GC pressure.
+  const startPos = firstNewline + 1
 
   // Find valid JSON boundary
-  const jsonEnd = findJsonEnd(data)
+  const jsonEnd = findJsonEnd(text, startPos)
   if (jsonEnd === -1) throw new Error('Could not find JSON boundary in response')
 
-  const jsonStr = data.substring(0, jsonEnd)
+  const jsonStr = text.substring(startPos, jsonEnd)
   const fixed = fixJsonControlChars(jsonStr)
   const outer = JSON.parse(fixed)
 
