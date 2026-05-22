@@ -49,7 +49,13 @@ function updateOpModeUI(value) {
 
   // Context-aware start button text
   if (!startBtn.disabled) {
-    startBtn.textContent = isArchive ? 'Start Archiving' : 'Start Suggestions'
+    const modeRadio = document.querySelector('input[name="mode"]:checked')
+    const isDry = modeRadio && modeRadio.value === 'dry'
+    if (isArchive) {
+      startBtn.textContent = isDry ? 'Dry Run Archive' : 'Start Archiving'
+    } else {
+      startBtn.textContent = isDry ? 'Dry Run Suggestions' : 'Start Suggestions'
+    }
   }
 }
 
@@ -57,6 +63,15 @@ document.querySelectorAll('#opMode button').forEach((btn) => {
   btn.addEventListener('click', () => {
     setActiveOpMode(btn.dataset.value)
     chrome.storage.sync.set({ opMode })
+  })
+})
+
+// Update button text when execution mode changes
+document.querySelectorAll('input[name="mode"]').forEach((radio) => {
+  radio.addEventListener('change', () => {
+    if (!startBtn.disabled && startBtn.textContent !== '⏳ Running...') {
+      updateOpModeUI(opMode)
+    }
   })
 })
 
@@ -139,7 +154,7 @@ resetBtn.addEventListener('click', () => {
   chrome.runtime.sendMessage({ action: 'RESET' })
   startBtn.disabled = false
   startBtn.removeAttribute('aria-busy')
-  startBtn.textContent = opMode === 'archive' ? 'Start Archiving' : 'Start Suggestions'
+  updateOpModeUI(opMode)
   resetBtn.style.display = 'none'
   progressSection.style.display = 'none'
   summarySection.style.display = 'none'
@@ -184,7 +199,7 @@ function renderState(state) {
   if (state.status === 'done' || state.status === 'error') {
     startBtn.disabled = false
     startBtn.removeAttribute('aria-busy')
-    startBtn.textContent = opMode === 'archive' ? 'Start Archiving' : 'Start Suggestions'
+    updateOpModeUI(opMode)
     resetBtn.style.display = 'block'
     progressFill.style.width = '100%'
     progressFill.parentElement.setAttribute('aria-valuenow', '100')

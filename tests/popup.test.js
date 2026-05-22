@@ -86,6 +86,7 @@ function setupPopupSandbox() {
     '#ghToken': createMockElement('input'),
     '#force': createMockElement('input', { type: 'checkbox' }),
     '#startBtn': createMockElement('button'),
+    'input[name="mode"]:checked': createMockElement('input', { value: 'dry' }),
     '#resetBtn': createMockElement('button'),
     '#progressSection': createMockElement('section'),
     '#summarySection': createMockElement('section'),
@@ -107,9 +108,9 @@ function setupPopupSandbox() {
 
   const document = {
     querySelector: (sel) => {
+      if (sel === 'input[name="mode"]:checked') return { value: 'dry' }
+      if (sel === 'input[name="scope"]:checked') return { value: 'all' }
       if (elements[sel]) return elements[sel]
-      if (sel.includes('[name="mode"]:checked')) return createMockElement('input', { value: 'dry' })
-      if (sel.includes('[name="scope"]:checked')) return createMockElement('input', { value: 'all' })
       return createMockElement()
     },
     querySelectorAll: (sel) => {
@@ -360,7 +361,7 @@ describe('Button Event Handlers', () => {
 
     assert.strictEqual(sentMessage.action, 'RESET')
     assert.strictEqual(elements['#startBtn'].disabled, false)
-    assert.strictEqual(elements['#startBtn'].textContent, 'Start Archiving')
+    assert.strictEqual(elements['#startBtn'].textContent, 'Dry Run Archive')
     assert.strictEqual(elements['#resetBtn'].style.display, 'none')
   })
 
