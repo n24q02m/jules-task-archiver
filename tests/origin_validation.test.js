@@ -7,10 +7,29 @@ const vm = require('node:vm')
 const contentJs = fs.readFileSync(path.join(__dirname, '../content.js'), 'utf8')
 const mainWorldJs = fs.readFileSync(path.join(__dirname, '../main-world.js'), 'utf8')
 
+const PAGE_ORIGIN = 'https://jules.google.com'
+
 function setupSandbox() {
   const postMessages = []
+  const runtimeMessages = []
+  const listeners = {}
+
+  // An explicit window object: `event.source === window` identity checks only
+  // work if the same object is used both inside the script and by the test.
+  const windowObj = {
+    location: { origin: PAGE_ORIGIN, href: `${PAGE_ORIGIN}/u/0/` },
+    postMessage: (data, origin) => {
+      postMessages.push({ data, origin })
+    },
+    addEventListener: (type, handler) => {
+      listeners[type] = handler
+    },
+    removeEventListener: () => {}
+  }
+  windowObj.window = windowObj
+
   const sandbox = {
-    window: {},
+    window: windowObj,
     document: {
       createElement: () => ({
         src: '',
@@ -18,33 +37,20 @@ function setupSandbox() {
         remove: () => {}
       }),
       head: { appendChild: () => {} },
-      documentElement: { appendChild: () => {} },
-      addEventListener: (type, handler) => {
-        if (!sandbox.window.listeners) sandbox.window.listeners = {}
-        sandbox.window.listeners[type] = handler
-      }
+      documentElement: { appendChild: () => {} }
     },
-    location: {
-      origin: 'https://jules.google.com',
-      href: 'https://jules.google.com/u/0/'
-    },
+    location: windowObj.location,
     chrome: {
       runtime: {
-        getURL: (path) => `chrome-extension://id/${path}`,
-        sendMessage: () => {},
+        getURL: (p) => `chrome-extension://id/${p}`,
+        sendMessage: (msg) => {
+          runtimeMessages.push(msg)
+        },
         onMessage: {
           addListener: () => {}
         }
       }
     },
-    postMessage: (data, origin) => {
-      postMessages.push({ data, origin })
-    },
-    addEventListener: (type, handler) => {
-      if (!sandbox.listeners) sandbox.listeners = {}
-      sandbox.listeners[type] = handler
-    },
-    removeEventListener: () => {},
     setTimeout: (fn) => fn(),
     clearTimeout: () => {},
     console,
@@ -52,9 +58,8 @@ function setupSandbox() {
     URLSearchParams,
     Date
   }
-  sandbox.window = sandbox
   vm.createContext(sandbox)
-  return { sandbox, postMessages }
+  return { sandbox, windowObj, listeners, postMessages, runtimeMessages }
 }
 
 describe('Origin Validation Security', () => {
@@ -63,8 +68,6 @@ describe('Origin Validation Security', () => {
 
     vm.runInContext(contentJs, sandbox)
 
-    // Trigger extractConfig by calling the GET_CONFIG handler if we can,
-    // or since extractConfig is at top level in the sandbox, we can call it.
     if (sandbox.extractConfig) {
       sandbox.extractConfig()
     }
@@ -80,5 +83,91 @@ describe('Origin Validation Security', () => {
 
     const wildcards = postMessages.filter((m) => m.origin === '*')
     assert.strictEqual(wildcards.length, 0, 'Found wildcard origin in main-world.js postMessage')
+  })
+})
+
+describe('content.js message handler origin checks', () => {
+  it('should relay JULES_START_CONFIG from the trusted same-origin window', () => {
+    const { sandbox, windowObj, listeners, runtimeMessages } = setupSandbox()
+    vm.runInContext(contentJs, sandbox)
+
+    listeners.message({
+      source: windowObj,
+      origin: PAGE_ORIGIN,
+      data: { type: 'JULES_START_CONFIG', config: { capturedAt: 1 } }
+    })
+
+    assert.strictEqual(runtimeMessages.length, 1)
+    assert.strictEqual(runtimeMessages[0].action, 'CACHE_START_CONFIG')
+  })
+
+  it('should ignore a message from a foreign origin', () => {
+    const { sandbox, windowObj, listeners, runtimeMessages } = setupSandbox()
+    vm.runInContext(contentJs, sandbox)
+
+    listeners.message({
+      source: windowObj,
+      origin: 'https://evil.example.com',
+      data: { type: 'JULES_START_CONFIG', config: { capturedAt: 1 } }
+    })
+
+    assert.strictEqual(runtimeMessages.length, 0, 'foreign-origin message must not be relayed')
+  })
+
+  it('should ignore a message whose source is not this window', () => {
+    const { sandbox, listeners, runtimeMessages } = setupSandbox()
+    vm.runInContext(contentJs, sandbox)
+
+    listeners.message({
+      source: {},
+      origin: PAGE_ORIGIN,
+      data: { type: 'JULES_START_CONFIG', config: { capturedAt: 1 } }
+    })
+
+    assert.strictEqual(runtimeMessages.length, 0, 'cross-frame message must not be relayed')
+  })
+})
+
+describe('main-world.js message handler origin checks', () => {
+  it('should re-broadcast config for a trusted same-origin request', () => {
+    const { sandbox, windowObj, listeners, postMessages } = setupSandbox()
+    vm.runInContext(mainWorldJs, sandbox)
+
+    const initialCount = postMessages.length // initial broadcast on load
+    listeners.message({
+      source: windowObj,
+      origin: PAGE_ORIGIN,
+      data: { type: 'JULES_REQUEST_CONFIG' }
+    })
+
+    assert.strictEqual(postMessages.length, initialCount + 1, 'trusted request should trigger a broadcast')
+  })
+
+  it('should not broadcast for a foreign-origin request', () => {
+    const { sandbox, windowObj, listeners, postMessages } = setupSandbox()
+    vm.runInContext(mainWorldJs, sandbox)
+
+    const initialCount = postMessages.length
+    listeners.message({
+      source: windowObj,
+      origin: 'https://evil.example.com',
+      data: { type: 'JULES_REQUEST_CONFIG' }
+    })
+
+    assert.strictEqual(postMessages.length, initialCount, 'foreign-origin request must not trigger a broadcast')
+  })
+
+  it('should not broadcast for a request from a different window', () => {
+    const { sandbox, listeners, postMessages } = setupSandbox()
+    vm.runInContext(mainWorldJs, sandbox)
+
+    const initialCount = postMessages.length
+    listeners.message({
+      source: {},
+      origin: PAGE_ORIGIN,
+      data: { type: 'JULES_REQUEST_CONFIG' }
+    })
+
+    assert.strictEqual(postMessages.length, initialCount, 'cross-frame request must not trigger a broadcast')
   })
 })
