@@ -67,9 +67,12 @@ if (!window.__julesArchiver) {
 // Broadcast config immediately (WIZ_global_data should be ready by document_idle)
 broadcastConfig()
 
-// Also listen for explicit re-extract requests from content.js
+// Also listen for explicit re-extract requests from content.js.
+// Only honour requests from this page's own window/origin — a cross-origin
+// frame must not be able to trigger config broadcasts.
 window.addEventListener('message', (event) => {
   if (event.source !== window) return
+  if (event.origin !== window.location.origin) return
   if (event.data?.type === 'JULES_REQUEST_CONFIG') {
     broadcastConfig()
   }

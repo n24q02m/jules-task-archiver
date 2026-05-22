@@ -12,6 +12,10 @@ function setupSandbox(initialWizData = {}) {
 
   const windowMock = {
     WIZ_global_data: initialWizData,
+    location: {
+      origin: 'https://jules.google.com',
+      href: 'https://jules.google.com/u/0/'
+    },
     postMessage: (data, targetOrigin) => {
       messages.push({ data, targetOrigin })
     },
@@ -103,6 +107,7 @@ describe('main-world.js', () => {
     // Simulate request message
     const event = {
       source: windowMock,
+      origin: 'https://jules.google.com',
       data: { type: 'JULES_REQUEST_CONFIG' }
     }
     listeners.message.forEach((l) => {
@@ -111,6 +116,27 @@ describe('main-world.js', () => {
 
     assert.strictEqual(messages.length, 2)
     assert.strictEqual(messages[1].data.type, 'JULES_ARCHIVER_CONFIG')
+  })
+
+  it('should ignore JULES_REQUEST_CONFIG from a foreign origin', () => {
+    const { sandbox, messages, listeners, windowMock } = setupSandbox({
+      SNlM0e: 'at-token'
+    })
+
+    vm.runInContext(mainWorldJs, sandbox)
+    assert.strictEqual(messages.length, 1)
+
+    // Same window object, but a spoofed cross-origin value
+    const event = {
+      source: windowMock,
+      origin: 'https://evil.example.com',
+      data: { type: 'JULES_REQUEST_CONFIG' }
+    }
+    listeners.message.forEach((l) => {
+      l(event)
+    })
+
+    assert.strictEqual(messages.length, 1, 'foreign-origin request must not trigger a broadcast')
   })
 
   it('should ignore JULES_REQUEST_CONFIG from other sources', () => {
