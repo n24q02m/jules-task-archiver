@@ -53,8 +53,10 @@ function setupEnvironment(initialStorage = {}) {
     chrome: chromeMock,
     fetch: async () => ({ ok: true, json: async () => [], text: async () => ")]}'\n\n4\n[[]]" }),
     setTimeout,
-    setInterval,
-    clearInterval,
+    // No-op timer mocks: the real keepAlive interval would otherwise keep the
+    // Node event loop alive and hang the test process after all tests pass.
+    setInterval: () => 0,
+    clearInterval: () => {},
     Math,
     Date,
     JSON,
@@ -82,6 +84,7 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_updateState = updateState;
     globalThis.test_addLog = addLog;
     globalThis.test_buildBatchRequest = buildBatchRequest;
+    globalThis.test_runInPool = runInPool;
     globalThis.test_fixJsonControlChars = fixJsonControlChars;
     globalThis.test_findJsonEnd = findJsonEnd;
     globalThis.test_parseResponse = parseResponse;
@@ -179,6 +182,68 @@ describe('findJsonEnd', () => {
     const { sandbox } = setupEnvironment()
     assert.strictEqual(sandbox.test_findJsonEnd('[["a"'), -1)
   })
+
+  it('should scan from startPos and return an absolute index', () => {
+    const { sandbox } = setupEnvironment()
+    // 6-char prefix (byte-length line) followed by the JSON array
+    assert.strictEqual(sandbox.test_findJsonEnd('1234\n\n[["a","b"]]tail', 6), 17)
+  })
+
+  it('should ignore brackets located before startPos', () => {
+    const { sandbox } = setupEnvironment()
+    // The leading "]]]" must not corrupt depth counting when skipped
+    assert.strictEqual(sandbox.test_findJsonEnd(']]]["x"]', 3), 8)
+  })
+
+  it('should treat startPos=0 the same as the default', () => {
+    const { sandbox } = setupEnvironment()
+    assert.strictEqual(sandbox.test_findJsonEnd('[["a","b"]]extra', 0), 11)
+  })
+})
+
+describe('runInPool', () => {
+  it('should run the worker over every item and preserve order', async () => {
+    const { sandbox } = setupEnvironment()
+    const results = await sandbox.test_runInPool([1, 2, 3, 4], 2, async (n) => n * 10)
+    assert.deepStrictEqual(results, [10, 20, 30, 40])
+  })
+
+  it('should never exceed the concurrency limit', async () => {
+    const { sandbox } = setupEnvironment()
+    let inFlight = 0
+    let peak = 0
+    const worker = async () => {
+      inFlight++
+      peak = Math.max(peak, inFlight)
+      await new Promise((r) => setTimeout(r, 5))
+      inFlight--
+    }
+    await sandbox.test_runInPool([1, 2, 3, 4, 5, 6, 7, 8], 3, worker)
+    assert.ok(peak <= 3, `peak concurrency ${peak} should not exceed 3`)
+    assert.strictEqual(peak, 3, 'pool should saturate the limit')
+  })
+
+  it('should return an empty array for empty input', async () => {
+    const { sandbox } = setupEnvironment()
+    let called = 0
+    const results = await sandbox.test_runInPool([], 5, async () => {
+      called++
+    })
+    assert.deepStrictEqual(results, [])
+    assert.strictEqual(called, 0)
+  })
+
+  it('should handle a limit larger than the item count', async () => {
+    const { sandbox } = setupEnvironment()
+    const results = await sandbox.test_runInPool([1, 2], 10, async (n) => n + 1)
+    assert.deepStrictEqual(results, [2, 3])
+  })
+
+  it('should pass the item index to the worker', async () => {
+    const { sandbox } = setupEnvironment()
+    const results = await sandbox.test_runInPool(['a', 'b', 'c'], 2, async (item, idx) => `${item}${idx}`)
+    assert.deepStrictEqual(results, ['a0', 'b1', 'c2'])
+  })
 })
 
 describe('parseResponse', () => {
@@ -187,6 +252,21 @@ describe('parseResponse', () => {
     const response = ')]}\'\n\n100\n[["wrb.fr","p1Takd","[[\\"task1\\",\\"task2\\"]]",null,null,null,"generic"]]'
     const result = sandbox.test_parseResponse(response, 'p1Takd')
     assert.deepStrictEqual(result, [['task1', 'task2']])
+  })
+
+  it('should parse correctly when trailing data follows the JSON array', () => {
+    const { sandbox } = setupEnvironment()
+    // A second chunk (byte-length line + sibling array) must be ignored by the
+    // offset-based boundary scan.
+    const response = ')]}\'\n\n55\n[["wrb.fr","Tjmm5c","[[\\"ok\\"]]",null,null,null,"generic"]]\n12\n[["di",99]]'
+    const result = sandbox.test_parseResponse(response, 'Tjmm5c')
+    assert.deepStrictEqual(result, [['ok']])
+  })
+
+  it('should return null when the rpcId is not present', () => {
+    const { sandbox } = setupEnvironment()
+    const response = ')]}\'\n\n40\n[["wrb.fr","p1Takd","[[]]",null,null,null,"generic"]]'
+    assert.strictEqual(sandbox.test_parseResponse(response, 'Rja83d'), null)
   })
 })
 

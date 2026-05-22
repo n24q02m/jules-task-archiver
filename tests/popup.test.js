@@ -67,10 +67,14 @@ function setupPopupSandbox() {
       },
       querySelectorAll: (_sel) => [],
       querySelector: (_sel) => null,
+      focus: () => {
+        element.focused = true
+      },
       textContent: '',
       value: '',
       checked: false,
       disabled: false,
+      focused: false,
       scrollHeight: 0,
       scrollTop: 0
     }
@@ -358,5 +362,28 @@ describe('Button Event Handlers', () => {
     assert.strictEqual(elements['#startBtn'].disabled, false)
     assert.strictEqual(elements['#startBtn'].textContent, 'Start Archiving')
     assert.strictEqual(elements['#resetBtn'].style.display, 'none')
+  })
+
+  it('should move keyboard focus to startBtn after reset', () => {
+    const { sandbox, elements } = setupPopupSandbox()
+    sandbox.chrome.runtime.sendMessage = () => {}
+
+    vm.runInContext(popupJs, sandbox)
+
+    assert.strictEqual(elements['#startBtn'].focused, false)
+    elements['#resetBtn'].dispatchEvent('click')
+    assert.strictEqual(elements['#startBtn'].focused, true, 'focus should return to the primary action')
+  })
+})
+
+describe('popup.html accessibility', () => {
+  const popupHtml = fs.readFileSync(path.join(__dirname, '../popup.html'), 'utf8')
+
+  it('should link the GitHub token input to its hint via aria-describedby', () => {
+    assert.ok(popupHtml.includes('id="ghTokenHint"'), 'token hint span should have an id')
+    assert.ok(
+      popupHtml.includes('aria-describedby="ghTokenHint"'),
+      'token input should reference the hint via aria-describedby'
+    )
   })
 })

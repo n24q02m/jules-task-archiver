@@ -143,6 +143,9 @@ resetBtn.addEventListener('click', () => {
   resetBtn.style.display = 'none'
   progressSection.style.display = 'none'
   summarySection.style.display = 'none'
+  // Move focus back to the primary action so keyboard users are not stranded
+  // on the now-hidden Reset button.
+  startBtn.focus()
 })
 
 // --- Listen for state changes ---

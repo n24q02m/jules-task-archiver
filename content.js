@@ -18,9 +18,16 @@ function injectMainWorldScript() {
 }
 injectMainWorldScript()
 
+// Reject messages that did not originate from this page's own window/origin.
+// The MAIN world script and isolated world share the same window and origin,
+// so anything failing these checks is a cross-origin/cross-frame spoof attempt.
+function isTrustedMessage(event) {
+  return event.source === window && event.origin === window.location.origin
+}
+
 // Listen for messages from MAIN world script
 window.addEventListener('message', (event) => {
-  if (event.source !== window) return
+  if (!isTrustedMessage(event)) return
   if (event.data?.type === 'JULES_ARCHIVER_CONFIG') {
     cachedConfig = event.data.config
   }
@@ -45,7 +52,7 @@ function extractConfig() {
 
     const timeout = setTimeout(() => resolve(cachedConfig), 2000)
     const handler = (event) => {
-      if (event.source !== window) return
+      if (!isTrustedMessage(event)) return
       if (event.data?.type !== 'JULES_ARCHIVER_CONFIG') return
       window.removeEventListener('message', handler)
       clearTimeout(timeout)
