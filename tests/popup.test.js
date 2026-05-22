@@ -57,8 +57,20 @@ function setupPopupSandbox() {
       style: { display: '' },
       appendChild: (child) => {
         if (!element.children) element.children = []
-        element.children.push(child)
-        child.parentElement = element
+        if (child.nodeType === 11) {
+          // It's a DocumentFragment, append its children
+          if (child.children) {
+            for (const c of child.children) {
+              element.children.push(c)
+              c.parentElement = element
+            }
+          }
+          // Clear fragment children
+          child.children = []
+        } else {
+          element.children.push(child)
+          child.parentElement = element
+        }
       },
       remove: () => {
         if (element.parentElement?.children) {
@@ -120,7 +132,12 @@ function setupPopupSandbox() {
       }
       return { forEach: () => {} }
     },
-    createElement: (tag) => createMockElement(tag)
+    createElement: (tag) => createMockElement(tag),
+    createDocumentFragment: () => {
+      const frag = createMockElement()
+      frag.nodeType = 11
+      return frag
+    }
   }
 
   const chrome = {
