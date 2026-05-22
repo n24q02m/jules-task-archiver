@@ -12,6 +12,10 @@ importScripts('utils.js')
 
 const JULES_ORIGIN = 'https://jules.google.com'
 
+// Max number of in-flight network operations. Caps fan-out so a tab with many
+// repos/tasks does not fire hundreds of simultaneous fetches at once.
+const API_CONCURRENCY = 5
+
 function extractAccountNum(url) {
   try {
     const parts = new URL(url).pathname.split('/')
@@ -44,6 +48,31 @@ async function jFetch(url, options = {}) {
     throw new Error(`HTTP ${res.status}`)
   }
   return res
+}
+
+/**
+ * Run `worker` over every item with at most `limit` tasks in flight at once.
+ * Results are returned in input order. Unlike `Promise.all(items.map(...))`,
+ * this bounds concurrency so large fan-outs cannot overwhelm the network.
+ */
+async function runInPool(items, limit, worker) {
+  const results = new Array(items.length)
+  let cursor = 0
+
+  async function drain() {
+    while (cursor < items.length) {
+      const index = cursor++
+      results[index] = await worker(items[index], index)
+    }
+  }
+
+  const poolSize = Math.min(limit, items.length)
+  const pool = []
+  for (let i = 0; i < poolSize; i++) {
+    pool.push(drain())
+  }
+  await Promise.all(pool)
+  return results
 }
 
 // =============================================================================
@@ -97,13 +126,17 @@ async function callBatchExecute(rpcId, payload, config) {
 /**
  * Find the end of the outermost JSON array using bracket balancing.
  * Handles control chars inside strings by skipping them.
+ *
+ * `startPos` lets callers scan a slice of a larger string without first
+ * allocating a substring copy — important for multi-MB batchexecute payloads.
+ * The returned index is absolute (relative to the start of `str`).
  */
-function findJsonEnd(str) {
+function findJsonEnd(str, startPos = 0) {
   // ⚡ Bolt Optimization: Use String.prototype.indexOf('"') to fast-forward
   // through string literals instead of character-by-character iteration.
   // This avoids huge JS overhead for large string payloads.
   let depth = 0
-  for (let i = 0; i < str.length; i++) {
+  for (let i = startPos; i < str.length; i++) {
     const ch = str[i]
     if (ch === '"') {
       while (true) {
@@ -147,13 +180,14 @@ function parseResponse(text, rpcId) {
   // Skip byte-length line
   const firstNewline = text.indexOf('\n', pos)
   if (firstNewline === -1) throw new Error('Invalid batchexecute response')
-  const data = text.substring(firstNewline + 1)
+  const dataStart = firstNewline + 1
 
-  // Find valid JSON boundary
-  const jsonEnd = findJsonEnd(data)
+  // ⚡ Bolt Optimization: Scan for the JSON boundary directly in `text` using an
+  // offset instead of allocating a `data` substring copy of the whole payload.
+  const jsonEnd = findJsonEnd(text, dataStart)
   if (jsonEnd === -1) throw new Error('Could not find JSON boundary in response')
 
-  const jsonStr = data.substring(0, jsonEnd)
+  const jsonStr = text.substring(dataStart, jsonEnd)
   const fixed = fixJsonControlChars(jsonStr)
   const outer = JSON.parse(fixed)
 
@@ -451,12 +485,11 @@ async function processSuggestionsForTab(tab, options) {
   addLog(`[${label}] Found ${repos.length} repos: ${repos.join(', ')}`)
 
   addLog(`\n[${label}] Fetching suggestions for ${repos.length} repos concurrently...`)
-  const suggestionFetches = repos.map((repo) =>
+  const allSuggestions = await runInPool(repos, API_CONCURRENCY, (repo) =>
     listSuggestions(repo, config)
       .then((suggestions) => ({ repo, suggestions }))
       .catch((e) => ({ repo, error: e.message }))
   )
-  const allSuggestions = await Promise.all(suggestionFetches)
 
   let totalStarted = 0
   for (const { repo, suggestions, error } of allSuggestions) {
@@ -478,33 +511,31 @@ async function processSuggestionsForTab(tab, options) {
     const prevTotal = state.progress.total
     let processedInRepo = 0
 
-    await Promise.all(
-      suggestions.map(async (s) => {
-        if (state.status === 'cancelled') return
+    await runInPool(suggestions, API_CONCURRENCY, async (s) => {
+      if (state.status === 'cancelled') return
 
-        if (options.dryRun) {
-          addLog(`  [DRY] Would start: ${s.title} (${s.categorySlug})`)
-        } else {
-          addLog(`  Starting: ${s.title}...`)
-          try {
-            await startSuggestion(s, repo, config, startConfig)
-            addLog(`  Started: ${s.title}`)
-            totalStarted++
-          } catch (err) {
-            addLog(`  [!] Failed to start "${s.title}": ${err.message}`)
-          }
+      if (options.dryRun) {
+        addLog(`  [DRY] Would start: ${s.title} (${s.categorySlug})`)
+      } else {
+        addLog(`  Starting: ${s.title}...`)
+        try {
+          await startSuggestion(s, repo, config, startConfig)
+          addLog(`  Started: ${s.title}`)
+          totalStarted++
+        } catch (err) {
+          addLog(`  [!] Failed to start "${s.title}": ${err.message}`)
         }
+      }
 
-        processedInRepo++
-        updateState({
-          progress: {
-            ...state.progress,
-            archived: totalStarted,
-            total: prevTotal + processedInRepo
-          }
-        })
+      processedInRepo++
+      updateState({
+        progress: {
+          ...state.progress,
+          archived: totalStarted,
+          total: prevTotal + processedInRepo
+        }
       })
-    )
+    })
   }
 
   addLog(`\n[${label}] TOTAL: ${totalStarted} suggestions started`)
@@ -761,14 +792,13 @@ async function processTab(tab, options) {
     for (const task of candidates) toArchive.push(task)
   } else {
     addLog(`\n[${label}] Checking open PRs per task...`)
-    // Fetch open PRs concurrently for all repos
+    // Fetch open PRs concurrently for all repos (bounded)
     const repoEntries = [...byRepo.entries()]
-    const prFetches = repoEntries.map(([_repo, repoTasks]) => {
+    const allPRs = await runInPool(repoEntries, API_CONCURRENCY, ([_repo, repoTasks]) => {
       const owner = repoTasks[0]?.owner || ghOwner || ''
       const repoName = repoTasks[0]?.repoName || ''
       return owner && repoName ? getOpenPRs(owner, repoName, ghToken) : Promise.resolve([])
     })
-    const allPRs = await Promise.all(prFetches)
 
     for (let i = 0; i < repoEntries.length; i++) {
       const [repo, repoTasks] = repoEntries[i]
@@ -833,25 +863,23 @@ async function processTab(tab, options) {
     updateState({ currentRepo: repo })
     addLog(`\n[${label}] -> ${repo} (${repoTasks.length} tasks)`)
 
-    await Promise.all(
-      repoTasks.map(async (task) => {
-        try {
-          await archiveTask(task.id, config)
-          grandTotal++
-          addLog(`  Archived: [${task.id}] ${task.title}`)
+    await runInPool(repoTasks, API_CONCURRENCY, async (task) => {
+      try {
+        await archiveTask(task.id, config)
+        grandTotal++
+        addLog(`  Archived: [${task.id}] ${task.title}`)
 
-          updateState({
-            progress: {
-              ...state.progress,
-              archived: grandTotal,
-              total: totalTasks
-            }
-          })
-        } catch (e) {
-          addLog(`  ERROR archiving ${task.id}: ${e.message}`)
-        }
-      })
-    )
+        updateState({
+          progress: {
+            ...state.progress,
+            archived: grandTotal,
+            total: totalTasks
+          }
+        })
+      } catch (e) {
+        addLog(`  ERROR archiving ${task.id}: ${e.message}`)
+      }
+    })
   }
 
   addLog(`\n[${label}] TOTAL: ${grandTotal} archived`)
