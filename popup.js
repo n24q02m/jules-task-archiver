@@ -206,7 +206,12 @@ function renderSummary(results) {
   summarySection.style.display = 'block'
   summaryDiv.textContent = ''
 
+  // ⚡ Bolt Optimization: Use DocumentFragment to batch DOM insertions.
+  // This prevents redundant browser reflows/repaints when processing large
+  // numbers of repositories, improving performance during summary rendering.
+  const fragment = document.createDocumentFragment()
   let grand = 0
+
   for (const r of results) {
     grand += r.count
     const div = document.createElement('div')
@@ -216,13 +221,15 @@ function renderSummary(results) {
     } else {
       div.textContent = `${r.label}: ${r.count} processed`
     }
-    summaryDiv.appendChild(div)
+    fragment.appendChild(div)
   }
 
   const totalDiv = document.createElement('div')
   totalDiv.className = 'total'
   totalDiv.textContent = `TOTAL: ${grand} processed`
-  summaryDiv.appendChild(totalDiv)
+  fragment.appendChild(totalDiv)
+
+  summaryDiv.appendChild(fragment)
 }
 
 // --- Check for existing state on popup open ---
