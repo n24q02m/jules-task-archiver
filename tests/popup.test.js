@@ -57,8 +57,17 @@ function setupPopupSandbox() {
       style: { display: '' },
       appendChild: (child) => {
         if (!element.children) element.children = []
-        element.children.push(child)
-        child.parentElement = element
+        if (child.nodeType === 11) {
+          // DocumentFragment
+          child.children.forEach((c) => {
+            element.children.push(c)
+            c.parentElement = element
+          })
+          child.children = [] // Clear fragment
+        } else {
+          element.children.push(child)
+          child.parentElement = element
+        }
       },
       remove: () => {
         if (element.parentElement?.children) {
@@ -120,7 +129,12 @@ function setupPopupSandbox() {
       }
       return { forEach: () => {} }
     },
-    createElement: (tag) => createMockElement(tag)
+    createElement: (tag) => createMockElement(tag),
+    createDocumentFragment: () => {
+      const frag = createMockElement('documentfragment')
+      frag.nodeType = 11
+      return frag
+    }
   }
 
   const chrome = {
