@@ -35,6 +35,12 @@ function extractAccountNum(url) {
  * Standard fetch wrapper with error handling and token injection.
  */
 async function jFetch(url, options = {}) {
+  const urlObj = new URL(url)
+  const origin = urlObj.origin
+  if (origin !== JULES_ORIGIN && origin !== 'https://api.github.com') {
+    throw new Error('Security Error: Disallowed fetch origin')
+  }
+
   const { token, headers = {}, ...rest } = options
 
   if (token) {
@@ -731,9 +737,14 @@ async function getTabConfig(tabId) {
   if (!response?.config?.at) {
     throw new Error('Could not extract page config (XSRF token missing). Try refreshing the Jules tab.')
   }
+  // Validate accountNum to prevent path traversal
+  const accountNum = String(response.accountNum || '0')
+  if (!/^\d+$/.test(accountNum)) {
+    throw new Error('Security Error: Invalid account number format')
+  }
   return {
     ...response.config,
-    accountNum: response.accountNum
+    accountNum
   }
 }
 

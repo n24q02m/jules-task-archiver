@@ -237,3 +237,67 @@ describe('ensureContentScript Security', () => {
     assert.strictEqual(injected, true)
   })
 })
+
+describe('jFetch SSRF Security', () => {
+  it('should block requests to unauthorized origins', async () => {
+    const { sandbox } = setupEnvironment()
+
+    // Test with malicious origin
+    await assert.rejects(sandbox.jFetch('https://evil.com/api/data'), {
+      message: /Security Error: Disallowed fetch origin/
+    })
+
+    // Test with localhost
+    await assert.rejects(sandbox.jFetch('http://localhost:8080/data'), {
+      message: /Security Error: Disallowed fetch origin/
+    })
+  })
+
+  it('should allow requests to jules.google.com and api.github.com', async () => {
+    const { sandbox } = setupEnvironment()
+
+    // We expect these to resolve correctly because the mocked fetch returns { ok: true }
+    const res1 = await sandbox.jFetch('https://jules.google.com/u/1/tasks')
+    assert.strictEqual(res1.ok, true)
+
+    const res2 = await sandbox.jFetch('https://api.github.com/repos/owner/repo')
+    assert.strictEqual(res2.ok, true)
+  })
+})
+
+describe('getTabConfig Path Traversal Security', () => {
+  it('should validate accountNum to prevent path traversal', async () => {
+    const { sandbox, chromeMock } = setupEnvironment()
+
+    // Inject global function into sandbox that isn't exported by default
+    vm.runInContext(`globalThis.test_getTabConfig = getTabConfig;`, sandbox)
+
+    // Mock ensureContentScript to just return a dummy doc ID
+    vm.runInContext(`globalThis.ensureContentScript = async () => 'doc_123';`, sandbox)
+
+    // Test with valid digits
+    chromeMock.tabs.sendMessage = async () => ({
+      config: { at: 'valid-token' },
+      accountNum: '42'
+    })
+
+    const validConfig = await sandbox.test_getTabConfig(1)
+    assert.strictEqual(validConfig.accountNum, '42')
+
+    // Test with path traversal payload
+    chromeMock.tabs.sendMessage = async () => ({
+      config: { at: 'valid-token' },
+      accountNum: '../1'
+    })
+
+    await assert.rejects(sandbox.test_getTabConfig(2), { message: /Security Error: Invalid account number format/ })
+
+    // Test with SQL injection / other invalid payloads
+    chromeMock.tabs.sendMessage = async () => ({
+      config: { at: 'valid-token' },
+      accountNum: '1 OR 1=1'
+    })
+
+    await assert.rejects(sandbox.test_getTabConfig(3), { message: /Security Error: Invalid account number format/ })
+  })
+})
