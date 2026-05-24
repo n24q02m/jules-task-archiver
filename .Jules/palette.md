@@ -4,3 +4,6 @@
 ## 2025-05-08 - Transient Error State Visuals & Input Noise
 **Learning:** Error state visual indicators (like turning a progress bar red) must be explicitly cleared when the user initiates a new operation. Failing to do so carries over the negative visual feedback, causing immediate anxiety on retry. Additionally, browsers aggressively spellcheck technical inputs (like GitHub usernames and tokens), adding distracting visual noise.
 **Action:** Always verify that state reset functions clear *all* dynamically applied error styles, not just structural changes like width or text. Apply `spellcheck="false"` to non-prose inputs.
+## 2025-05-22 - Dynamic Action Button Context
+**Learning:** Using static text (e.g., 'Start Archiving') on a primary action button when multiple execution modes (e.g., 'Run' vs 'Dry Run') are available creates ambiguity and hesitation for the user. They may be unsure if clicking the button will actually modify data or just simulate the process.
+**Action:** Always implement context-aware dynamic text for primary action buttons that reflects both the operation type and the execution mode (e.g., 'Dry Run Archive' vs 'Start Archiving'). Attach event listeners to the mode selection inputs to update this text immediately when the user changes settings, ensuring clear, real-time feedback on what the primary action will do.
