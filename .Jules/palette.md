@@ -7,3 +7,6 @@
 ## 2025-05-22 - Dynamic Action Button Context
 **Learning:** Using static text (e.g., 'Start Archiving') on a primary action button when multiple execution modes (e.g., 'Run' vs 'Dry Run') are available creates ambiguity and hesitation for the user. They may be unsure if clicking the button will actually modify data or just simulate the process.
 **Action:** Always implement context-aware dynamic text for primary action buttons that reflects both the operation type and the execution mode (e.g., 'Dry Run Archive' vs 'Start Archiving'). Attach event listeners to the mode selection inputs to update this text immediately when the user changes settings, ensuring clear, real-time feedback on what the primary action will do.
+## 2025-06-15 - Inaccessible Tooltips on Form Controls
+**Learning:** Using native HTML `title` attributes for hints on form controls (like checkboxes) creates significant accessibility barriers. They are completely inaccessible on touch devices and often skipped or read unreliably by screen readers compared to explicitly linked text.
+**Action:** Always replace `title` attributes with visible, inline helper text (e.g., `<span class="hint">`) and link it directly to the input field using `aria-describedby` so the hint is always discoverable and correctly announced by assistive technologies.
