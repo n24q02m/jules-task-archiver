@@ -20,6 +20,15 @@ function fixJsonControlChars(str) {
   let lastIndex = 0
 
   for (let i = 0; i < str.length; i++) {
+    // ⚡ Bolt Optimization: Fast-forward to the next quote if we are not in a string.
+    // This avoids iterating character-by-character through structural JSON.
+    if (!inStr) {
+      i = str.indexOf('"', i)
+      if (i === -1) break
+      inStr = true
+      continue
+    }
+
     const ch = str[i]
     const code = str.charCodeAt(i)
 
@@ -28,17 +37,17 @@ function fixJsonControlChars(str) {
       continue
     }
 
-    if (inStr && ch === '\\') {
+    if (ch === '\\') {
       esc = true
       continue
     }
 
     if (ch === '"') {
-      inStr = !inStr
+      inStr = false
       continue
     }
 
-    if (inStr && code < 0x20) {
+    if (code < 0x20) {
       if (!out) out = []
       if (i > lastIndex) {
         out.push(str.substring(lastIndex, i))
