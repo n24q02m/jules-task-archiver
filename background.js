@@ -993,11 +993,19 @@ async function startOperation(options) {
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   switch (msg.action) {
     case 'START':
+      if (_sender.tab) {
+        sendResponse({ error: 'Security Error: Unauthorized action from content script' })
+        break
+      }
       startOperation(msg.options)
       sendResponse({ ok: true })
       break
 
     case 'GET_STATE':
+      if (_sender.tab) {
+        sendResponse({ error: 'Security Error: Unauthorized action from content script' })
+        break
+      }
       stateReadyPromise.then(() => sendResponse(state))
       return true
 
@@ -1007,6 +1015,10 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       break
 
     case 'RESET':
+      if (_sender.tab) {
+        sendResponse({ error: 'Security Error: Unauthorized action from content script' })
+        break
+      }
       prCache.clear()
       stopKeepAlive()
       state = { ...DEFAULT_STATE }
