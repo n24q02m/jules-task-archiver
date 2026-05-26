@@ -143,8 +143,9 @@ function findJsonEnd(str, startPos = 0) {
   // This avoids huge JS overhead for large string payloads.
   let depth = 0
   for (let i = startPos; i < str.length; i++) {
-    const ch = str[i]
-    if (ch === '"') {
+    const code = str.charCodeAt(i)
+    if (code === 0x22) {
+      // '"'
       while (true) {
         i = str.indexOf('"', i + 1)
         if (i === -1) return -1
@@ -156,9 +157,11 @@ function findJsonEnd(str, startPos = 0) {
         }
         if (count % 2 === 0) break
       }
-    } else if (ch === '[') {
+    } else if (code === 0x5b) {
+      // '['
       depth++
-    } else if (ch === ']') {
+    } else if (code === 0x5d) {
+      // ']'
       depth--
       if (depth === 0) return i + 1
     }
