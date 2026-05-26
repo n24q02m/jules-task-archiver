@@ -119,6 +119,8 @@ const bgScriptContent = fs.readFileSync(bgScriptPath, 'utf8')
 const utilsScriptContent = fs.readFileSync(utilsScriptPath, 'utf8')
 
 function setupEnvironment(initialTabs = {}) {
+  const onMessageListeners = []
+
   const chromeMock = {
     storage: {
       session: {
@@ -127,7 +129,11 @@ function setupEnvironment(initialTabs = {}) {
       }
     },
     runtime: {
-      onMessage: { addListener: () => {} },
+      onMessage: {
+        addListener: (listener) => {
+          onMessageListeners.push(listener)
+        }
+      },
       getPlatformInfo: async () => ({})
     },
     tabs: {
@@ -177,7 +183,7 @@ function setupEnvironment(initialTabs = {}) {
   `
 
   vm.runInContext(scriptContent, sandbox)
-  return { sandbox, chromeMock }
+  return { sandbox, chromeMock, onMessageListeners }
 }
 
 describe('ensureContentScript Security', () => {
@@ -299,5 +305,55 @@ describe('getTabConfig Path Traversal Security', () => {
     })
 
     await assert.rejects(sandbox.test_getTabConfig(3), { message: /Security Error: Invalid account number format/ })
+  })
+})
+
+describe('Orchestrator Privilege Escalation Security', () => {
+  it('should reject privileged actions from content scripts', () => {
+    const { onMessageListeners } = setupEnvironment()
+    const listener = onMessageListeners[0] // background.js listener
+
+    assert.ok(listener, 'Background message listener should be registered')
+
+    const privilegedActions = ['START', 'RESET', 'GET_STATE']
+
+    for (const action of privilegedActions) {
+      let responseData = null
+      const sendResponse = (data) => {
+        responseData = data
+      }
+
+      // Simulate message from a content script (_sender.tab is present)
+      const sender = { tab: { id: 1 } }
+      listener({ action }, sender, sendResponse)
+
+      assert.strictEqual(
+        responseData?.error,
+        'Security Error: Unauthorized action from content script',
+        `Should reject ${action} from content script`
+      )
+    }
+  })
+
+  it('should allow unprivileged actions from content scripts', () => {
+    const { onMessageListeners, chromeMock } = setupEnvironment()
+    const listener = onMessageListeners[0] // background.js listener
+
+    let responseData = null
+    const sendResponse = (data) => {
+      responseData = data
+    }
+
+    let sessionData = {}
+    chromeMock.storage.session.set = async (data) => {
+      sessionData = data
+    }
+
+    // Simulate CACHE_START_CONFIG from a content script
+    const sender = { tab: { id: 1 } }
+    listener({ action: 'CACHE_START_CONFIG', config: { some: 'data' } }, sender, sendResponse)
+
+    assert.strictEqual(responseData?.ok, true, 'Should allow CACHE_START_CONFIG from content script')
+    assert.deepStrictEqual(sessionData.startConfig, { some: 'data' })
   })
 })
