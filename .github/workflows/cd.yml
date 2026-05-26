@@ -112,6 +112,7 @@ jobs:
             popup.html \
             popup.js \
             popup.css \
+            utils.js \
             icons/
 
       - name: Upload to GitHub Release
