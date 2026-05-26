@@ -70,6 +70,7 @@ function setupEnvironment(initialStorage = {}) {
     Promise,
     console,
     parseInt,
+    crypto,
     importScripts: () => {}
   }
 
