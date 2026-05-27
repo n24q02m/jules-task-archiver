@@ -144,7 +144,8 @@ function findJsonEnd(str, startPos = 0) {
   let depth = 0
   for (let i = startPos; i < str.length; i++) {
     const code = str.charCodeAt(i)
-    if (code === 34) { // '"'
+    if (code === 34) {
+      // '"'
       while (true) {
         i = str.indexOf('"', i + 1)
         if (i === -1) return -1
@@ -156,9 +157,11 @@ function findJsonEnd(str, startPos = 0) {
         }
         if (count % 2 === 0) break
       }
-    } else if (code === 91 || code === 123) { // '[', '{'
+    } else if (code === 91 || code === 123) {
+      // '[', '{'
       depth++
-    } else if (code === 93 || code === 125) { // ']', '}'
+    } else if (code === 93 || code === 125) {
+      // ']', '}'
       depth--
       if (depth === 0) return i + 1
     }

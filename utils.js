@@ -36,12 +36,14 @@ function fixJsonControlChars(str) {
       continue
     }
 
-    if (code === 92) { // '\\'
+    if (code === 92) {
+      // '\\'
       esc = true
       continue
     }
 
-    if (code === 34) { // '"'
+    if (code === 34) {
+      // '"'
       inStr = false
       continue
     }
