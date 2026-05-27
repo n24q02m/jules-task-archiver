@@ -29,7 +29,6 @@ function fixJsonControlChars(str) {
       continue
     }
 
-    const ch = str[i]
     const code = str.charCodeAt(i)
 
     if (esc) {
@@ -37,12 +36,12 @@ function fixJsonControlChars(str) {
       continue
     }
 
-    if (ch === '\\') {
+    if (code === 92) { // '\\'
       esc = true
       continue
     }
 
-    if (ch === '"') {
+    if (code === 34) { // '"'
       inStr = false
       continue
     }
