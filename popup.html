@@ -38,9 +38,12 @@
           <button type="button" data-value="suggestions" aria-pressed="false">Start Suggestions</button>
         </div>
       </div>
-      <div class="radio-group" role="radiogroup" aria-label="Execution Mode">
-        <label><input type="radio" name="mode" value="dry" checked /> Dry Run</label>
-        <label><input type="radio" name="mode" value="run" /> Run</label>
+      <div class="setting-row">
+        <label id="execModeLabel">Execution Mode</label>
+        <div class="radio-group" role="radiogroup" aria-labelledby="execModeLabel">
+          <label><input type="radio" name="mode" value="dry" checked /> Dry Run</label>
+          <label><input type="radio" name="mode" value="run" /> Run</label>
+        </div>
       </div>
       <div class="setting-row">
         <label class="checkbox">
@@ -49,9 +52,12 @@
         </label>
         <span class="hint" id="forceHint" style="display: block; margin-left: 20px; margin-top: 2px;">Archive tasks even if they have matching open Pull Requests</span>
       </div>
-      <div class="radio-group" role="radiogroup" aria-label="Scope">
-        <label><input type="radio" name="scope" value="current" /> Current tab</label>
-        <label><input type="radio" name="scope" value="all" checked /> All Jules tabs</label>
+      <div class="setting-row">
+        <label id="scopeLabel">Scope</label>
+        <div class="radio-group" role="radiogroup" aria-labelledby="scopeLabel">
+          <label><input type="radio" name="scope" value="current" /> Current tab</label>
+          <label><input type="radio" name="scope" value="all" checked /> All Jules tabs</label>
+        </div>
       </div>
     </section>
 
