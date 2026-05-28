@@ -10,3 +10,6 @@
 ## 2025-06-15 - Inaccessible Tooltips on Form Controls
 **Learning:** Using native HTML `title` attributes for hints on form controls (like checkboxes) creates significant accessibility barriers. They are completely inaccessible on touch devices and often skipped or read unreliably by screen readers compared to explicitly linked text.
 **Action:** Always replace `title` attributes with visible, inline helper text (e.g., `<span class="hint">`) and link it directly to the input field using `aria-describedby` so the hint is always discoverable and correctly announced by assistive technologies.
+## 2025-06-16 - Explicit Labels for Radio Groups
+**Learning:** Using invisible `aria-label`s on form control groups (like radio groups) when visual context is needed can cause confusion for sighted users.
+**Action:** Always provide explicit, visible `<label>` elements and link them directly to the group via `aria-labelledby` (e.g., `<label id="modeLabel">...` and `<div role="radiogroup" aria-labelledby="modeLabel">`) to ensure a clear visual and semantic hierarchy.
