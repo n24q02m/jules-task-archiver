@@ -311,7 +311,11 @@ function parseSuggestion(raw) {
 async function listSuggestions(repo, config) {
   const result = await callBatchExecute('hQP40d', [repo], config)
   if (!result || !Array.isArray(result) || !Array.isArray(result[0])) return []
-  return result[0].map(parseSuggestion).filter(Boolean)
+  return result[0].reduce((acc, s) => {
+    const parsed = parseSuggestion(s)
+    if (parsed) acc.push(parsed)
+    return acc
+  }, [])
 }
 
 // =============================================================================
@@ -485,7 +489,11 @@ async function processSuggestionsForTab(tab, options) {
     return 0
   }
 
-  const repos = [...new Set(tasks.map((t) => t.source).filter(Boolean))]
+  const repoSet = new Set()
+  for (const t of tasks) {
+    if (t.source) repoSet.add(t.source)
+  }
+  const repos = [...repoSet]
   if (repos.length === 0) {
     addLog(`[${label}] No repos found from tasks.`)
     return 0
