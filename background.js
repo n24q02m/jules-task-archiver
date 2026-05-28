@@ -589,10 +589,20 @@ async function getOpenPRs(owner, repo, token) {
   }
 }
 
-function taskHasOpenPR(task, openPRs) {
-  if (openPRs.length === 0) return false
+function taskHasOpenPR(task, openPRs, matcher) {
+  if (!openPRs || openPRs.length === 0) return false
   const taskTitle = (task.title || '').toLowerCase()
   if (!taskTitle || taskTitle === '(untitled)') return false
+
+  if (matcher) {
+    // ⚡ Bolt Optimization: Use precomputed matcher to avoid O(N*M) substring matching.
+    // 1. Check if PR title is in task title: taskTitle.includes(pr.titleLower)
+    if (matcher.prTitlesRegex?.test(taskTitle)) return true
+    // 2. Check if task title is in PR title: pr.titleLower.includes(taskTitle)
+    if (matcher.joinedTitles.includes(taskTitle)) return true
+    return false
+  }
+
   return openPRs.some((pr) => pr.titleLower.includes(taskTitle) || taskTitle.includes(pr.titleLower))
 }
 
@@ -817,13 +827,14 @@ async function processTab(tab, options) {
     for (let i = 0; i < repoEntries.length; i++) {
       const [repo, repoTasks] = repoEntries[i]
       const openPRs = allPRs[i]
+      const matcher = createPRMatcher(openPRs)
       addLog(`  ${repo}: ${repoTasks.length} tasks, ${openPRs.length} open PRs`)
 
       for (const task of repoTasks) {
         if (task.state === 9) {
           // Failed tasks: always archive (no PR created)
           toArchive.push(task)
-        } else if (taskHasOpenPR(task, openPRs)) {
+        } else if (taskHasOpenPR(task, openPRs, matcher)) {
           toSkip.push(task)
           addLog(`    SKIP [${task.id}] ${task.title} (matching open PR)`)
         } else {
@@ -1035,3 +1046,29 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       break
   }
 })
+
+/**
+ * Creates an optimized PR matcher for a list of open PRs.
+ * Pre-processes PR titles to avoid O(N*M) matching in the inner task loop.
+ */
+function createPRMatcher(openPRs) {
+  if (!openPRs || openPRs.length === 0) return null
+
+  // 1. To optimize taskTitle.includes(pr.titleLower):
+  // We join all PR titles into a single string with a unique separator.
+  const joinedTitles = ` ${openPRs.map((pr) => pr.titleLower).join(' \0 ')} `
+
+  // 2. To optimize pr.titleLower.includes(taskTitle):
+  // We create a combined Regex of all PR titles.
+  // Note: PR titles can contain special regex characters, so we must escape them.
+  const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\\\]/g, '\\\\$&')
+  const regexSource = openPRs
+    .map((pr) => pr.titleLower)
+    .filter(Boolean)
+    .map(escapeRegex)
+    .join('|')
+
+  const prTitlesRegex = regexSource ? new RegExp(regexSource, 'i') : null
+
+  return { joinedTitles, prTitlesRegex, openPRs }
+}
