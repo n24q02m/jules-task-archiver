@@ -95,6 +95,7 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_updateState = updateState;
     globalThis.test_addLog = addLog;
     globalThis.test_buildBatchRequest = buildBatchRequest;
+    globalThis.test_callBatchExecute = callBatchExecute;
     globalThis.test_runInPool = runInPool;
     globalThis.test_fixJsonControlChars = fixJsonControlChars;
     globalThis.test_findJsonEnd = findJsonEnd;
@@ -1133,5 +1134,33 @@ describe('KeepAlive', () => {
     assert.strictEqual(sandbox.test_clearedTimers.length, 1)
     assert.strictEqual(sandbox.test_clearedTimers[0], intervalId)
     assert.strictEqual(sandbox.test_getKeepAliveInterval(), null)
+  })
+})
+
+describe('callBatchExecute', () => {
+  it('should throw error when jFetch fails with HTTP error', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.fetch = async () => ({
+      ok: false,
+      status: 500,
+      statusText: 'Internal Server Error'
+    })
+
+    const config = { accountNum: '0' }
+    await assert.rejects(sandbox.test_callBatchExecute('rpcId', {}, config), {
+      message: 'batchexecute rpcId failed: HTTP 500'
+    })
+  })
+
+  it('should throw error when fetch throws network error', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.fetch = async () => {
+      throw new Error('Network Error')
+    }
+
+    const config = { accountNum: '0' }
+    await assert.rejects(sandbox.test_callBatchExecute('rpcId', {}, config), {
+      message: 'batchexecute rpcId failed: Network Error'
+    })
   })
 })
