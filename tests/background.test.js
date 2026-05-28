@@ -128,6 +128,7 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_startKeepAlive = startKeepAlive;
     globalThis.test_stopKeepAlive = stopKeepAlive;
     globalThis.test_getKeepAliveInterval = () => keepAliveInterval;
+    globalThis.test_listSuggestions = listSuggestions;
   `
 
   const script = new vm.Script(scriptContent)
@@ -1162,5 +1163,71 @@ describe('callBatchExecute', () => {
     await assert.rejects(sandbox.test_callBatchExecute('rpcId', {}, config), {
       message: 'batchexecute rpcId failed: Network Error'
     })
+  })
+})
+
+// =============================================================================
+// Suggestion Operations Tests
+// =============================================================================
+
+describe('listSuggestions', () => {
+  it('should return an empty array if callBatchExecute returns null', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.callBatchExecute = async () => null
+
+    const result = await sandbox.test_listSuggestions('repo', {})
+    assert.strictEqual(result.length, 0)
+  })
+
+  it('should return an empty array if callBatchExecute returns an empty array', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.callBatchExecute = async () => []
+
+    const result = await sandbox.test_listSuggestions('repo', {})
+    assert.strictEqual(result.length, 0)
+  })
+
+  it('should return an empty array if callBatchExecute returns [null]', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.callBatchExecute = async () => [null]
+
+    const result = await sandbox.test_listSuggestions('repo', {})
+    assert.strictEqual(result.length, 0)
+  })
+
+  it('should return an empty array if callBatchExecute returns [[]]', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.callBatchExecute = async () => [[]]
+
+    const result = await sandbox.test_listSuggestions('repo', {})
+    assert.strictEqual(result.length, 0)
+  })
+
+  it('should return parsed suggestions for valid response data', async () => {
+    const { sandbox } = setupEnvironment()
+    const mockResponse = [[['s1', ['Title', 'Desc', 'url', 'path', 1, 0.9, 'rat', 'code', 'js', 'slug', 1], 1, [], 0]]]
+    sandbox.callBatchExecute = async () => mockResponse
+
+    const result = await sandbox.test_listSuggestions('repo', {})
+    assert.strictEqual(result.length, 1)
+    assert.strictEqual(result[0].id, 's1')
+    assert.strictEqual(result[0].title, 'Title')
+    assert.strictEqual(result[0].confidence, 0.9)
+  })
+
+  it('should filter out null/invalid suggestions', async () => {
+    const { sandbox } = setupEnvironment()
+    const mockResponse = [
+      [
+        ['s1', ['Title', 'Desc', 'url', 'path', 1, 0.9, 'rat', 'code', 'js', 'slug', 1], 1, [], 0],
+        null,
+        ['s2', null, 1, [], 0] // parseSuggestion returns null if details is missing
+      ]
+    ]
+    sandbox.callBatchExecute = async () => mockResponse
+
+    const result = await sandbox.test_listSuggestions('repo', {})
+    assert.strictEqual(result.length, 1)
+    assert.strictEqual(result[0].id, 's1')
   })
 })
