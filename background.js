@@ -971,8 +971,9 @@ function finalizeOperation(results, isSuggestions) {
 }
 
 function handleOperationError(e) {
-  addLog(`FATAL ERROR: ${e.message}`)
-  updateState({ status: 'error', error: e.message })
+  const message = e?.message || String(e) || 'Unknown error'
+  addLog(`FATAL ERROR: ${message}`)
+  updateState({ status: 'error', error: message })
 }
 
 async function startOperation(options) {

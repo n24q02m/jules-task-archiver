@@ -980,14 +980,51 @@ describe('startOperation refactoring', () => {
     assert.ok(state.log.some((l) => l.includes('GRAND TOTAL: 5 tasks archived')))
   })
 
-  it('handleOperationError should log error and update status', () => {
+  describe('handleOperationError', () => {
+    it('should log Error objects and update status', () => {
+      const { sandbox } = setupEnvironment()
+      sandbox.test_handleOperationError(new Error('Test error'))
+
+      const state = sandbox.test_state()
+      assert.strictEqual(state.status, 'error')
+      assert.strictEqual(state.error, 'Test error')
+      assert.ok(state.log.some((l) => l.includes('FATAL ERROR: Test error')))
+    })
+
+    it('should log string errors and update status', () => {
+      const { sandbox } = setupEnvironment()
+      sandbox.test_handleOperationError('String error')
+
+      const state = sandbox.test_state()
+      assert.strictEqual(state.status, 'error')
+      assert.strictEqual(state.error, 'String error')
+      assert.ok(state.log.some((l) => l.includes('FATAL ERROR: String error')))
+    })
+
+    it('should log null/undefined errors as "null"/"undefined"', () => {
+      const { sandbox } = setupEnvironment()
+      sandbox.test_handleOperationError(null)
+
+      const state = sandbox.test_state()
+      assert.strictEqual(state.status, 'error')
+      assert.strictEqual(state.error, 'null')
+      assert.ok(state.log.some((l) => l.includes('FATAL ERROR: null')))
+    })
+  })
+
+  it('startOperation should handle fatal errors in the orchestration loop', async () => {
     const { sandbox } = setupEnvironment()
-    sandbox.test_handleOperationError(new Error('Test error'))
+    // Mock getJulesTabs (via chrome.tabs.query) to throw
+    sandbox.chrome.tabs.query = () => {
+      throw new Error('Orchestration failed')
+    }
+
+    await sandbox.test_startOperation({ opMode: 'archive' })
 
     const state = sandbox.test_state()
     assert.strictEqual(state.status, 'error')
-    assert.strictEqual(state.error, 'Test error')
-    assert.ok(state.log.some((l) => l.includes('FATAL ERROR: Test error')))
+    assert.strictEqual(state.error, 'Orchestration failed')
+    assert.ok(state.log.some((l) => l.includes('FATAL ERROR: Orchestration failed')))
   })
 
   it('startOperation should orchestrate successfully', async () => {
