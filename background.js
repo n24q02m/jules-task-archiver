@@ -138,11 +138,13 @@ async function callBatchExecute(rpcId, payload, config) {
  * The returned index is absolute (relative to the start of `str`).
  */
 function findJsonEnd(str, startPos = 0) {
+  if (!str) return -1
   // ⚡ Bolt Optimization: Use String.prototype.indexOf('"') to fast-forward
   // through string literals instead of character-by-character iteration.
   // This avoids huge JS overhead for large string payloads.
   let depth = 0
-  for (let i = startPos; i < str.length; i++) {
+  const len = str.length
+  for (let i = startPos; i < len; i++) {
     const code = str.charCodeAt(i)
     if (code === 34) {
       // '"'
@@ -150,10 +152,8 @@ function findJsonEnd(str, startPos = 0) {
         i = str.indexOf('"', i + 1)
         if (i === -1) return -1
         let count = 0
-        let k = i - 1
-        while (k >= 0 && str.charCodeAt(k) === 92) {
+        while (i - 1 - count >= 0 && str.charCodeAt(i - 1 - count) === 92) {
           count++
-          k--
         }
         if (count % 2 === 0) break
       }
