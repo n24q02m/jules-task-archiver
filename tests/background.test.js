@@ -35,6 +35,9 @@ function setupEnvironment(initialStorage = {}) {
       onMessage: { addListener: () => {} },
       getPlatformInfo: async () => ({})
     },
+    webNavigation: {
+      getFrame: async () => ({ url: 'https://jules.google.com/u/0/session', documentId: 'doc1' })
+    },
     tabs: {
       query: async () => [],
       get: async (id) => ({ id, url: 'https://jules.google.com/u/0/session' }),
@@ -46,9 +49,6 @@ function setupEnvironment(initialStorage = {}) {
     },
     scripting: {
       executeScript: async () => {}
-    },
-    webNavigation: {
-      getFrame: async () => ({ url: 'https://jules.google.com/u/0/session', documentId: 'doc123' })
     }
   }
 
@@ -134,6 +134,7 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_stopKeepAlive = stopKeepAlive;
     globalThis.test_getKeepAliveInterval = () => keepAliveInterval;
     globalThis.test_listSuggestions = listSuggestions;
+    globalThis.test_ensureContentScript = ensureContentScript;
     globalThis.test_getTabConfig = getTabConfig;
   `
 
@@ -1320,5 +1321,99 @@ describe('getTabConfig', () => {
     })
     const result = await sandbox.test_getTabConfig(1)
     assert.strictEqual(result.accountNum, '0')
+  })
+})
+
+// =============================================================================
+// ensureContentScript Tests
+// =============================================================================
+
+describe('ensureContentScript', () => {
+  it('should return documentId when initial PING succeeds', async () => {
+    const { sandbox } = setupEnvironment()
+    const tabId = 123
+    let messageSent = null
+
+    sandbox.chrome.tabs.sendMessage = async (id, msg, options) => {
+      if (msg.action === 'PING') {
+        messageSent = { id, msg, options }
+        return { ok: true }
+      }
+      return null
+    }
+
+    const docId = await sandbox.test_ensureContentScript(tabId)
+    assert.strictEqual(docId, 'doc1')
+    assert.strictEqual(messageSent.id, tabId)
+    assert.strictEqual(messageSent.msg.action, 'PING')
+    assert.strictEqual(messageSent.options.documentId, 'doc1')
+  })
+
+  it('should inject script and retry when initial PING fails', async () => {
+    const { sandbox } = setupEnvironment()
+    const tabId = 123
+    let pings = 0
+    let scriptInjected = false
+
+    sandbox.chrome.tabs.sendMessage = async () => {
+      pings++
+      if (pings === 1) throw new Error('Could not establish connection')
+      return { ok: true }
+    }
+
+    sandbox.chrome.scripting.executeScript = async (opts) => {
+      assert.strictEqual(opts.target.tabId, tabId)
+      // Use JSON.stringify to avoid cross-VM reference issues with deepStrictEqual
+      assert.strictEqual(JSON.stringify(opts.files), JSON.stringify(['content.js']))
+      scriptInjected = true
+    }
+
+    // Mock setTimeout to resolve immediately
+    sandbox.setTimeout = (fn) => {
+      fn()
+      return 0
+    }
+
+    const docId = await sandbox.test_ensureContentScript(tabId)
+    assert.strictEqual(docId, 'doc1')
+    assert.strictEqual(scriptInjected, true)
+    assert.strictEqual(pings, 2)
+  })
+
+  it('should throw security error if frame URL is missing', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.chrome.webNavigation.getFrame = async () => ({ url: null, documentId: 'doc1' })
+
+    await assert.rejects(sandbox.test_ensureContentScript(123), { message: 'Security Error: Cannot verify tab origin' })
+  })
+
+  it('should throw security error if origin is invalid', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.chrome.webNavigation.getFrame = async () => ({ url: 'https://example.com', documentId: 'doc1' })
+
+    await assert.rejects(sandbox.test_ensureContentScript(123), {
+      message: 'Security Error: Cannot inject script into non-Jules tab'
+    })
+  })
+
+  it('should throw error if content script fails to initialize within 3s', async () => {
+    const { sandbox } = setupEnvironment()
+    const tabId = 123
+    let now = 1000
+
+    sandbox.chrome.tabs.sendMessage = async () => {
+      throw new Error('Still not ready')
+    }
+
+    sandbox.Date.now = () => now
+    sandbox.setTimeout = (fn) => {
+      now += 500 // Advance time by 500ms on each retry (loop has 100ms sleep)
+      fn()
+      return 0
+    }
+
+    await assert.rejects(sandbox.test_ensureContentScript(tabId), {
+      message: 'Content script failed to initialize within 3s'
+    })
   })
 })
