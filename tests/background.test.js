@@ -128,6 +128,7 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_processAllTabs = processAllTabs;
     globalThis.test_finalizeOperation = finalizeOperation;
     globalThis.test_handleOperationError = handleOperationError;
+    globalThis.test_listTasks = listTasks;
     globalThis.test_startOperation = startOperation;
     globalThis.test_startKeepAlive = startKeepAlive;
     globalThis.test_stopKeepAlive = stopKeepAlive;
@@ -141,6 +142,30 @@ function setupEnvironment(initialStorage = {}) {
 
   return { sandbox, sessionSetData }
 }
+
+// =============================================================================
+// Task Operations Tests
+// =============================================================================
+
+describe('listTasks', () => {
+  it('should return an empty array when callBatchExecute returns null', async () => {
+    const { sandbox } = setupEnvironment()
+    // Override the internal callBatchExecute with a mock that returns null
+    sandbox.callBatchExecute = async () => null
+
+    const tasks = await sandbox.test_listTasks('filter', {})
+    assert.strictEqual(JSON.stringify(tasks), '[]')
+  })
+
+  it('should return an empty array when callBatchExecute returns an empty array', async () => {
+    const { sandbox } = setupEnvironment()
+    // Override the internal callBatchExecute with a mock that returns []
+    sandbox.callBatchExecute = async () => []
+
+    const tasks = await sandbox.test_listTasks('filter', {})
+    assert.strictEqual(JSON.stringify(tasks), '[]')
+  })
+})
 
 // =============================================================================
 // batchexecute Client Tests
