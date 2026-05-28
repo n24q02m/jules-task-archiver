@@ -50,8 +50,7 @@ function extractConfig() {
     // Ask main-world.js to re-broadcast config
     window.postMessage({ type: 'JULES_REQUEST_CONFIG' }, window.location.origin)
 
-    const timeout = setTimeout(() => resolve(cachedConfig), 2000)
-    const handler = (event) => {
+    function handler(event) {
       if (!isTrustedMessage(event)) return
       if (event.data?.type !== 'JULES_ARCHIVER_CONFIG') return
       window.removeEventListener('message', handler)
@@ -59,6 +58,12 @@ function extractConfig() {
       cachedConfig = event.data.config
       resolve(cachedConfig)
     }
+
+    const timeout = setTimeout(() => {
+      window.removeEventListener('message', handler)
+      resolve(cachedConfig)
+    }, 2000)
+
     window.addEventListener('message', handler)
   })
 }
