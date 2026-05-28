@@ -46,6 +46,9 @@ function setupEnvironment(initialStorage = {}) {
     },
     scripting: {
       executeScript: async () => {}
+    },
+    webNavigation: {
+      getFrame: async () => ({ url: 'https://jules.google.com/u/0/session', documentId: 'doc123' })
     }
   }
 
@@ -130,6 +133,7 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_stopKeepAlive = stopKeepAlive;
     globalThis.test_getKeepAliveInterval = () => keepAliveInterval;
     globalThis.test_listSuggestions = listSuggestions;
+    globalThis.test_getTabConfig = getTabConfig;
   `
 
   const script = new vm.Script(scriptContent)
@@ -1247,5 +1251,49 @@ describe('getStartConfig', () => {
 
     const result = await sandbox.test_getStartConfig()
     assert.strictEqual(result, null)
+  })
+})
+
+// =============================================================================
+// getTabConfig Tests
+// =============================================================================
+
+describe('getTabConfig', () => {
+  it('should return config and accountNum on success', async () => {
+    const { sandbox } = setupEnvironment()
+    const result = await sandbox.test_getTabConfig(1)
+    assert.strictEqual(result.at, 'token')
+    assert.strictEqual(result.bl, 'build')
+    assert.strictEqual(result.fsid, '123')
+    assert.strictEqual(result.accountNum, '0')
+  })
+
+  it('should throw error when "at" property is missing', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.chrome.tabs.sendMessage = async () => ({
+      config: { bl: 'build', fsid: '123' },
+      accountNum: '0'
+    })
+    await assert.rejects(sandbox.test_getTabConfig(1), {
+      message: 'Could not extract page config (XSRF token missing). Try refreshing the Jules tab.'
+    })
+  })
+
+  it('should throw security error for invalid accountNum format', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.chrome.tabs.sendMessage = async () => ({
+      config: { at: 'token', bl: 'build', fsid: '123' },
+      accountNum: 'invalid-123'
+    })
+    await assert.rejects(sandbox.test_getTabConfig(1), { message: 'Security Error: Invalid account number format' })
+  })
+
+  it('should handle missing accountNum by defaulting to "0"', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.chrome.tabs.sendMessage = async () => ({
+      config: { at: 'token', bl: 'build', fsid: '123' }
+    })
+    const result = await sandbox.test_getTabConfig(1)
+    assert.strictEqual(result.accountNum, '0')
   })
 })
