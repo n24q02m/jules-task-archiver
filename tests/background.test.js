@@ -109,6 +109,7 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_extractAccountNum = extractAccountNum;
     globalThis.test_getTabLabel = getTabLabel;
     globalThis.test_getOpenPRs = getOpenPRs;
+    globalThis.test_getStartConfig = getStartConfig;
     globalThis.test_prCache = prCache;
     globalThis.test_jFetch = jFetch;
     globalThis.test_taskHasOpenPR = taskHasOpenPR;
@@ -1229,5 +1230,22 @@ describe('listSuggestions', () => {
     const result = await sandbox.test_listSuggestions('repo', {})
     assert.strictEqual(result.length, 1)
     assert.strictEqual(result[0].id, 's1')
+  })
+})
+
+describe('getStartConfig', () => {
+  it('should return the config object when it exists in session storage', async () => {
+    const mockConfig = { modelId: 'test-model', features: ['a', 'b'] }
+    const { sandbox } = setupEnvironment({ startConfig: mockConfig })
+
+    const result = await sandbox.test_getStartConfig()
+    assert.deepStrictEqual(result, mockConfig)
+  })
+
+  it('should return null when no config exists in session storage', async () => {
+    const { sandbox } = setupEnvironment({}) // empty storage
+
+    const result = await sandbox.test_getStartConfig()
+    assert.strictEqual(result, null)
   })
 })
