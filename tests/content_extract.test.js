@@ -63,8 +63,8 @@ function setupEnvironment() {
     document,
     window,
     console,
-    setTimeout,
-    clearTimeout,
+    setTimeout: (...args) => globalThis.setTimeout(...args),
+    clearTimeout: (...args) => globalThis.clearTimeout(...args),
     Date,
     Promise,
     URL,
@@ -77,6 +77,7 @@ function setupEnvironment() {
         fn(event)
       })
     },
+    getListenerCount: (type) => (listeners.get(type) || []).length,
     wasPostMessageCalled: () => postMessageCalled,
     getLastPostMessage: () => lastPostMessage,
     resetPostMessage: () => {
@@ -149,18 +150,9 @@ describe('content.js extractConfig', () => {
     assert.deepStrictEqual(normalize(result), newConfig)
   })
 
-  it('should resolve with current cached value on timeout', async () => {
+  it('should resolve with current cached value on timeout', async (t) => {
+    t.mock.timers.enable()
     const sandbox = setupEnvironment()
-    // Mock setTimeout to fire immediately
-    const originalSetTimeout = sandbox.setTimeout
-    let timeoutCallback = null
-    sandbox.setTimeout = (fn, delay) => {
-      if (delay === 2000) {
-        timeoutCallback = fn
-        return 123
-      }
-      return originalSetTimeout(fn, delay)
-    }
 
     const oldTime = Date.now() - 400000
     const oldConfig = { at: 'stale-token', timestamp: oldTime }
@@ -168,29 +160,41 @@ describe('content.js extractConfig', () => {
 
     const promise = sandbox.extractConfig()
 
-    assert.ok(timeoutCallback, 'Timeout should have been set')
-    timeoutCallback() // Trigger timeout
+    t.mock.timers.tick(2000)
 
     const result = await promise
     assert.deepStrictEqual(normalize(result), oldConfig, 'Should resolve with stale config on timeout')
   })
 
-  it('should resolve with null on timeout if no cache exists', async () => {
+  it('should resolve with null on timeout if no cache exists', async (t) => {
+    t.mock.timers.enable()
     const sandbox = setupEnvironment()
-    let timeoutCallback = null
-    const originalSetTimeout = sandbox.setTimeout
-    sandbox.setTimeout = (fn, delay) => {
-      if (delay === 2000) {
-        timeoutCallback = fn
-        return 123
-      }
-      return originalSetTimeout(fn, delay)
-    }
 
     const promise = sandbox.extractConfig()
-    timeoutCallback()
+
+    t.mock.timers.tick(2000)
 
     const result = await promise
     assert.strictEqual(result, null)
+  })
+
+  it('should remove message listener on timeout', async (t) => {
+    t.mock.timers.enable()
+    const sandbox = setupEnvironment()
+
+    // Initial listeners (should be 1 for the global listener)
+    const initialCount = sandbox.getListenerCount('message')
+
+    const promise = sandbox.extractConfig()
+    assert.strictEqual(sandbox.getListenerCount('message'), initialCount + 1, 'Should have added a temporary listener')
+
+    t.mock.timers.tick(2000)
+    await promise
+
+    assert.strictEqual(
+      sandbox.getListenerCount('message'),
+      initialCount,
+      'Should have removed the temporary listener on timeout'
+    )
   })
 })
