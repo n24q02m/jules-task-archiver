@@ -564,8 +564,8 @@ describe('taskHasOpenPR', () => {
     const prData = {
       mapped: prs,
       matcher: {
-        joinedPRs: prs.map(p => p.titleLower).join('\0'),
-        regex: new RegExp(prs.map(p => escapeRegex(p.titleLower)).join('|'))
+        joinedPRs: prs.map((p) => p.titleLower).join('\0'),
+        regex: new RegExp(prs.map((p) => escapeRegex(p.titleLower)).join('|'))
       }
     }
     assert.strictEqual(sandbox.test_taskHasOpenPR(task, prData), true)
@@ -585,8 +585,8 @@ describe('taskHasOpenPR', () => {
     const prData = {
       mapped: prs,
       matcher: {
-        joinedPRs: prs.map(p => p.titleLower).join('\0'),
-        regex: new RegExp(prs.map(p => escapeRegex(p.titleLower)).join('|'))
+        joinedPRs: prs.map((p) => p.titleLower).join('\0'),
+        regex: new RegExp(prs.map((p) => escapeRegex(p.titleLower)).join('|'))
       }
     }
     assert.strictEqual(sandbox.test_taskHasOpenPR(task, prData), true)
@@ -603,8 +603,8 @@ describe('taskHasOpenPR', () => {
     const prData = {
       mapped: prs,
       matcher: {
-        joinedPRs: prs.map(p => p.titleLower).join('\0'),
-        regex: new RegExp(prs.map(p => escapeRegex(p.titleLower)).join('|'))
+        joinedPRs: prs.map((p) => p.titleLower).join('\0'),
+        regex: new RegExp(prs.map((p) => escapeRegex(p.titleLower)).join('|'))
       }
     }
     assert.strictEqual(sandbox.test_taskHasOpenPR(task, prData), false)
@@ -622,8 +622,8 @@ describe('taskHasOpenPR', () => {
     const prData = {
       mapped: prs,
       matcher: {
-        joinedPRs: prs.map(p => p.titleLower).join('\0'),
-        regex: new RegExp(prs.map(p => escapeRegex(p.titleLower)).join('|'))
+        joinedPRs: prs.map((p) => p.titleLower).join('\0'),
+        regex: new RegExp(prs.map((p) => escapeRegex(p.titleLower)).join('|'))
       }
     }
     assert.strictEqual(sandbox.test_taskHasOpenPR({ title: '(untitled)' }, prData), false)
@@ -644,8 +644,8 @@ describe('taskHasOpenPR', () => {
     const prData = {
       mapped: prs,
       matcher: {
-        joinedPRs: prs.map(p => p.titleLower).join('\0'),
-        regex: new RegExp(prs.map(p => escapeRegex(p.titleLower)).join('|'))
+        joinedPRs: prs.map((p) => p.titleLower).join('\0'),
+        regex: new RegExp(prs.map((p) => escapeRegex(p.titleLower)).join('|'))
       }
     }
     assert.strictEqual(sandbox.test_taskHasOpenPR(task, prData), true)
