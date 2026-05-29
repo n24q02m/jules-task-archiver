@@ -99,6 +99,7 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_getTabLabel = getTabLabel;
     globalThis.test_getOpenPRs = getOpenPRs;
     globalThis.test_prCache = prCache;
+    globalThis.test_jFetch = jFetch;
     globalThis.test_taskHasOpenPR = taskHasOpenPR;
     globalThis.test_parseSuggestion = parseSuggestion;
     globalThis.test_buildSuggestionPrompt = buildSuggestionPrompt;
@@ -1003,5 +1004,73 @@ describe('startOperation refactoring', () => {
     const state = sandbox.test_state()
     assert.strictEqual(state.status, 'done')
     assert.strictEqual(state.results[0].count, 3)
+  })
+})
+
+// =============================================================================
+// jFetch Tests
+// =============================================================================
+
+describe('jFetch', () => {
+  it('should throw an error for non-OK HTTP responses', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.fetch = async () => ({
+      ok: false,
+      status: 404,
+      statusText: 'Not Found'
+    })
+
+    await assert.rejects(() => sandbox.test_jFetch('https://jules.google.com/api/test'), {
+      name: 'Error',
+      message: 'HTTP 404'
+    })
+  })
+
+  it('should return the response for successful HTTP requests', async () => {
+    const { sandbox } = setupEnvironment()
+    const mockResponse = { ok: true, status: 200 }
+    sandbox.fetch = async () => mockResponse
+
+    const res = await sandbox.test_jFetch('https://jules.google.com/api/test')
+    assert.strictEqual(res, mockResponse)
+  })
+
+  it('should throw an error for disallowed fetch origins', async () => {
+    const { sandbox } = setupEnvironment()
+
+    await assert.rejects(() => sandbox.test_jFetch('https://malicious.com/api/test'), {
+      name: 'Error',
+      message: 'Security Error: Disallowed fetch origin'
+    })
+  })
+
+  it('should throw an error if token is not a string', async () => {
+    const { sandbox } = setupEnvironment()
+
+    await assert.rejects(() => sandbox.test_jFetch('https://jules.google.com/api/test', { token: 123 }), {
+      name: 'Error',
+      message: 'Token must be a string'
+    })
+  })
+
+  it('should throw an error if token contains newlines', async () => {
+    const { sandbox } = setupEnvironment()
+
+    await assert.rejects(() => sandbox.test_jFetch('https://jules.google.com/api/test', { token: 'invalid\ntoken' }), {
+      name: 'Error',
+      message: 'Invalid token: contains newline'
+    })
+  })
+
+  it('should include Authorization header when token is provided', async () => {
+    const { sandbox } = setupEnvironment()
+    let capturedHeaders = null
+    sandbox.fetch = async (_url, options) => {
+      capturedHeaders = options.headers
+      return { ok: true }
+    }
+
+    await sandbox.test_jFetch('https://jules.google.com/api/test', { token: 'valid-token' })
+    assert.strictEqual(capturedHeaders.Authorization, 'token valid-token')
   })
 })
