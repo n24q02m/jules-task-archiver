@@ -457,7 +457,8 @@ describe('getOpenPRs', () => {
         { title: 'Add feature', head: { ref: 'feat/feature-456' } }
       ]
     })
-    const prs = await sandbox.test_getOpenPRs('owner', 'repo', null)
+    const prData = await sandbox.test_getOpenPRs('owner', 'repo', null)
+    const prs = prData.mapped
     assert.strictEqual(prs.length, 2)
     assert.strictEqual(prs[0].title, 'Fix bug')
     assert.strictEqual(prs[0].branch, 'fix/bug-123')
@@ -471,20 +472,20 @@ describe('getOpenPRs', () => {
       json: async () => [{ title: 'PR1', head: { ref: 'branch1' } }]
     })
     const first = await sandbox.test_getOpenPRs('cacheOwner', 'cacheRepo', null)
-    assert.strictEqual(first.length, 1)
+    assert.strictEqual(first.mapped.length, 1)
 
     sandbox.fetch = async () => {
       throw new Error('should not be called')
     }
     const second = await sandbox.test_getOpenPRs('cacheOwner', 'cacheRepo', null)
-    assert.strictEqual(second.length, 1)
+    assert.strictEqual(second.mapped.length, 1)
   })
 
   it('should return empty array on HTTP error', async () => {
     const { sandbox } = setupEnvironment()
     sandbox.fetch = async () => ({ ok: false, status: 404 })
-    const prs = await sandbox.test_getOpenPRs('err1', 'err1', null)
-    assert.strictEqual(prs.length, 0)
+    const prData = await sandbox.test_getOpenPRs('err1', 'err1', null)
+    assert.strictEqual(prData.mapped.length, 0)
   })
 
   it('should return empty array on network error', async () => {
@@ -492,8 +493,8 @@ describe('getOpenPRs', () => {
     sandbox.fetch = async () => {
       throw new Error('network error')
     }
-    const prs = await sandbox.test_getOpenPRs('err2', 'err2', null)
-    assert.strictEqual(prs.length, 0)
+    const prData = await sandbox.test_getOpenPRs('err2', 'err2', null)
+    assert.strictEqual(prData.mapped.length, 0)
   })
 
   it('should encode owner and repo in URL', async () => {
@@ -511,8 +512,8 @@ describe('getOpenPRs', () => {
   it('should reject tokens with newlines', async () => {
     const { sandbox } = setupEnvironment()
     sandbox.fetch = async () => ({ ok: true, json: async () => [] })
-    const prs = await sandbox.test_getOpenPRs('own5', 'rep5', 'token\r\nEvil: header')
-    assert.strictEqual(prs.length, 0)
+    const prData = await sandbox.test_getOpenPRs('own5', 'rep5', 'token\r\nEvil: header')
+    assert.strictEqual(prData.mapped.length, 0)
   })
 
   it('should use Authorization header when token is provided', async () => {
@@ -543,8 +544,8 @@ describe('getOpenPRs', () => {
 
     assert.strictEqual(sandbox.test_prCache.has(key), true)
     const cached = sandbox.test_prCache.get(key)
-    assert.strictEqual(cached.length, 1)
-    assert.strictEqual(cached[0].title, 'PR')
+    assert.strictEqual(cached.mapped.length, 1)
+    assert.strictEqual(cached.mapped[0].title, 'PR')
   })
 })
 
@@ -559,7 +560,15 @@ describe('taskHasOpenPR', () => {
         branch: 'fix/redos-123'
       }
     ]
-    assert.strictEqual(sandbox.test_taskHasOpenPR(task, prs), true)
+    const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const prData = {
+      mapped: prs,
+      matcher: {
+        joinedPRs: prs.map(p => p.titleLower).join('\0'),
+        regex: new RegExp(prs.map(p => escapeRegex(p.titleLower)).join('|'))
+      }
+    }
+    assert.strictEqual(sandbox.test_taskHasOpenPR(task, prData), true)
   })
 
   it('should match when task title contains PR title', () => {
@@ -572,7 +581,15 @@ describe('taskHasOpenPR', () => {
         branch: 'fix-unused-123'
       }
     ]
-    assert.strictEqual(sandbox.test_taskHasOpenPR(task, prs), true)
+    const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const prData = {
+      mapped: prs,
+      matcher: {
+        joinedPRs: prs.map(p => p.titleLower).join('\0'),
+        regex: new RegExp(prs.map(p => escapeRegex(p.titleLower)).join('|'))
+      }
+    }
+    assert.strictEqual(sandbox.test_taskHasOpenPR(task, prData), true)
   })
 
   it('should not match unrelated PR titles', () => {
@@ -582,19 +599,35 @@ describe('taskHasOpenPR', () => {
       { title: 'Add unit tests', titleLower: 'add unit tests', branch: 'test/unit' },
       { title: 'Update README', titleLower: 'update readme', branch: 'docs/readme' }
     ]
-    assert.strictEqual(sandbox.test_taskHasOpenPR(task, prs), false)
+    const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const prData = {
+      mapped: prs,
+      matcher: {
+        joinedPRs: prs.map(p => p.titleLower).join('\0'),
+        regex: new RegExp(prs.map(p => escapeRegex(p.titleLower)).join('|'))
+      }
+    }
+    assert.strictEqual(sandbox.test_taskHasOpenPR(task, prData), false)
   })
 
   it('should return false for empty PR list', () => {
     const { sandbox } = setupEnvironment()
-    assert.strictEqual(sandbox.test_taskHasOpenPR({ title: 'Any task' }, []), false)
+    assert.strictEqual(sandbox.test_taskHasOpenPR({ title: 'Any task' }, { mapped: [], matcher: null }), false)
   })
 
   it('should return false for untitled tasks', () => {
     const { sandbox } = setupEnvironment()
     const prs = [{ title: 'Some PR', titleLower: 'some pr', branch: 'branch' }]
-    assert.strictEqual(sandbox.test_taskHasOpenPR({ title: '(untitled)' }, prs), false)
-    assert.strictEqual(sandbox.test_taskHasOpenPR({ title: '' }, prs), false)
+    const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const prData = {
+      mapped: prs,
+      matcher: {
+        joinedPRs: prs.map(p => p.titleLower).join('\0'),
+        regex: new RegExp(prs.map(p => escapeRegex(p.titleLower)).join('|'))
+      }
+    }
+    assert.strictEqual(sandbox.test_taskHasOpenPR({ title: '(untitled)' }, prData), false)
+    assert.strictEqual(sandbox.test_taskHasOpenPR({ title: '' }, prData), false)
   })
 
   it('should be case-insensitive', () => {
@@ -607,7 +640,15 @@ describe('taskHasOpenPR', () => {
         branch: 'fix-123'
       }
     ]
-    assert.strictEqual(sandbox.test_taskHasOpenPR(task, prs), true)
+    const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const prData = {
+      mapped: prs,
+      matcher: {
+        joinedPRs: prs.map(p => p.titleLower).join('\0'),
+        regex: new RegExp(prs.map(p => escapeRegex(p.titleLower)).join('|'))
+      }
+    }
+    assert.strictEqual(sandbox.test_taskHasOpenPR(task, prData), true)
   })
 })
 

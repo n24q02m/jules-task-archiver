@@ -588,19 +588,46 @@ async function getOpenPRs(owner, repo, token) {
       titleLower: (pr.title || '').toLowerCase(),
       branch: pr.head?.ref || ''
     }))
-    prCache.set(key, mapped)
-    return mapped
+
+    // ⚡ Bolt Optimization: Precompute a bidirectional matcher once per repo's PRs
+    // instead of executing O(N*M) checks inside a nested loop during task filtering.
+    let matcher = null
+    if (mapped.length > 0) {
+      const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const prTitles = mapped.map((pr) => pr.titleLower).filter(Boolean)
+      if (prTitles.length > 0) {
+        matcher = {
+          joinedPRs: prTitles.join('\0'), // Fast check for taskTitle inside PR title
+          regex: new RegExp(prTitles.map(escapeRegex).join('|')) // Fast check for PR title inside taskTitle
+        }
+      }
+    }
+
+    const result = { mapped, matcher }
+    prCache.set(key, result)
+    return result
   } catch (e) {
     addLog(`  WARNING: Could not check PRs for ${key}: ${e.message}`)
-    prCache.set(key, [])
-    return []
+    const fallback = { mapped: [], matcher: null }
+    prCache.set(key, fallback)
+    return fallback
   }
 }
 
-function taskHasOpenPR(task, openPRs) {
+function taskHasOpenPR(task, prData) {
+  const openPRs = prData.mapped || prData
   if (openPRs.length === 0) return false
   const taskTitle = (task.title || '').toLowerCase()
   if (!taskTitle || taskTitle === '(untitled)') return false
+
+  // ⚡ Bolt Optimization: Use the precomputed matcher from getOpenPRs.
+  // This reduces the complexity from O(N*M) to O(N+M) across the dataset.
+  if (prData.matcher) {
+    if (prData.matcher.regex.test(taskTitle)) return true
+    if (prData.matcher.joinedPRs.includes(taskTitle)) return true
+    return false
+  }
+
   return openPRs.some((pr) => pr.titleLower.includes(taskTitle) || taskTitle.includes(pr.titleLower))
 }
 
@@ -832,7 +859,8 @@ async function processTab(tab, options) {
     for (let i = 0; i < repoEntries.length; i++) {
       const [repo, repoTasks] = repoEntries[i]
       const openPRs = allPRs[i]
-      addLog(`  ${repo}: ${repoTasks.length} tasks, ${openPRs.length} open PRs`)
+      const openPRCount = openPRs.mapped ? openPRs.mapped.length : openPRs.length
+      addLog(`  ${repo}: ${repoTasks.length} tasks, ${openPRCount} open PRs`)
 
       for (const task of repoTasks) {
         if (task.state === 9) {
