@@ -1116,7 +1116,7 @@ describe('jFetch', () => {
       return { ok: true }
     }
 
-    await sandbox.test_jFetch('https://jules.google.com/api/test', { token: 'valid-token' })
+    await sandbox.test_jFetch('https://api.github.com/api/test', { token: 'valid-token' })
     assert.strictEqual(capturedHeaders.Authorization, 'token valid-token')
   })
 })

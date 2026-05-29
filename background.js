@@ -46,6 +46,9 @@ async function jFetch(url, options = {}) {
   if (token) {
     if (typeof token !== 'string') throw new Error('Token must be a string')
     if (/[\r\n]/.test(token)) throw new Error('Invalid token: contains newline')
+    if (origin !== 'https://api.github.com') {
+      throw new Error('Security Error: Token can only be sent to GitHub API')
+    }
     headers.Authorization = `token ${token}`
   }
 
