@@ -13,3 +13,6 @@
 ## 2025-06-16 - Explicit Labels for Radio Groups
 **Learning:** Using invisible `aria-label`s on form control groups (like radio groups) when visual context is needed can cause confusion for sighted users.
 **Action:** Always provide explicit, visible `<label>` elements and link them directly to the group via `aria-labelledby` (e.g., `<label id="modeLabel">...` and `<div role="radiogroup" aria-labelledby="modeLabel">`) to ensure a clear visual and semantic hierarchy.
+## 2025-06-25 - Context-Aware Loading States
+**Learning:** Using a generic loading indicator (like "⏳ Running...") on the primary action button during asynchronous operations can create user ambiguity, especially in multi-mode interfaces (e.g., Dry Run vs. Run, Archive vs. Suggestions). Users may feel uncertain about which specific action is being processed.
+**Action:** Always provide context-aware text during loading/processing states (e.g., "⏳ Dry Running Archive...") that dynamically reflects the user's selected configuration, assuring them the system is performing exactly what they intended.
