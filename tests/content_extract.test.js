@@ -9,16 +9,21 @@ const contentJsCode = fs.readFileSync(contentJsPath, 'utf8')
 
 function setupEnvironment() {
   const listeners = new Map()
-  const runtimeListeners = []
+  let runtimeListener = null
   let postMessageCalled = false
   let lastPostMessage = null
+  const sentMessages = []
 
   const chrome = {
     runtime: {
       getURL: (path) => `chrome-extension://id/${path}`,
-      sendMessage: () => {},
+      sendMessage: (msg) => {
+        sentMessages.push(msg)
+      },
       onMessage: {
-        addListener: (fn) => runtimeListeners.push(fn)
+        addListener: (fn) => {
+          runtimeListener = fn
+        }
       }
     }
   }
@@ -69,9 +74,10 @@ function setupEnvironment() {
     Promise,
     URL,
     location: window.location,
+    TEST_MODE: true,
     // Helpers for testing
-    fireMessage: (data, origin = 'https://jules.google.com') => {
-      const event = { source: window, origin, data }
+    fireMessage: (data, origin = 'https://jules.google.com', source = window) => {
+      const event = { source, origin, data }
       const handlers = [...(listeners.get('message') || [])]
       handlers.forEach((fn) => {
         fn(event)
@@ -83,9 +89,14 @@ function setupEnvironment() {
     resetPostMessage: () => {
       postMessageCalled = false
       lastPostMessage = null
+    },
+    getSentMessages: () => sentMessages,
+    fireRuntimeMessage: (msg, sender, sendResponse) => {
+      if (runtimeListener) return runtimeListener(msg, sender, sendResponse)
     }
   }
 
+  sandbox.globalThis = sandbox
   vm.createContext(sandbox)
   vm.runInContext(contentJsCode, sandbox)
 
@@ -104,8 +115,8 @@ describe('content.js extractConfig', () => {
     const now = Date.now()
     const config = { at: 'test-token', timestamp: now }
 
-    // Populate cache by firing a message
-    sandbox.fireMessage({ type: 'JULES_ARCHIVER_CONFIG', config })
+    // Populate cache via direct access
+    sandbox.test_cachedConfig.set(config)
 
     sandbox.resetPostMessage()
     const result = await sandbox.extractConfig()
@@ -135,13 +146,32 @@ describe('content.js extractConfig', () => {
     const oldTime = Date.now() - 301000 // 5 min 1 sec ago
     const oldConfig = { at: 'old-token', timestamp: oldTime }
 
-    // Populate cache with old data
-    sandbox.fireMessage({ type: 'JULES_ARCHIVER_CONFIG', config: oldConfig })
+    // Populate cache via direct access
+    sandbox.test_cachedConfig.set(oldConfig)
 
     const newConfig = { at: 'new-token', timestamp: Date.now() }
     const promise = sandbox.extractConfig()
 
     assert.strictEqual(sandbox.wasPostMessageCalled(), true, 'Should have called postMessage for old cache')
+
+    // Simulate response
+    sandbox.fireMessage({ type: 'JULES_ARCHIVER_CONFIG', config: newConfig })
+
+    const result = await promise
+    assert.deepStrictEqual(normalize(result), newConfig)
+  })
+
+  it('should request fresh config if cache exists but lacks timestamp', async () => {
+    const sandbox = setupEnvironment()
+    const configNoTS = { at: 'no-ts-token' }
+
+    // Populate cache via direct access
+    sandbox.test_cachedConfig.set(configNoTS)
+
+    const newConfig = { at: 'new-token', timestamp: Date.now() }
+    const promise = sandbox.extractConfig()
+
+    assert.strictEqual(sandbox.wasPostMessageCalled(), true, 'Should have called postMessage when timestamp is missing')
 
     // Simulate response
     sandbox.fireMessage({ type: 'JULES_ARCHIVER_CONFIG', config: newConfig })
@@ -156,7 +186,7 @@ describe('content.js extractConfig', () => {
 
     const oldTime = Date.now() - 400000
     const oldConfig = { at: 'stale-token', timestamp: oldTime }
-    sandbox.fireMessage({ type: 'JULES_ARCHIVER_CONFIG', config: oldConfig })
+    sandbox.test_cachedConfig.set(oldConfig)
 
     const promise = sandbox.extractConfig()
 
@@ -176,6 +206,88 @@ describe('content.js extractConfig', () => {
 
     const result = await promise
     assert.strictEqual(result, null)
+  })
+
+  it('should ignore untrusted window messages in extractConfig handler', async () => {
+    const sandbox = setupEnvironment()
+    const promise = sandbox.extractConfig()
+
+    // Untrusted origin
+    sandbox.fireMessage({ type: 'JULES_ARCHIVER_CONFIG', config: { at: 'evil' } }, 'https://evil.com')
+    // Untrusted source
+    sandbox.fireMessage({ type: 'JULES_ARCHIVER_CONFIG', config: { at: 'evil' } }, 'https://jules.google.com', {})
+
+    // Message type mismatch
+    sandbox.fireMessage({ type: 'OTHER_TYPE', config: { at: 'wrong' } })
+
+    // Valid message should still work after noise
+    const validConfig = { at: 'valid', timestamp: Date.now() }
+    sandbox.fireMessage({ type: 'JULES_ARCHIVER_CONFIG', config: validConfig })
+
+    const result = await promise
+    assert.deepStrictEqual(normalize(result), validConfig)
+  })
+})
+
+describe('content.js Message Listeners', () => {
+  it('should relay JULES_START_CONFIG to background', () => {
+    const sandbox = setupEnvironment()
+    const startConfig = { modelConfig: { foo: 'bar' }, experimentIds: [1, 2] }
+
+    sandbox.fireMessage({ type: 'JULES_START_CONFIG', config: startConfig })
+
+    const sent = sandbox.getSentMessages()
+    assert.strictEqual(sent.length, 1)
+    assert.deepStrictEqual(normalize(sent[0]), {
+      action: 'CACHE_START_CONFIG',
+      config: startConfig
+    })
+  })
+
+  it('should ignore untrusted JULES_START_CONFIG messages', () => {
+    const sandbox = setupEnvironment()
+    sandbox.fireMessage({ type: 'JULES_START_CONFIG', config: { bad: 1 } }, 'https://evil.com')
+    assert.strictEqual(sandbox.getSentMessages().length, 0)
+  })
+
+  it('should handle PING runtime message', () => {
+    const sandbox = setupEnvironment()
+    let responseData = null
+    sandbox.fireRuntimeMessage({ action: 'PING' }, {}, (response) => {
+      responseData = response
+    })
+    assert.strictEqual(responseData.ok, true)
+    assert.strictEqual(responseData.account, 'default')
+  })
+
+  it('should handle GET_CONFIG runtime message', async () => {
+    const sandbox = setupEnvironment()
+    const config = { at: 'tok', timestamp: Date.now() }
+    sandbox.test_cachedConfig.set(config)
+
+    let responseData = null
+    const result = sandbox.fireRuntimeMessage({ action: 'GET_CONFIG' }, {}, (response) => {
+      responseData = response
+    })
+
+    // It returns true for async response
+    assert.strictEqual(result, true)
+
+    // Wait for the promise in extractConfig to resolve
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    assert.deepStrictEqual(normalize(responseData.config), config)
+    assert.strictEqual(responseData.accountNum, '0')
+    assert.strictEqual(responseData.account, 'default')
+  })
+
+  it('should handle unknown runtime message', () => {
+    const sandbox = setupEnvironment()
+    let responseData = null
+    sandbox.fireRuntimeMessage({ action: 'UNKNOWN' }, {}, (response) => {
+      responseData = response
+    })
+    assert.strictEqual(responseData.error, 'Unknown action')
   })
 
   it('should remove message listener on timeout', async (t) => {
