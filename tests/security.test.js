@@ -187,6 +187,38 @@ function setupEnvironment(initialTabs = {}) {
 }
 
 describe('ensureContentScript Security', () => {
+  it('should throw Security Error if frame URL is missing', async () => {
+    // This targets the explicit guard at the top of ensureContentScript
+
+    const { sandbox } = setupEnvironment({
+      123: { id: 123 }
+    })
+
+    await assert.rejects(sandbox.test_ensureContentScript(123), {
+      message: /Security Error: Cannot verify tab origin/
+    })
+  })
+
+  it('should throw Security Error if URL is malformed', async () => {
+    const { sandbox } = setupEnvironment({
+      123: { id: 123, url: 'not-a-url' }
+    })
+
+    await assert.rejects(sandbox.test_ensureContentScript(123), {
+      message: /Security Error: Cannot inject script into non-Jules tab/
+    })
+  })
+
+  it('should throw Security Error if URL has a tricky foreign origin', async () => {
+    const { sandbox } = setupEnvironment({
+      123: { id: 123, url: 'https://jules.google.com.evil.com/u/0/' }
+    })
+
+    await assert.rejects(sandbox.test_ensureContentScript(123), {
+      message: /Security Error: Cannot inject script into non-Jules tab/
+    })
+  })
+
   it('should block injection into non-Jules origin', async () => {
     const { sandbox } = setupEnvironment({
       123: { id: 123, url: 'https://evil.com/' }
