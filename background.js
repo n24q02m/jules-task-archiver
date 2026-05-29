@@ -784,8 +784,15 @@ async function processTab(tab, options) {
   }
 
   // Filter by task state: only completed/failed are candidates
-  const candidates = tasks.filter(isArchivable)
-  const active = tasks.filter((t) => !isArchivable(t))
+  const candidates = []
+  const active = []
+  for (const t of tasks) {
+    if (isArchivable(t)) {
+      candidates.push(t)
+    } else {
+      active.push(t)
+    }
+  }
 
   addLog(`[${label}] ${tasks.length} total: ${candidates.length} completed/failed, ${active.length} active`)
 
