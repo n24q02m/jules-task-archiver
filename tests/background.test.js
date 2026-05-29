@@ -49,14 +49,24 @@ function setupEnvironment(initialStorage = {}) {
     }
   }
 
+  const activeTimers = []
+  const clearedTimers = []
   const sandbox = {
     chrome: chromeMock,
     fetch: async () => ({ ok: true, json: async () => [], text: async () => ")]}'\n\n4\n[[]]" }),
     setTimeout,
     // No-op timer mocks: the real keepAlive interval would otherwise keep the
     // Node event loop alive and hang the test process after all tests pass.
-    setInterval: () => 0,
-    clearInterval: () => {},
+    setInterval: (fn, ms) => {
+      const id = activeTimers.length + 1
+      activeTimers.push({ id, fn, ms })
+      return id
+    },
+    clearInterval: (id) => {
+      clearedTimers.push(id)
+    },
+    test_activeTimers: activeTimers,
+    test_clearedTimers: clearedTimers,
     Math,
     Date,
     JSON,
@@ -114,6 +124,9 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_finalizeOperation = finalizeOperation;
     globalThis.test_handleOperationError = handleOperationError;
     globalThis.test_startOperation = startOperation;
+    globalThis.test_startKeepAlive = startKeepAlive;
+    globalThis.test_stopKeepAlive = stopKeepAlive;
+    globalThis.test_getKeepAliveInterval = () => keepAliveInterval;
   `
 
   const script = new vm.Script(scriptContent)
@@ -1072,5 +1085,53 @@ describe('jFetch', () => {
 
     await sandbox.test_jFetch('https://jules.google.com/api/test', { token: 'valid-token' })
     assert.strictEqual(capturedHeaders.Authorization, 'token valid-token')
+  })
+})
+
+// =============================================================================
+// KeepAlive Tests
+// =============================================================================
+
+describe('KeepAlive', () => {
+  it('startKeepAlive should set a 25s interval', () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.test_startKeepAlive()
+
+    assert.strictEqual(sandbox.test_activeTimers.length, 1)
+    assert.strictEqual(sandbox.test_activeTimers[0].ms, 25000)
+    assert.ok(sandbox.test_getKeepAliveInterval() !== null)
+  })
+
+  it('startKeepAlive should call chrome.runtime.getPlatformInfo periodically', async () => {
+    const { sandbox } = setupEnvironment()
+    let called = false
+    sandbox.chrome.runtime.getPlatformInfo = async () => {
+      called = true
+    }
+
+    sandbox.test_startKeepAlive()
+    // Manually trigger the interval callback
+    await sandbox.test_activeTimers[0].fn()
+    assert.ok(called)
+  })
+
+  it('startKeepAlive should be idempotent', () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.test_startKeepAlive()
+    sandbox.test_startKeepAlive()
+
+    assert.strictEqual(sandbox.test_activeTimers.length, 1)
+  })
+
+  it('stopKeepAlive should clear the interval and reset state', () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.test_startKeepAlive()
+    const intervalId = sandbox.test_getKeepAliveInterval()
+    assert.ok(intervalId !== null)
+
+    sandbox.test_stopKeepAlive()
+    assert.strictEqual(sandbox.test_clearedTimers.length, 1)
+    assert.strictEqual(sandbox.test_clearedTimers[0], intervalId)
+    assert.strictEqual(sandbox.test_getKeepAliveInterval(), null)
   })
 })
