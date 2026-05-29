@@ -116,6 +116,7 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_prCache = prCache;
     globalThis.test_jFetch = jFetch;
     globalThis.test_taskHasOpenPR = taskHasOpenPR;
+    globalThis.test_buildPRMatcher = buildPRMatcher;
     globalThis.test_parseSuggestion = parseSuggestion;
     globalThis.test_buildSuggestionPrompt = buildSuggestionPrompt;
     globalThis.test_buildStartPayload = buildStartPayload;
@@ -560,6 +561,9 @@ describe('taskHasOpenPR', () => {
       }
     ]
     assert.strictEqual(sandbox.test_taskHasOpenPR(task, prs), true)
+
+    const matcher = sandbox.test_buildPRMatcher(prs)
+    assert.strictEqual(sandbox.test_taskHasOpenPR(task, prs, matcher), true)
   })
 
   it('should match when task title contains PR title', () => {
@@ -583,6 +587,9 @@ describe('taskHasOpenPR', () => {
       { title: 'Update README', titleLower: 'update readme', branch: 'docs/readme' }
     ]
     assert.strictEqual(sandbox.test_taskHasOpenPR(task, prs), false)
+
+    const matcher = sandbox.test_buildPRMatcher(prs)
+    assert.strictEqual(sandbox.test_taskHasOpenPR(task, prs, matcher), false)
   })
 
   it('should return false for empty PR list', () => {

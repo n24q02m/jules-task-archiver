@@ -597,10 +597,27 @@ async function getOpenPRs(owner, repo, token) {
   }
 }
 
-function taskHasOpenPR(task, openPRs) {
-  if (openPRs.length === 0) return false
+function buildPRMatcher(openPRs) {
+  if (!openPRs || openPRs.length === 0) return null
+  const validPRs = openPRs.filter((pr) => pr.titleLower)
+  if (validPRs.length === 0) return null
+  const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return {
+    joined: validPRs.map((pr) => pr.titleLower).join('\0'),
+    regex: new RegExp(validPRs.map((pr) => escapeRegex(pr.titleLower)).join('|'))
+  }
+}
+
+function taskHasOpenPR(task, openPRs, matcher = null) {
   const taskTitle = (task.title || '').toLowerCase()
   if (!taskTitle || taskTitle === '(untitled)') return false
+
+  // ⚡ Bolt Optimization: O(1) checks against precomputed structures
+  if (matcher) {
+    return matcher.joined.includes(taskTitle) || matcher.regex.test(taskTitle)
+  }
+
+  if (openPRs.length === 0) return false
   return openPRs.some((pr) => pr.titleLower.includes(taskTitle) || taskTitle.includes(pr.titleLower))
 }
 
@@ -834,11 +851,14 @@ async function processTab(tab, options) {
       const openPRs = allPRs[i]
       addLog(`  ${repo}: ${repoTasks.length} tasks, ${openPRs.length} open PRs`)
 
+      // ⚡ Bolt Optimization: Precompute matcher to change O(N*M) checks to O(N+M)
+      const matcher = buildPRMatcher(openPRs)
+
       for (const task of repoTasks) {
         if (task.state === 9) {
           // Failed tasks: always archive (no PR created)
           toArchive.push(task)
-        } else if (taskHasOpenPR(task, openPRs)) {
+        } else if (taskHasOpenPR(task, openPRs, matcher)) {
           toSkip.push(task)
           addLog(`    SKIP [${task.id}] ${task.title} (matching open PR)`)
         } else {
