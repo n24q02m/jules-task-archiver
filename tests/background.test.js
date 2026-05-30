@@ -549,6 +549,17 @@ describe('getOpenPRs', () => {
 })
 
 describe('taskHasOpenPR', () => {
+  const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const createMatcher = (openPRs) => {
+    if (!openPRs || openPRs.length === 0) return null
+    const validPRs = openPRs.filter((pr) => pr.titleLower)
+    if (validPRs.length === 0) return null
+    return {
+      regex: new RegExp(validPRs.map((pr) => escapeRegex(pr.titleLower)).join('|')),
+      joined: validPRs.map((pr) => pr.titleLower).join('\0')
+    }
+  }
+
   it('should match when PR title contains task title', () => {
     const { sandbox } = setupEnvironment()
     const task = { title: 'Fix ReDoS vulnerability' }
@@ -559,7 +570,7 @@ describe('taskHasOpenPR', () => {
         branch: 'fix/redos-123'
       }
     ]
-    assert.strictEqual(sandbox.test_taskHasOpenPR(task, prs), true)
+    assert.strictEqual(sandbox.test_taskHasOpenPR(task, prs, createMatcher(prs)), true)
   })
 
   it('should match when task title contains PR title', () => {
@@ -572,7 +583,7 @@ describe('taskHasOpenPR', () => {
         branch: 'fix-unused-123'
       }
     ]
-    assert.strictEqual(sandbox.test_taskHasOpenPR(task, prs), true)
+    assert.strictEqual(sandbox.test_taskHasOpenPR(task, prs, createMatcher(prs)), true)
   })
 
   it('should not match unrelated PR titles', () => {
@@ -582,19 +593,19 @@ describe('taskHasOpenPR', () => {
       { title: 'Add unit tests', titleLower: 'add unit tests', branch: 'test/unit' },
       { title: 'Update README', titleLower: 'update readme', branch: 'docs/readme' }
     ]
-    assert.strictEqual(sandbox.test_taskHasOpenPR(task, prs), false)
+    assert.strictEqual(sandbox.test_taskHasOpenPR(task, prs, createMatcher(prs)), false)
   })
 
   it('should return false for empty PR list', () => {
     const { sandbox } = setupEnvironment()
-    assert.strictEqual(sandbox.test_taskHasOpenPR({ title: 'Any task' }, []), false)
+    assert.strictEqual(sandbox.test_taskHasOpenPR({ title: 'Any task' }, [], null), false)
   })
 
   it('should return false for untitled tasks', () => {
     const { sandbox } = setupEnvironment()
     const prs = [{ title: 'Some PR', titleLower: 'some pr', branch: 'branch' }]
-    assert.strictEqual(sandbox.test_taskHasOpenPR({ title: '(untitled)' }, prs), false)
-    assert.strictEqual(sandbox.test_taskHasOpenPR({ title: '' }, prs), false)
+    assert.strictEqual(sandbox.test_taskHasOpenPR({ title: '(untitled)' }, prs, createMatcher(prs)), false)
+    assert.strictEqual(sandbox.test_taskHasOpenPR({ title: '' }, prs, createMatcher(prs)), false)
   })
 
   it('should be case-insensitive', () => {
@@ -607,7 +618,7 @@ describe('taskHasOpenPR', () => {
         branch: 'fix-123'
       }
     ]
-    assert.strictEqual(sandbox.test_taskHasOpenPR(task, prs), true)
+    assert.strictEqual(sandbox.test_taskHasOpenPR(task, prs, createMatcher(prs)), true)
   })
 })
 

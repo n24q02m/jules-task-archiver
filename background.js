@@ -597,10 +597,15 @@ async function getOpenPRs(owner, repo, token) {
   }
 }
 
-function taskHasOpenPR(task, openPRs) {
+function taskHasOpenPR(task, openPRs, matcher) {
   if (openPRs.length === 0) return false
   const taskTitle = (task.title || '').toLowerCase()
   if (!taskTitle || taskTitle === '(untitled)') return false
+
+  if (matcher) {
+    return matcher.regex.test(taskTitle) || matcher.joined.includes(taskTitle)
+  }
+
   return openPRs.some((pr) => pr.titleLower.includes(taskTitle) || taskTitle.includes(pr.titleLower))
 }
 
@@ -829,16 +834,31 @@ async function processTab(tab, options) {
       return owner && repoName ? getOpenPRs(owner, repoName, ghToken) : Promise.resolve([])
     })
 
+    const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
     for (let i = 0; i < repoEntries.length; i++) {
       const [repo, repoTasks] = repoEntries[i]
       const openPRs = allPRs[i]
       addLog(`  ${repo}: ${repoTasks.length} tasks, ${openPRs.length} open PRs`)
 
+      // ⚡ Bolt Optimization: Precompute matchers for O(N) PR title checking instead
+      // of O(N*M) nested inclusion checking.
+      let matcher = null
+      if (openPRs.length > 0) {
+        const validPRs = openPRs.filter((pr) => pr.titleLower)
+        if (validPRs.length > 0) {
+          matcher = {
+            regex: new RegExp(validPRs.map((pr) => escapeRegex(pr.titleLower)).join('|')),
+            joined: validPRs.map((pr) => pr.titleLower).join('\0')
+          }
+        }
+      }
+
       for (const task of repoTasks) {
         if (task.state === 9) {
           // Failed tasks: always archive (no PR created)
           toArchive.push(task)
-        } else if (taskHasOpenPR(task, openPRs)) {
+        } else if (taskHasOpenPR(task, openPRs, matcher)) {
           toSkip.push(task)
           addLog(`    SKIP [${task.id}] ${task.title} (matching open PR)`)
         } else {
