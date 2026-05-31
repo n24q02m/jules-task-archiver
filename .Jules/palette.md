@@ -13,3 +13,6 @@
 ## 2025-06-16 - Explicit Labels for Radio Groups
 **Learning:** Using invisible `aria-label`s on form control groups (like radio groups) when visual context is needed can cause confusion for sighted users.
 **Action:** Always provide explicit, visible `<label>` elements and link them directly to the group via `aria-labelledby` (e.g., `<label id="modeLabel">...` and `<div role="radiogroup" aria-labelledby="modeLabel">`) to ensure a clear visual and semantic hierarchy.
+## 2025-06-21 - Visual Distinction for Loading States
+**Learning:** Using the same `:disabled` style for both a truly inactive button (e.g., waiting for valid input) and a button actively processing an async operation creates ambiguity. Users might think the action failed to start or is permanently blocked.
+**Action:** To visually distinguish a loading/processing state from a purely disabled state without breaking semantics, style elements using the `:disabled[aria-busy="true"]` CSS selector to maintain primary colors (often with slight opacity) and add a `wait` cursor, while keeping the standard `:disabled` selector for inactive elements.

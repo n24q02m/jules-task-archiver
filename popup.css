@@ -169,6 +169,13 @@ button.primary:disabled {
   cursor: not-allowed;
 }
 
+button.primary:disabled[aria-busy="true"] {
+  background: #4ade80;
+  opacity: 0.7;
+  color: #0f172a;
+  cursor: wait;
+}
+
 button.secondary {
   display: block;
   width: 100%;
