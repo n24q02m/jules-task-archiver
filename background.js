@@ -597,11 +597,42 @@ async function getOpenPRs(owner, repo, token) {
   }
 }
 
-function taskHasOpenPR(task, openPRs) {
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function buildPRData(openPRs) {
+  if (openPRs.length === 0) {
+    return { mapped: openPRs, matcher: null }
+  }
+
+  // ⚡ Bolt Optimization: Precompute matcher to turn O(N*M) PR matching into O(N+M)
+  // 1. Regex for "PR title in task title"
+  const prTitlePatterns = openPRs.map((pr) => escapeRegex(pr.titleLower))
+  const regex = new RegExp(prTitlePatterns.join('|'), 'i')
+
+  // 2. Joined string for "task title in PR title"
+  const joinedTitles = openPRs.map((pr) => pr.titleLower).join('\0')
+
+  return {
+    mapped: openPRs,
+    matcher: { regex, joinedTitles }
+  }
+}
+
+function taskHasOpenPR(task, prData) {
+  const openPRs = prData.mapped
   if (openPRs.length === 0) return false
   const taskTitle = (task.title || '').toLowerCase()
   if (!taskTitle || taskTitle === '(untitled)') return false
-  return openPRs.some((pr) => pr.titleLower.includes(taskTitle) || taskTitle.includes(pr.titleLower))
+
+  const matcher = prData.matcher
+  // "PR title in task title"
+  if (matcher.regex.test(taskTitle)) return true
+  // "task title in PR title"
+  if (matcher.joinedTitles.includes(taskTitle)) return true
+
+  return false
 }
 
 // =============================================================================
@@ -834,11 +865,13 @@ async function processTab(tab, options) {
       const openPRs = allPRs[i]
       addLog(`  ${repo}: ${repoTasks.length} tasks, ${openPRs.length} open PRs`)
 
+      const prData = buildPRData(openPRs)
+
       for (const task of repoTasks) {
         if (task.state === 9) {
           // Failed tasks: always archive (no PR created)
           toArchive.push(task)
-        } else if (taskHasOpenPR(task, openPRs)) {
+        } else if (taskHasOpenPR(task, prData)) {
           toSkip.push(task)
           addLog(`    SKIP [${task.id}] ${task.title} (matching open PR)`)
         } else {

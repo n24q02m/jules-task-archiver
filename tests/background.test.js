@@ -115,6 +115,8 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_getStartConfig = getStartConfig;
     globalThis.test_prCache = prCache;
     globalThis.test_jFetch = jFetch;
+    globalThis.test_escapeRegex = escapeRegex;
+    globalThis.test_buildPRData = buildPRData;
     globalThis.test_taskHasOpenPR = taskHasOpenPR;
     globalThis.test_parseSuggestion = parseSuggestion;
     globalThis.test_buildSuggestionPrompt = buildSuggestionPrompt;
@@ -559,7 +561,7 @@ describe('taskHasOpenPR', () => {
         branch: 'fix/redos-123'
       }
     ]
-    assert.strictEqual(sandbox.test_taskHasOpenPR(task, prs), true)
+    assert.strictEqual(sandbox.test_taskHasOpenPR(task, sandbox.test_buildPRData(prs)), true)
   })
 
   it('should match when task title contains PR title', () => {
@@ -572,7 +574,7 @@ describe('taskHasOpenPR', () => {
         branch: 'fix-unused-123'
       }
     ]
-    assert.strictEqual(sandbox.test_taskHasOpenPR(task, prs), true)
+    assert.strictEqual(sandbox.test_taskHasOpenPR(task, sandbox.test_buildPRData(prs)), true)
   })
 
   it('should not match unrelated PR titles', () => {
@@ -582,19 +584,19 @@ describe('taskHasOpenPR', () => {
       { title: 'Add unit tests', titleLower: 'add unit tests', branch: 'test/unit' },
       { title: 'Update README', titleLower: 'update readme', branch: 'docs/readme' }
     ]
-    assert.strictEqual(sandbox.test_taskHasOpenPR(task, prs), false)
+    assert.strictEqual(sandbox.test_taskHasOpenPR(task, sandbox.test_buildPRData(prs)), false)
   })
 
   it('should return false for empty PR list', () => {
     const { sandbox } = setupEnvironment()
-    assert.strictEqual(sandbox.test_taskHasOpenPR({ title: 'Any task' }, []), false)
+    assert.strictEqual(sandbox.test_taskHasOpenPR({ title: 'Any task' }, sandbox.test_buildPRData([])), false)
   })
 
   it('should return false for untitled tasks', () => {
     const { sandbox } = setupEnvironment()
     const prs = [{ title: 'Some PR', titleLower: 'some pr', branch: 'branch' }]
-    assert.strictEqual(sandbox.test_taskHasOpenPR({ title: '(untitled)' }, prs), false)
-    assert.strictEqual(sandbox.test_taskHasOpenPR({ title: '' }, prs), false)
+    assert.strictEqual(sandbox.test_taskHasOpenPR({ title: '(untitled)' }, sandbox.test_buildPRData(prs)), false)
+    assert.strictEqual(sandbox.test_taskHasOpenPR({ title: '' }, sandbox.test_buildPRData(prs)), false)
   })
 
   it('should be case-insensitive', () => {
@@ -607,7 +609,7 @@ describe('taskHasOpenPR', () => {
         branch: 'fix-123'
       }
     ]
-    assert.strictEqual(sandbox.test_taskHasOpenPR(task, prs), true)
+    assert.strictEqual(sandbox.test_taskHasOpenPR(task, sandbox.test_buildPRData(prs)), true)
   })
 })
 
