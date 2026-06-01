@@ -1093,7 +1093,7 @@ describe('jFetch', () => {
   it('should throw an error if token is not a string', async () => {
     const { sandbox } = setupEnvironment()
 
-    await assert.rejects(() => sandbox.test_jFetch('https://jules.google.com/api/test', { token: 123 }), {
+    await assert.rejects(() => sandbox.test_jFetch('https://api.github.com/api/test', { token: 123 }), {
       name: 'Error',
       message: 'Token must be a string'
     })
@@ -1102,7 +1102,7 @@ describe('jFetch', () => {
   it('should throw an error if token contains newlines', async () => {
     const { sandbox } = setupEnvironment()
 
-    await assert.rejects(() => sandbox.test_jFetch('https://jules.google.com/api/test', { token: 'invalid\ntoken' }), {
+    await assert.rejects(() => sandbox.test_jFetch('https://api.github.com/api/test', { token: 'invalid\ntoken' }), {
       name: 'Error',
       message: 'Invalid token: contains newline'
     })
@@ -1116,7 +1116,7 @@ describe('jFetch', () => {
       return { ok: true }
     }
 
-    await sandbox.test_jFetch('https://jules.google.com/api/test', { token: 'valid-token' })
+    await sandbox.test_jFetch('https://api.github.com/api/test', { token: 'valid-token' })
     assert.strictEqual(capturedHeaders.Authorization, 'token valid-token')
   })
 })

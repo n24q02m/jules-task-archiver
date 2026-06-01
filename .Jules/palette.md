@@ -16,3 +16,6 @@
 ## 2025-06-25 - Context-Aware Loading States
 **Learning:** Using a generic loading indicator (like "⏳ Running...") on the primary action button during asynchronous operations can create user ambiguity, especially in multi-mode interfaces (e.g., Dry Run vs. Run, Archive vs. Suggestions). Users may feel uncertain about which specific action is being processed.
 **Action:** Always provide context-aware text during loading/processing states (e.g., "⏳ Dry Running Archive...") that dynamically reflects the user's selected configuration, assuring them the system is performing exactly what they intended.
+## 2025-06-25 - Differentiating Loading vs Disabled States
+**Learning:** Using the same disabled styling (grayed out) for an active, processing state (e.g., when a button is clicked and waiting for an async operation) makes the UI feel unresponsive and "dead," confusing users about whether the action is actually occurring.
+**Action:** Always visually distinguish a loading state from a purely disabled state. If a button is disabled because it is busy (`[aria-busy="true"]`), maintain the primary visual context (like color) but indicate processing (e.g., cursor: wait, partial opacity). Additionally, add subtle interactive feedback like `transform: scale(0.98)` on active states to improve tactile feel.

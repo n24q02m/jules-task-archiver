@@ -301,6 +301,14 @@ describe('jFetch SSRF Security', () => {
     const res2 = await sandbox.jFetch('https://api.github.com/repos/owner/repo')
     assert.strictEqual(res2.ok, true)
   })
+
+  it('should block sending token to non-GitHub origin', async () => {
+    const { sandbox } = setupEnvironment()
+
+    await assert.rejects(sandbox.jFetch('https://jules.google.com/u/1/tasks', { token: 'secret-token' }), {
+      message: /Security Error: Refusing to send GitHub token to non-GitHub origin/
+    })
+  })
 })
 
 describe('getTabConfig Path Traversal Security', () => {
