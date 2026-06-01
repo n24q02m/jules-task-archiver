@@ -22,6 +22,18 @@ const summaryDiv = $('#summary')
 // --- Operation mode state ---
 let opMode = 'archive'
 
+function getRunningText() {
+  const modeRadio = document.querySelector('input[name="mode"]:checked')
+  const isDry = modeRadio && modeRadio.value === 'dry'
+  const isArchive = opMode === 'archive'
+
+  if (isArchive) {
+    return isDry ? '⏳ Dry Running Archive...' : '⏳ Running Archive...'
+  } else {
+    return isDry ? '⏳ Dry Running Suggestions...' : '⏳ Running Suggestions...'
+  }
+}
+
 // --- Operation mode selector ---
 function setActiveOpMode(value) {
   opMode = value
@@ -69,7 +81,7 @@ document.querySelectorAll('#opMode button').forEach((btn) => {
 // Update button text when execution mode changes
 document.querySelectorAll('input[name="mode"]').forEach((radio) => {
   radio.addEventListener('change', () => {
-    if (!startBtn.disabled && startBtn.textContent !== '⏳ Running...') {
+    if (!startBtn.disabled && !startBtn.textContent.startsWith('⏳')) {
       updateOpModeUI(opMode)
     }
   })
@@ -137,7 +149,7 @@ startBtn.addEventListener('click', async () => {
   // Reset UI
   startBtn.disabled = true
   startBtn.setAttribute('aria-busy', 'true')
-  startBtn.textContent = '⏳ Running...'
+  startBtn.textContent = getRunningText()
   resetBtn.style.display = 'none'
   progressSection.style.display = 'block'
   summarySection.style.display = 'none'
@@ -250,11 +262,15 @@ function renderSummary(results) {
 // --- Check for existing state on popup open ---
 chrome.runtime.sendMessage({ action: 'GET_STATE' }, (state) => {
   if (state && state.status !== 'idle') {
+    // Rehydrate opMode if it's available in the state options
+    if (state.options?.opMode) {
+      opMode = state.options.opMode
+    }
     renderState(state)
     if (state.status === 'running') {
       startBtn.disabled = true
       startBtn.setAttribute('aria-busy', 'true')
-      startBtn.textContent = '⏳ Running...'
+      startBtn.textContent = getRunningText()
     } else {
       resetBtn.style.display = 'block'
     }
