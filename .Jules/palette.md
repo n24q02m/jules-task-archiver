@@ -13,3 +13,6 @@
 ## 2025-06-16 - Explicit Labels for Radio Groups
 **Learning:** Using invisible `aria-label`s on form control groups (like radio groups) when visual context is needed can cause confusion for sighted users.
 **Action:** Always provide explicit, visible `<label>` elements and link them directly to the group via `aria-labelledby` (e.g., `<label id="modeLabel">...` and `<div role="radiogroup" aria-labelledby="modeLabel">`) to ensure a clear visual and semantic hierarchy.
+## 2025-06-25 - Differentiating Loading vs Disabled States
+**Learning:** Using the same disabled styling (grayed out) for an active, processing state (e.g., when a button is clicked and waiting for an async operation) makes the UI feel unresponsive and "dead," confusing users about whether the action is actually occurring.
+**Action:** Always visually distinguish a loading state from a purely disabled state. If a button is disabled because it is busy (`[aria-busy="true"]`), maintain the primary visual context (like color) but indicate processing (e.g., cursor: wait, partial opacity). Additionally, add subtle interactive feedback like `transform: scale(0.98)` on active states to improve tactile feel.
