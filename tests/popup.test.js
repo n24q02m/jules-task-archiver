@@ -94,6 +94,7 @@ function setupPopupSandbox() {
     '#ghOwner': createMockElement('input'),
     '#ghToken': createMockElement('input'),
     '#force': createMockElement('input', { type: 'checkbox' }),
+    '#forceRow': createMockElement('div'),
     '#startBtn': createMockElement('button'),
     'input[name="mode"]:checked': createMockElement('input', { value: 'dry' }),
     '#resetBtn': createMockElement('button'),
@@ -107,7 +108,10 @@ function setupPopupSandbox() {
   }
 
   // Parent element for elements that use .parentElement in popup.js
-  elements['#force'].parentElement = createMockElement('div')
+  elements['#force'].closest = (sel) => {
+    if (sel === '.setting-row') return elements['#forceRow']
+    return null
+  }
   elements['#progressFill'].parentElement = createMockElement('div')
 
   const opModeButtons = [
@@ -240,12 +244,12 @@ describe('setActiveOpMode', () => {
     // Archive mode (default or set)
     sandbox.setActiveOpMode('archive')
     assert.strictEqual(elements['.settings'].style.display, 'block')
-    assert.strictEqual(elements['#force'].parentElement.style.display, 'flex')
+    assert.strictEqual(elements['#forceRow'].style.display, 'block')
 
     // Suggestions mode
     sandbox.setActiveOpMode('suggestions')
     assert.strictEqual(elements['.settings'].style.display, 'none')
-    assert.strictEqual(elements['#force'].parentElement.style.display, 'none')
+    assert.strictEqual(elements['#forceRow'].style.display, 'none')
   })
 })
 

@@ -19,3 +19,6 @@
 ## 2025-06-25 - Differentiating Loading vs Disabled States
 **Learning:** Using the same disabled styling (grayed out) for an active, processing state (e.g., when a button is clicked and waiting for an async operation) makes the UI feel unresponsive and "dead," confusing users about whether the action is actually occurring.
 **Action:** Always visually distinguish a loading state from a purely disabled state. If a button is disabled because it is busy (`[aria-busy="true"]`), maintain the primary visual context (like color) but indicate processing (e.g., cursor: wait, partial opacity). Additionally, add subtle interactive feedback like `transform: scale(0.98)` on active states to improve tactile feel.
+## 2025-10-25 - Orphaned Hint Text in Progressive Disclosure
+**Learning:** Hiding form inputs via their direct `.parentElement` works for simple labels, but leaves sibling elements (like structural hints or descriptions) visible and orphaned on the screen if they share a higher-level container, causing layout clutter and confusing the user context.
+**Action:** Always target the highest logical structural wrapper (e.g., using `.closest('.setting-row')`) when applying progressive disclosure rules to ensure the input, its label, and any associated hint text or spacing are shown or hidden together as a single atomic unit.
