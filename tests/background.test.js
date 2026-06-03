@@ -1037,6 +1037,28 @@ describe('startOperation refactoring', () => {
     assert.ok(state.log.some((l) => l.includes('FATAL ERROR: Test error')))
   })
 
+  it('handleOperationError should securely handle non-Error objects', () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.test_handleOperationError('A string error')
+
+    let state = sandbox.test_state()
+    assert.strictEqual(state.status, 'error')
+    assert.strictEqual(state.error, 'A string error')
+    assert.ok(state.log.some((l) => l.includes('FATAL ERROR: A string error')))
+
+    sandbox.test_handleOperationError(null)
+    state = sandbox.test_state()
+    assert.strictEqual(state.status, 'error')
+    assert.strictEqual(state.error, 'null')
+    assert.ok(state.log.some((l) => l.includes('FATAL ERROR: null')))
+
+    sandbox.test_handleOperationError(undefined)
+    state = sandbox.test_state()
+    assert.strictEqual(state.status, 'error')
+    assert.strictEqual(state.error, 'undefined')
+    assert.ok(state.log.some((l) => l.includes('FATAL ERROR: undefined')))
+  })
+
   it('startOperation should orchestrate successfully', async () => {
     const { sandbox } = setupEnvironment()
     const options = { opMode: 'archive' }
