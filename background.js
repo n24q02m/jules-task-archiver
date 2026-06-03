@@ -16,15 +16,15 @@ const JULES_ORIGIN = 'https://jules.google.com'
 // repos/tasks does not fire hundreds of simultaneous fetches at once.
 const API_CONCURRENCY = 5
 
+// ⚡ Bolt Optimization: Use a fast RegExp instead of new URL() parsing
+// and string splitting to extract the account number. This avoids
+// unnecessary object allocations and improves performance when sorting tabs.
+// The regex restricts matches to the URL pathname, avoiding false matches
+// from query parameters or fragments, preserving existing functionality exactly.
+const ACCOUNT_NUM_REGEX = /^https?:\/\/[^\/?#]+([^?#]*?\/u\/(\d+)(?:\/|[?#]|$))/
 function extractAccountNum(url) {
-  try {
-    const parts = new URL(url).pathname.split('/')
-    const uIdx = parts.indexOf('u')
-    const val = uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
-    return /^\d+$/.test(val) ? val : '0'
-  } catch (_e) {
-    return '0'
-  }
+  const match = ACCOUNT_NUM_REGEX.exec(url)
+  return match ? match[2] : '0'
 }
 
 // =============================================================================
