@@ -107,7 +107,8 @@ function setupPopupSandbox() {
   }
 
   // Parent element for elements that use .parentElement in popup.js
-  elements['#force'].parentElement = createMockElement('div')
+  elements['#force'].closest = (sel) => (sel === '.setting-row' ? elements['.setting-row'] : null)
+  elements['.setting-row'] = createMockElement('div')
   elements['#progressFill'].parentElement = createMockElement('div')
 
   const opModeButtons = [
@@ -240,12 +241,12 @@ describe('setActiveOpMode', () => {
     // Archive mode (default or set)
     sandbox.setActiveOpMode('archive')
     assert.strictEqual(elements['.settings'].style.display, 'block')
-    assert.strictEqual(elements['#force'].parentElement.style.display, 'flex')
+    assert.strictEqual(elements['.setting-row'].style.display, 'flex')
 
     // Suggestions mode
     sandbox.setActiveOpMode('suggestions')
     assert.strictEqual(elements['.settings'].style.display, 'none')
-    assert.strictEqual(elements['#force'].parentElement.style.display, 'none')
+    assert.strictEqual(elements['.setting-row'].style.display, 'none')
   })
 })
 
