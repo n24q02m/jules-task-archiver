@@ -138,6 +138,7 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_stopKeepAlive = stopKeepAlive;
     globalThis.test_getKeepAliveInterval = () => keepAliveInterval;
     globalThis.test_listSuggestions = listSuggestions;
+    globalThis.test_startSuggestion = startSuggestion;
     globalThis.test_listSources = listSources;
     globalThis.test_ensureContentScript = ensureContentScript;
     globalThis.test_getTabConfig = getTabConfig;
@@ -1597,6 +1598,64 @@ describe('ensureContentScript', () => {
 
     await assert.rejects(sandbox.test_ensureContentScript(tabId), {
       message: 'Content script failed to initialize within 3s'
+    })
+  })
+})
+
+describe('startSuggestion', () => {
+  it('should call callBatchExecute with correct Rja83d RPC ID and payload', async () => {
+    const { sandbox } = setupEnvironment()
+    let calledRpcId = null
+    let calledPayload = null
+    let calledConfig = null
+
+    sandbox.callBatchExecute = async (rpcId, payload, config) => {
+      calledRpcId = rpcId
+      calledPayload = payload
+      calledConfig = config
+      return { ok: true }
+    }
+
+    const suggestion = {
+      id: 'test-id',
+      title: 'Test Title',
+      filePath: 'test.js',
+      line: 1,
+      language: 'javascript',
+      codeSnippet: 'code',
+      rationale: 'reason',
+      categorySlug: 'cleanup'
+    }
+    const repo = 'github/owner/repo'
+    const config = { modelId: 'config-model' }
+    const startConfig = { featureFlags: [['flag1', 1]] }
+
+    const result = await sandbox.test_startSuggestion(suggestion, repo, config, startConfig)
+
+    assert.strictEqual(calledRpcId, 'Rja83d')
+    assert.strictEqual(calledConfig, config)
+    assert.deepStrictEqual(result, { ok: true })
+
+    // Verify payload structure indirectly via buildStartPayload logic
+    // We already have deep tests for buildStartPayload, here we just ensure it's integrated
+    assert.ok(calledPayload[0].includes('Test Title'))
+    assert.strictEqual(calledPayload[2][1], 'config-model')
+    assert.strictEqual(calledPayload[4], repo)
+  })
+
+  it('should propagate errors from callBatchExecute', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.callBatchExecute = async () => {
+      throw new Error('RPC Failed')
+    }
+
+    const suggestion = { id: 'id' }
+    const repo = 'repo'
+    const config = {}
+    const startConfig = {}
+
+    await assert.rejects(sandbox.test_startSuggestion(suggestion, repo, config, startConfig), {
+      message: 'RPC Failed'
     })
   })
 })
