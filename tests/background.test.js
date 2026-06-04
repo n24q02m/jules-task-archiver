@@ -378,21 +378,95 @@ describe('parseTask', () => {
 })
 
 describe('isArchivable', () => {
-  it('should return true for completed tasks (state=3)', () => {
+  // State codes verified 2026-06-04 against 725 real tasks from the live
+  // batchexecute API. Terminal/finished states observed: 2, 4, 12, and null.
+  it('should return true for terminal task states (2, 4, 12)', () => {
     const { sandbox } = setupEnvironment()
-    assert.strictEqual(sandbox.test_isArchivable({ state: 3 }), true)
+    assert.strictEqual(sandbox.test_isArchivable({ state: 2 }), true)
+    assert.strictEqual(sandbox.test_isArchivable({ state: 4 }), true)
+    assert.strictEqual(sandbox.test_isArchivable({ state: 12 }), true)
   })
 
-  it('should return true for failed tasks (state=9)', () => {
+  it('should return true for null/undefined state (completed task variant)', () => {
     const { sandbox } = setupEnvironment()
-    assert.strictEqual(sandbox.test_isArchivable({ state: 9 }), true)
+    assert.strictEqual(sandbox.test_isArchivable({ state: null }), true)
+    assert.strictEqual(sandbox.test_isArchivable({ state: undefined }), true)
   })
 
-  it('should return false for active/in-progress tasks', () => {
+  it('should return false for non-terminal / unknown states', () => {
     const { sandbox } = setupEnvironment()
     assert.strictEqual(sandbox.test_isArchivable({ state: 1 }), false)
     assert.strictEqual(sandbox.test_isArchivable({ state: 5 }), false)
-    assert.strictEqual(sandbox.test_isArchivable({ state: 0 }), false)
+    // Legacy reverse-engineered codes {3,9} are no longer emitted by Jules.
+    assert.strictEqual(sandbox.test_isArchivable({ state: 3 }), false)
+    assert.strictEqual(sandbox.test_isArchivable({ state: 9 }), false)
+  })
+})
+
+describe('processTab force vs default archiving', () => {
+  const TAB = { id: 1, url: 'https://jules.google.com/u/0/' }
+
+  function setupArchiveEnv(tasks) {
+    const { sandbox } = setupEnvironment()
+    sandbox.getTabConfig = async () => ({ at: 'at', bl: 'bl_v1', fsid: 'fsid', accountNum: '0' })
+    sandbox.listTasks = async () => tasks
+    sandbox.getOpenPRs = async () => []
+    const archived = []
+    sandbox.archiveTask = async (id) => {
+      archived.push(id)
+    }
+    return { sandbox, archived }
+  }
+
+  it('FORCE archives every task even when none are in a terminal state', async () => {
+    // Regression for the original bug: with real Jules state codes, the legacy
+    // {3,9} allowlist matched 0 tasks, so the candidates list was empty and
+    // Force archived nothing. Force must be independent of the state filter.
+    const tasks = [
+      { id: 'a', title: 'T1', state: 7, source: 'github/o/r' },
+      { id: 'b', title: 'T2', state: 99, source: 'github/o/r' }
+    ]
+    const { sandbox, archived } = setupArchiveEnv(tasks)
+    await sandbox.processTab(TAB, { force: true, dryRun: false })
+    assert.deepStrictEqual(archived.sort(), ['a', 'b'])
+  })
+
+  it('FORCE archives real terminal-state tasks (2, 4, 12, null)', async () => {
+    const tasks = [
+      { id: 'a', title: 'T', state: 12, source: 'github/o/r' },
+      { id: 'b', title: 'T', state: null, source: 'github/o/r' },
+      { id: 'c', title: 'T', state: 4, source: 'github/o/r' },
+      { id: 'd', title: 'T', state: 2, source: 'github/o/r' }
+    ]
+    const { sandbox, archived } = setupArchiveEnv(tasks)
+    await sandbox.processTab(TAB, { force: true, dryRun: false })
+    assert.strictEqual(archived.length, 4)
+  })
+
+  it('default mode archives terminal tasks and skips non-terminal ones', async () => {
+    const tasks = [
+      { id: 'term', title: 'Done', state: 12, source: 'github/o/r' },
+      { id: 'run', title: 'Running', state: 1, source: 'github/o/r' }
+    ]
+    const { sandbox, archived } = setupArchiveEnv(tasks)
+    await sandbox.processTab(TAB, { force: false, dryRun: false })
+    assert.deepStrictEqual(archived, ['term'])
+  })
+
+  it('default mode skips a terminal task with a matching open PR', async () => {
+    const tasks = [{ id: 'x', title: 'Fix the bug', state: 12, source: 'github/o/r', owner: 'o', repoName: 'r' }]
+    const { sandbox, archived } = setupArchiveEnv(tasks)
+    sandbox.getOpenPRs = async () => [{ title: 'Fix the bug', titleLower: 'fix the bug', branch: 'b' }]
+    await sandbox.processTab(TAB, { force: false, dryRun: false })
+    assert.deepStrictEqual(archived, [])
+  })
+
+  it('FORCE archives a terminal task even when it has a matching open PR', async () => {
+    const tasks = [{ id: 'x', title: 'Fix the bug', state: 12, source: 'github/o/r', owner: 'o', repoName: 'r' }]
+    const { sandbox, archived } = setupArchiveEnv(tasks)
+    sandbox.getOpenPRs = async () => [{ title: 'Fix the bug', titleLower: 'fix the bug', branch: 'b' }]
+    await sandbox.processTab(TAB, { force: true, dryRun: false })
+    assert.deepStrictEqual(archived, ['x'])
   })
 })
 

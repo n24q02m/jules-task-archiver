@@ -84,7 +84,7 @@
    - **GitHub Owner** -- your GitHub username (for PR checks in archive mode)
    - **GitHub Token** -- optional, for private repos
    - **Mode** -- Dry Run (preview) or Run (execute)
-   - **Force** -- skip PR check (archive mode only)
+   - **Force** -- archive every task regardless of state or open PRs (archive mode only)
    - **Scope** -- current tab only or all Jules tabs
 4. Click **Start**
 
