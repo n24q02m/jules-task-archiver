@@ -324,7 +324,8 @@ async function withRetry(fn) {
       return await fn()
     } catch (e) {
       if (attempt === RETRY_ATTEMPTS - 1 || !isRetryable(e.message)) throw e
-      const delay = RETRY_BASE_MS * 2 ** attempt + (crypto.getRandomValues(new Uint32Array(1))[0] % 200)
+      const delay =
+        RETRY_BASE_MS * 2 ** attempt + Math.floor((crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32) * 200)
       await new Promise((r) => setTimeout(r, delay))
     }
   }
@@ -1042,7 +1043,7 @@ function initOperationState(options) {
   prCache.clear()
   const randomArray = new Uint32Array(1)
   crypto.getRandomValues(randomArray)
-  reqCounter = (randomArray[0] % 900000) + 100000
+  reqCounter = Math.floor((randomArray[0] / 2 ** 32) * 900000) + 100000
   startKeepAlive()
   updateState({
     status: 'running',
