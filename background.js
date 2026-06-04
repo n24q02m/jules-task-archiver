@@ -16,6 +16,13 @@ const JULES_ORIGIN = 'https://jules.google.com'
 // repos/tasks does not fire hundreds of simultaneous fetches at once.
 const API_CONCURRENCY = 5
 
+// Archive fan-out. Accounts (tabs) are processed in parallel; each account
+// drains its own pool, while a shared global limiter caps the TOTAL in-flight
+// archive requests across all accounts so parallel work cannot overwhelm Jules
+// (which rate-limits with HTTP 429). Retries with backoff absorb the rest.
+const PER_ACCOUNT_CONCURRENCY = 6
+const GLOBAL_CONCURRENCY = 12
+
 function extractAccountNum(url) {
   try {
     const parts = new URL(url).pathname.split('/')
@@ -83,6 +90,38 @@ async function runInPool(items, limit, worker) {
   await Promise.all(pool)
   return results
 }
+
+/**
+ * A shared concurrency gate. `limit(fn)` runs `fn` once a slot is free and
+ * resolves with its result. Unlike `runInPool` (a one-shot pool over a fixed
+ * list), this is a long-lived limiter many independent callers funnel through —
+ * used to cap TOTAL in-flight archive requests while accounts run in parallel.
+ */
+function createLimiter(max) {
+  let active = 0
+  const queue = []
+
+  function next() {
+    if (active >= max || queue.length === 0) return
+    active++
+    const { fn, resolve, reject } = queue.shift()
+    Promise.resolve()
+      .then(fn)
+      .then(resolve, reject)
+      .finally(() => {
+        active--
+        next()
+      })
+  }
+
+  return (fn) =>
+    new Promise((resolve, reject) => {
+      queue.push({ fn, resolve, reject })
+      next()
+    })
+}
+
+const globalLimit = createLimiter(GLOBAL_CONCURRENCY)
 
 // =============================================================================
 // batchexecute Client
@@ -267,6 +306,29 @@ async function listTasks(filter, config) {
 
 async function archiveTask(taskId, config) {
   await callBatchExecute('Tjmm5c', [[taskId], 1], config)
+}
+
+const RETRY_ATTEMPTS = 4
+const RETRY_BASE_MS = 400
+
+// Higher concurrency makes Jules more likely to answer 429 (rate limit) or a
+// transient 5xx. Rather than dropping those tasks, back off and retry so a fast
+// run degrades gracefully instead of failing.
+function isRetryable(message) {
+  return /HTTP 429|HTTP 5\d\d|Failed to fetch|NetworkError/i.test(message || '')
+}
+
+async function archiveTaskWithRetry(taskId, config) {
+  for (let attempt = 0; attempt < RETRY_ATTEMPTS; attempt++) {
+    try {
+      await archiveTask(taskId, config)
+      return
+    } catch (e) {
+      if (attempt === RETRY_ATTEMPTS - 1 || !isRetryable(e.message)) throw e
+      const delay = RETRY_BASE_MS * 2 ** attempt + Math.random() * 200
+      await new Promise((r) => setTimeout(r, delay))
+    }
+  }
 }
 
 // =============================================================================
@@ -545,7 +607,7 @@ async function processSuggestionsForTab(tab, options) {
       } else {
         addLog(`  Starting: ${s.title}...`)
         try {
-          await startSuggestion(s, repo, config, startConfig)
+          await globalLimit(() => startSuggestion(s, repo, config, startConfig))
           addLog(`  Started: ${s.title}`)
           totalStarted++
         } catch (err) {
@@ -941,38 +1003,27 @@ async function processTab(tab, options) {
     return 0
   }
 
+  // Accumulate into the shared progress total so parallel accounts report one
+  // combined bar. JS is single-threaded, so these increments are race-free.
+  state.progress.total += totalTasks
+  updateState({})
+
   let grandTotal = 0
 
-  // Group toArchive by repo for organized logging
-  const archiveByRepo = new Map()
-  for (const t of toArchive) {
-    const key = t.repo || '(no repo)'
-    if (!archiveByRepo.has(key)) archiveByRepo.set(key, [])
-    archiveByRepo.get(key).push(t)
-  }
-
-  for (const [repo, repoTasks] of archiveByRepo) {
-    updateState({ currentRepo: repo })
-    addLog(`\n[${label}] -> ${repo} (${repoTasks.length} tasks)`)
-
-    await runInPool(repoTasks, API_CONCURRENCY, async (task) => {
-      try {
-        await archiveTask(task.id, config)
-        grandTotal++
-        addLog(`  Archived: [${task.id}] ${task.title}`)
-
-        updateState({
-          progress: {
-            ...state.progress,
-            archived: grandTotal,
-            total: totalTasks
-          }
-        })
-      } catch (e) {
-        addLog(`  ERROR archiving ${task.id}: ${e.message}`)
-      }
-    })
-  }
+  // Flatten across repos: one pool over every task keeps the fan-out saturated
+  // instead of idling between per-repo batches. Each network call passes through
+  // the shared global limiter so all accounts together stay under budget.
+  await runInPool(toArchive, PER_ACCOUNT_CONCURRENCY, async (task) => {
+    try {
+      await globalLimit(() => archiveTaskWithRetry(task.id, config))
+      grandTotal++
+      state.progress.archived += 1
+      updateState({ currentRepo: task.repo || '(no repo)' })
+      addLog(`  Archived [${label}] [${task.id}] ${task.title}`)
+    } catch (e) {
+      addLog(`  ERROR [${label}] archiving ${task.id}: ${e.message}`)
+    }
+  })
 
   addLog(`\n[${label}] TOTAL: ${grandTotal} archived`)
   return grandTotal
@@ -1019,18 +1070,20 @@ async function discoverTabs(options) {
 }
 
 async function processAllTabs(tabs, options, isSuggestions) {
-  const results = []
-  for (const tab of tabs) {
-    const label = getTabLabel(tab)
-    try {
-      const count = isSuggestions ? await processSuggestionsForTab(tab, options) : await processTab(tab, options)
-      results.push({ label, count })
-    } catch (e) {
-      addLog(`ERROR [${label}]: ${e.message}`)
-      results.push({ label, count: 0, err: e.message })
-    }
-  }
-  return results
+  // Process accounts in parallel. Per-account pools and the shared global
+  // limiter keep total in-flight requests bounded; results preserve tab order.
+  return Promise.all(
+    tabs.map(async (tab) => {
+      const label = getTabLabel(tab)
+      try {
+        const count = isSuggestions ? await processSuggestionsForTab(tab, options) : await processTab(tab, options)
+        return { label, count }
+      } catch (e) {
+        addLog(`ERROR [${label}]: ${e.message}`)
+        return { label, count: 0, err: e.message }
+      }
+    })
+  )
 }
 
 function finalizeOperation(results, isSuggestions) {

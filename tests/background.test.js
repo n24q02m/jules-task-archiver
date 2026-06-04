@@ -101,6 +101,9 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_buildBatchRequest = buildBatchRequest;
     globalThis.test_callBatchExecute = callBatchExecute;
     globalThis.test_runInPool = runInPool;
+    globalThis.test_createLimiter = createLimiter;
+    globalThis.test_archiveTaskWithRetry = archiveTaskWithRetry;
+    globalThis.test_isRetryable = isRetryable;
     globalThis.test_fixJsonControlChars = fixJsonControlChars;
     globalThis.test_findJsonEnd = findJsonEnd;
     globalThis.test_parseResponse = parseResponse;
@@ -292,6 +295,60 @@ describe('runInPool', () => {
     const { sandbox } = setupEnvironment()
     const results = await sandbox.test_runInPool(['a', 'b', 'c'], 2, async (item, idx) => `${item}${idx}`)
     assert.deepStrictEqual(results, ['a0', 'b1', 'c2'])
+  })
+})
+
+describe('createLimiter', () => {
+  it('caps concurrency across independent callers and resolves results', async () => {
+    const { sandbox } = setupEnvironment()
+    const limit = sandbox.test_createLimiter(2)
+    let inFlight = 0
+    let peak = 0
+    const make = (n) => () =>
+      new Promise((resolve) => {
+        inFlight++
+        peak = Math.max(peak, inFlight)
+        setTimeout(() => {
+          inFlight--
+          resolve(n * 2)
+        }, 5)
+      })
+    const results = await Promise.all([1, 2, 3, 4, 5].map((n) => limit(make(n))))
+    assert.deepStrictEqual(results, [2, 4, 6, 8, 10])
+    assert.ok(peak <= 2, `peak ${peak} should not exceed limiter max 2`)
+  })
+})
+
+describe('archiveTaskWithRetry', () => {
+  it('isRetryable matches rate-limit and transient errors only', () => {
+    const { sandbox } = setupEnvironment()
+    assert.strictEqual(sandbox.test_isRetryable('batchexecute Tjmm5c failed: HTTP 429'), true)
+    assert.strictEqual(sandbox.test_isRetryable('HTTP 503'), true)
+    assert.strictEqual(sandbox.test_isRetryable('Failed to fetch'), true)
+    assert.strictEqual(sandbox.test_isRetryable('HTTP 404'), false)
+    assert.strictEqual(sandbox.test_isRetryable('Security Error'), false)
+  })
+
+  it('retries on a 429 then succeeds', async () => {
+    const { sandbox } = setupEnvironment()
+    let calls = 0
+    sandbox.archiveTask = async () => {
+      calls++
+      if (calls === 1) throw new Error('batchexecute Tjmm5c failed: HTTP 429')
+    }
+    await sandbox.test_archiveTaskWithRetry('t1', {})
+    assert.strictEqual(calls, 2)
+  })
+
+  it('does not retry a non-retryable error', async () => {
+    const { sandbox } = setupEnvironment()
+    let calls = 0
+    sandbox.archiveTask = async () => {
+      calls++
+      throw new Error('HTTP 404')
+    }
+    await assert.rejects(() => sandbox.test_archiveTaskWithRetry('t1', {}), /HTTP 404/)
+    assert.strictEqual(calls, 1)
   })
 })
 
