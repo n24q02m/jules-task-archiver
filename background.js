@@ -402,6 +402,44 @@ async function listSources(config) {
   return result[0].map((s) => s?.[0]).filter((src) => typeof src === 'string' && src.startsWith('github/'))
 }
 
+/**
+ * Helper to list tasks with standard error logging and empty-check.
+ * Returns the list of tasks, or null if failed/empty (to signal early exit).
+ */
+async function safeListTasks(label, config) {
+  addLog(`[${label}] Fetching tasks via API...`)
+  try {
+    const tasks = await listTasks('', config)
+    if (tasks.length === 0) {
+      addLog(`[${label}] No tasks found.`)
+      return null
+    }
+    return tasks
+  } catch (e) {
+    addLog(`[${label}] ERROR listing tasks: ${e.message}`)
+    return null
+  }
+}
+
+/**
+ * Helper to list sources with standard error logging and empty-check.
+ * Returns the list of repos, or null if failed/empty (to signal early exit).
+ */
+async function safeListSources(label, config) {
+  addLog(`[${label}] Fetching connected repos...`)
+  try {
+    const repos = await listSources(config)
+    if (repos.length === 0) {
+      addLog(`[${label}] No connected repos found.`)
+      return null
+    }
+    return repos
+  } catch (e) {
+    addLog(`[${label}] ERROR listing sources: ${e.message}`)
+    return null
+  }
+}
+
 // =============================================================================
 // Prompt Builder
 // =============================================================================
@@ -565,19 +603,8 @@ async function processSuggestionsForTab(tab, options) {
 
   // Discover connected repos directly (independent of tasks). Deriving repos
   // from active tasks meant archiving all tasks hid every repo from Suggestions.
-  addLog(`[${label}] Fetching connected repos...`)
-  let repos
-  try {
-    repos = await listSources(config)
-  } catch (e) {
-    addLog(`[${label}] ERROR listing sources: ${e.message}`)
-    return 0
-  }
-
-  if (repos.length === 0) {
-    addLog(`[${label}] No connected repos found.`)
-    return 0
-  }
+  const repos = await safeListSources(label, config)
+  if (!repos) return 0
 
   addLog(`[${label}] Found ${repos.length} connected repos`)
 
@@ -895,19 +922,8 @@ async function processTab(tab, options) {
   const { label, config } = prepared
 
   // List all active tasks via API
-  addLog(`[${label}] Fetching tasks via API...`)
-  let tasks
-  try {
-    tasks = await listTasks('', config)
-  } catch (e) {
-    addLog(`[${label}] ERROR listing tasks: ${e.message}`)
-    return 0
-  }
-
-  if (tasks.length === 0) {
-    addLog(`[${label}] No tasks found.`)
-    return 0
-  }
+  const tasks = await safeListTasks(label, config)
+  if (!tasks) return 0
 
   // Partition into archivable (terminal) vs active (still-running) tasks.
   const candidates = []
