@@ -318,17 +318,20 @@ function isRetryable(message) {
   return /HTTP 429|HTTP 5\d\d|Failed to fetch|NetworkError/i.test(message || '')
 }
 
-async function archiveTaskWithRetry(taskId, config) {
+async function withRetry(fn) {
   for (let attempt = 0; attempt < RETRY_ATTEMPTS; attempt++) {
     try {
-      await archiveTask(taskId, config)
-      return
+      return await fn()
     } catch (e) {
       if (attempt === RETRY_ATTEMPTS - 1 || !isRetryable(e.message)) throw e
       const delay = RETRY_BASE_MS * 2 ** attempt + Math.random() * 200
       await new Promise((r) => setTimeout(r, delay))
     }
   }
+}
+
+function archiveTaskWithRetry(taskId, config) {
+  return withRetry(() => archiveTask(taskId, config))
 }
 
 // =============================================================================
@@ -573,58 +576,58 @@ async function processSuggestionsForTab(tab, options) {
   addLog(`[${label}] Found ${repos.length} repos: ${repos.join(', ')}`)
 
   addLog(`\n[${label}] Fetching suggestions for ${repos.length} repos concurrently...`)
-  const allSuggestions = await runInPool(repos, API_CONCURRENCY, (repo) =>
-    listSuggestions(repo, config)
+  const allSuggestions = await runInPool(repos, PER_ACCOUNT_CONCURRENCY, (repo) =>
+    globalLimit(() => listSuggestions(repo, config))
       .then((suggestions) => ({ repo, suggestions }))
       .catch((e) => ({ repo, error: e.message }))
   )
 
-  let totalStarted = 0
+  // Flatten (repo, suggestion) pairs across all repos so the pool stays
+  // saturated instead of draining one repo at a time.
+  const work = []
   for (const { repo, suggestions, error } of allSuggestions) {
-    if (state.status === 'cancelled') break
-
     if (error) {
       addLog(`\n[${label}] ERROR fetching suggestions for ${repo}: ${error}`)
       continue
     }
-
     if (suggestions.length === 0) {
       addLog(`\n[${label}] ${repo}: No suggestions found`)
       continue
     }
-
     addLog(`\n[${label}] ${repo}: Found ${suggestions.length} suggestions`)
-    updateState({ currentRepo: repo.replace(/^github\//, '') })
-
-    const prevTotal = state.progress.total
-    let processedInRepo = 0
-
-    await runInPool(suggestions, API_CONCURRENCY, async (s) => {
-      if (state.status === 'cancelled') return
-
-      if (options.dryRun) {
-        addLog(`  [DRY] Would start: ${s.title} (${s.categorySlug})`)
-      } else {
-        addLog(`  Starting: ${s.title}...`)
-        try {
-          await globalLimit(() => startSuggestion(s, repo, config, startConfig))
-          addLog(`  Started: ${s.title}`)
-          totalStarted++
-        } catch (err) {
-          addLog(`  [!] Failed to start "${s.title}": ${err.message}`)
-        }
-      }
-
-      processedInRepo++
-      updateState({
-        progress: {
-          ...state.progress,
-          archived: totalStarted,
-          total: prevTotal + processedInRepo
-        }
-      })
-    })
+    for (const s of suggestions) work.push({ repo, s })
   }
+
+  if (work.length === 0) {
+    addLog(`\n[${label}] TOTAL: 0 suggestions started`)
+    return 0
+  }
+
+  if (!options.dryRun) {
+    state.progress.total += work.length
+    updateState({})
+  }
+
+  let totalStarted = 0
+  await runInPool(work, PER_ACCOUNT_CONCURRENCY, async ({ repo, s }) => {
+    if (state.status === 'cancelled') return
+
+    if (options.dryRun) {
+      addLog(`  [DRY] Would start [${label}] ${s.title} (${s.categorySlug})`)
+      return
+    }
+
+    updateState({ currentRepo: repo.replace(/^github\//, '') })
+    try {
+      await globalLimit(() => withRetry(() => startSuggestion(s, repo, config, startConfig)))
+      totalStarted++
+      state.progress.archived += 1
+      updateState({})
+      addLog(`  Started [${label}] ${s.title}`)
+    } catch (err) {
+      addLog(`  [!] Failed to start "${s.title}": ${err.message}`)
+    }
+  })
 
   addLog(`\n[${label}] TOTAL: ${totalStarted} suggestions started`)
   return totalStarted
