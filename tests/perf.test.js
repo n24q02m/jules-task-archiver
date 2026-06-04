@@ -78,13 +78,16 @@ describe('Orchestrator Performance Optimization', () => {
       }
     })
 
-    // Mock dependencies. Repos are now discovered via listSources (connected
-    // repos), independent of tasks.
+    // Mock dependencies. Repos are now discovered via listSuggestionEnabledSources
+    // (only repos whose Suggestions toggle is ON).
     let listSourcesCalled = 0
-    sandbox.listSources = async () => {
+    sandbox.listSuggestionEnabledSources = async () => {
       listSourcesCalled++
       return ['github/owner/repo1', 'github/owner/repo2']
     }
+
+    // No daily-limit cap for this pool-saturation test.
+    sandbox.getDailySessionQuota = async () => null
 
     let listSuggestionsCount = 0
     sandbox.listSuggestions = async (_repo) => {
@@ -110,7 +113,7 @@ describe('Orchestrator Performance Optimization', () => {
 
     await sandbox.processSuggestionsForTab(tab, options)
 
-    assert.strictEqual(listSourcesCalled, 1, 'listSources should be called once')
+    assert.strictEqual(listSourcesCalled, 1, 'listSuggestionEnabledSources should be called once')
     assert.strictEqual(listSuggestionsCount, 2, 'listSuggestions should be called for each repo')
     assert.strictEqual(
       startSuggestionCount,

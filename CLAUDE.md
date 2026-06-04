@@ -25,7 +25,7 @@ popup.js (UI) <-> background.js (batchexecute client) <-> content.js (token extr
 
 Two operation modes:
 1. **Archive Tasks** -- ListTasks (p1Takd) -> check GitHub PRs -> ArchiveTask (Tjmm5c)
-2. **Start Suggestions** -- ListTasks -> discover repos -> ListSuggestions (hQP40d) -> StartSuggestion (Rja83d)
+2. **Start Suggestions** -- ListSources (YqkSHd) filtered to Suggestions-enabled repos -> ListSuggestions (hQP40d) per repo -> cap to remaining daily quota (KQOO7) -> StartSuggestion (Rja83d). Only repos whose per-repo Suggestions toggle is ON are touched; the daily session limit is never exceeded.
 
 Content script extracts auth tokens (SNlM0e, cfb2h, FdrFJe) from `WIZ_global_data` via MAIN world script injection. Also observes fetch() for Rja83d calls to capture model config and experiment IDs.
 
@@ -35,8 +35,13 @@ Background service worker makes all API calls. No DOM automation.
 
 - `p1Takd` -- ListTasks (filter, state)
 - `Tjmm5c` -- ArchiveTask (taskId, action)
-- `hQP40d` -- ListSuggestions (repo)
+- `tqq5v` -- PauseTask / stop a running session (taskId)
+- `YqkSHd` -- ListSources (connected repos); row `[5][2][0] === 2` => Suggestions toggle ON
+- `hQP40d` -- ListSuggestions (repo); returns the raw pool, does NOT respect the toggle
+- `e4motb` -- SetSuggestionsToggle (repo, [2]=enable / [1]=disable)
 - `Rja83d` -- StartSuggestion (prompt, model config, repo, experiment IDs)
+- `UTrvy` -- Suggestions-repo counter `[max, enabled, free]` (e.g. `[5,3,2]` = 3/5 repos enabled)
+- `KQOO7` -- Daily session quota `[usedToday, [windowSeconds], dailyLimit, ...]`
 
 ## Development
 
