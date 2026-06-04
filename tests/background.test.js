@@ -133,6 +133,7 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_finalizeOperation = finalizeOperation;
     globalThis.test_handleOperationError = handleOperationError;
     globalThis.test_listTasks = listTasks;
+    globalThis.test_archiveTask = archiveTask;
     globalThis.test_startOperation = startOperation;
     globalThis.test_startKeepAlive = startKeepAlive;
     globalThis.test_stopKeepAlive = stopKeepAlive;
@@ -340,6 +341,40 @@ describe('createLimiter', () => {
     const results = await Promise.all([1, 2, 3, 4, 5].map((n) => limit(make(n))))
     assert.deepStrictEqual(results, [2, 4, 6, 8, 10])
     assert.ok(peak <= 2, `peak ${peak} should not exceed limiter max 2`)
+  })
+})
+
+describe('archiveTask', () => {
+  it('should call callBatchExecute with RPC ID A0Q2Z and correct payload', async () => {
+    const { sandbox } = setupEnvironment()
+    let capturedRpcId = null
+    let capturedPayload = null
+
+    sandbox.callBatchExecute = async (rpcId, payload, _config) => {
+      capturedRpcId = rpcId
+      capturedPayload = payload
+      return {}
+    }
+
+    const taskId = 'task-123'
+    const config = { accountNum: '0' }
+    await sandbox.test_archiveTask(taskId, config)
+
+    assert.strictEqual(capturedRpcId, 'A0Q2Z')
+    assert.strictEqual(JSON.stringify(capturedPayload), JSON.stringify([[[taskId, 3]]]))
+  })
+
+  it('should propagate errors from callBatchExecute', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.callBatchExecute = async () => {
+      throw new Error('RPC Failed')
+    }
+
+    const taskId = 'task-123'
+    const config = { accountNum: '0' }
+    await assert.rejects(sandbox.test_archiveTask(taskId, config), {
+      message: 'RPC Failed'
+    })
   })
 })
 

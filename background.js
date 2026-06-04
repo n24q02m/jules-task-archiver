@@ -305,7 +305,7 @@ async function listTasks(filter, config) {
 }
 
 async function archiveTask(taskId, config) {
-  await callBatchExecute('Tjmm5c', [[taskId], 1], config)
+  return callBatchExecute('A0Q2Z', [[[taskId, 3]]], config)
 }
 
 const RETRY_ATTEMPTS = 4
