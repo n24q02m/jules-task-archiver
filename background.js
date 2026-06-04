@@ -277,6 +277,25 @@ const TASK = {
 // is protected by default rather than silently archived.
 const ARCHIVABLE_STATES = new Set([2, 4, 12])
 
+// Source (connected repo) row layout from YqkSHd.
+// [5] is a per-repo Suggestions block: [bool, bool, [TOGGLE], [bool]] where
+// TOGGLE === 2 means the repo's Suggestions toggle is ON, 1/absent means OFF.
+// This mirrors the e4motb write RPC (payload [2]=enable, [1]=disable) and was
+// verified 2026-06-04 against Jules' own "X / 5 repo max" counter (UTrvy) across
+// all 5 accounts: the enabled-repo count matched UTrvy exactly every time.
+const SOURCE = {
+  ID: 0,
+  SUGGESTION_BLOCK: 5
+}
+const SUGGESTION_TOGGLE_ON = 2
+
+// A Jules account may enable Suggestions on at most 5 repos. The extension must
+// only start suggestions on those, never on every connected source.
+function isSuggestionEnabled(row) {
+  const block = row?.[SOURCE.SUGGESTION_BLOCK]
+  return Array.isArray(block) && Array.isArray(block[2]) && block[2][0] === SUGGESTION_TOGGLE_ON
+}
+
 function parseTask(raw) {
   const source = raw[TASK.SOURCE] || ''
   const parts = source.split('/')
@@ -392,14 +411,30 @@ async function listSuggestions(repo, config) {
   }, [])
 }
 
-// List the account's connected repos (sources) directly, independent of tasks.
-// Response shape (YqkSHd): result[0] is an array of source entries whose [0]
-// is the "github/owner/repo" id. Deriving repos from tasks instead meant that
-// archiving every task hid all repos from Suggestions.
-async function listSources(config) {
+// List the repos that have the Jules Suggestions toggle ENABLED for this account.
+// Response shape (YqkSHd): result[0] is an array of source rows whose [0] is the
+// "github/owner/repo" id and whose [5] block encodes the per-repo toggle.
+// Returning every connected source (not just enabled ones) is what caused the
+// extension to start hundreds of unwanted suggestion tasks across all repos.
+async function listSuggestionEnabledSources(config) {
   const result = await callBatchExecute('YqkSHd', [null, 'source_status=SOURCE_STATUS_ACTIVE'], config)
   if (!result?.[0]) return []
-  return result[0].map((s) => s?.[0]).filter((src) => typeof src === 'string' && src.startsWith('github/'))
+  return result[0]
+    .filter(
+      (row) => isSuggestionEnabled(row) && typeof row?.[SOURCE.ID] === 'string' && row[SOURCE.ID].startsWith('github/')
+    )
+    .map((row) => row[SOURCE.ID])
+}
+
+// Jules caps suggestion sessions per account per day. KQOO7 returns
+// [usedToday, [windowSeconds], dailyLimit, ...]; the extension must not start
+// more sessions than the remaining quota, or it blows past the limit (observed
+// 268/100). Returns null if the shape is unrecognised so callers can no-op the
+// guard rather than block the run.
+async function getDailySessionQuota(config) {
+  const result = await callBatchExecute('KQOO7', [], config)
+  if (!Array.isArray(result) || typeof result[0] !== 'number' || typeof result[2] !== 'number') return null
+  return { used: result[0], limit: result[2], remaining: Math.max(0, result[2] - result[0]) }
 }
 
 // =============================================================================
@@ -563,23 +598,26 @@ async function processSuggestionsForTab(tab, options) {
     addLog(`[${label}] Tip: Click Start on any suggestion in Jules UI to capture config.`)
   }
 
-  // Discover connected repos directly (independent of tasks). Deriving repos
-  // from active tasks meant archiving all tasks hid every repo from Suggestions.
-  addLog(`[${label}] Fetching connected repos...`)
+  // Only repos whose Jules Suggestions toggle is ON. Enumerating every connected
+  // source instead caused the extension to start suggestions on repos the user
+  // never enabled (and blow past the daily session limit).
+  addLog(`[${label}] Fetching Suggestions-enabled repos...`)
   let repos
   try {
-    repos = await listSources(config)
+    repos = await listSuggestionEnabledSources(config)
   } catch (e) {
     addLog(`[${label}] ERROR listing sources: ${e.message}`)
     return 0
   }
 
   if (repos.length === 0) {
-    addLog(`[${label}] No connected repos found.`)
+    addLog(`[${label}] No repos have Suggestions enabled. Nothing to do.`)
     return 0
   }
 
-  addLog(`[${label}] Found ${repos.length} connected repos`)
+  addLog(
+    `[${label}] ${repos.length} repo(s) with Suggestions enabled: ${repos.map((r) => r.replace(/^github\//, '')).join(', ')}`
+  )
 
   addLog(`\n[${label}] Fetching suggestions for ${repos.length} repos concurrently...`)
   const allSuggestions = await runInPool(repos, PER_ACCOUNT_CONCURRENCY, (repo) =>
@@ -609,13 +647,29 @@ async function processSuggestionsForTab(tab, options) {
     return 0
   }
 
+  // Respect Jules' daily session limit: never start more suggestions than the
+  // account's remaining quota. Each started suggestion consumes one session.
+  let toStart = work
+  const quota = await getDailySessionQuota(config)
+  if (quota) {
+    addLog(`\n[${label}] Daily sessions: ${quota.used}/${quota.limit} used, ${quota.remaining} remaining`)
+    if (quota.remaining === 0) {
+      addLog(`[${label}] Daily limit reached. Starting 0 suggestions.`)
+      return 0
+    }
+    if (work.length > quota.remaining) {
+      addLog(`[${label}] Capping ${work.length} suggestions to ${quota.remaining} (daily limit)`)
+      toStart = work.slice(0, quota.remaining)
+    }
+  }
+
   if (!options.dryRun) {
-    state.progress.total += work.length
+    state.progress.total += toStart.length
     updateState({})
   }
 
   let totalStarted = 0
-  await runInPool(work, PER_ACCOUNT_CONCURRENCY, async ({ repo, s }) => {
+  await runInPool(toStart, PER_ACCOUNT_CONCURRENCY, async ({ repo, s }) => {
     if (state.status === 'cancelled') return
 
     if (options.dryRun) {

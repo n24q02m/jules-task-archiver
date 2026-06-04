@@ -138,7 +138,9 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_stopKeepAlive = stopKeepAlive;
     globalThis.test_getKeepAliveInterval = () => keepAliveInterval;
     globalThis.test_listSuggestions = listSuggestions;
-    globalThis.test_listSources = listSources;
+    globalThis.test_listSuggestionEnabledSources = listSuggestionEnabledSources;
+    globalThis.test_isSuggestionEnabled = isSuggestionEnabled;
+    globalThis.test_getDailySessionQuota = getDailySessionQuota;
     globalThis.test_ensureContentScript = ensureContentScript;
     globalThis.test_getTabConfig = getTabConfig;
   `
@@ -299,26 +301,69 @@ describe('runInPool', () => {
   })
 })
 
-describe('listSources', () => {
-  it('extracts github sources from a YqkSHd response (independent of tasks)', async () => {
+describe('isSuggestionEnabled', () => {
+  it('treats toggle value 2 as enabled', () => {
+    const { sandbox } = setupEnvironment()
+    assert.strictEqual(sandbox.test_isSuggestionEnabled(['id', [[]], [1], [1], 1, [true, true, [2], [true]]]), true)
+  })
+
+  it('treats toggle value 1, null block, or missing block as disabled', () => {
+    const { sandbox } = setupEnvironment()
+    assert.strictEqual(sandbox.test_isSuggestionEnabled(['id', [[]], [1], [1], 1, [true, true, [1], [true]]]), false)
+    assert.strictEqual(sandbox.test_isSuggestionEnabled(['id', [[]], [1], [1], 1, [null, null, [1]]]), false)
+    assert.strictEqual(sandbox.test_isSuggestionEnabled(['id', [[]], [1], [1], 1]), false)
+  })
+})
+
+describe('listSuggestionEnabledSources', () => {
+  it('returns only github repos whose Suggestions toggle is ON', async () => {
     const { sandbox } = setupEnvironment()
     sandbox.callBatchExecute = async () => [
       [
-        ['github/n24q02m/.github', [[false, '.github', 'n24q02m']], [1], [1], 1],
-        ['github/n24q02m/Aiora', [[true, 'Aiora', 'n24q02m']], [1], [1], 1],
-        ['not-a-github-source', [[]], [1], [1], 1],
-        [null, [[]], [1], [1], 1]
+        ['github/n24q02m/on-a', [[true, 'on-a', 'n24q02m']], [1], [1], 1, [true, true, [2], [true]]],
+        ['github/n24q02m/off-toggle', [[true, 'off-toggle', 'n24q02m']], [1], [1], 1, [true, true, [1], [true]]],
+        ['github/n24q02m/off-noblock', [[true, 'off-noblock', 'n24q02m']], [1], [1], 1],
+        ['github/n24q02m/on-b', [[true, 'on-b', 'n24q02m']], [1], [1], 1, [true, true, [2], [true]]],
+        ['not-a-github-source', [[]], [1], [1], 1, [true, true, [2], [true]]],
+        [null, [[]], [1], [1], 1, [true, true, [2], [true]]]
       ]
     ]
-    const repos = await sandbox.test_listSources({})
-    assert.deepStrictEqual(repos, ['github/n24q02m/.github', 'github/n24q02m/Aiora'])
+    const repos = await sandbox.test_listSuggestionEnabledSources({})
+    assert.deepStrictEqual(repos, ['github/n24q02m/on-a', 'github/n24q02m/on-b'])
   })
 
   it('returns [] when the response has no sources', async () => {
     const { sandbox } = setupEnvironment()
     sandbox.callBatchExecute = async () => null
     // JSON.stringify avoids cross-VM Array realm mismatch in deepStrictEqual.
-    assert.strictEqual(JSON.stringify(await sandbox.test_listSources({})), '[]')
+    assert.strictEqual(JSON.stringify(await sandbox.test_listSuggestionEnabledSources({})), '[]')
+  })
+})
+
+describe('getDailySessionQuota', () => {
+  it('parses KQOO7 into used/limit/remaining', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.callBatchExecute = async () => [13, [86400], 100, 1, 2]
+    // JSON.stringify avoids cross-VM realm mismatch in deepStrictEqual.
+    assert.strictEqual(
+      JSON.stringify(await sandbox.test_getDailySessionQuota({})),
+      JSON.stringify({ used: 13, limit: 100, remaining: 87 })
+    )
+  })
+
+  it('clamps remaining at 0 when over the limit', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.callBatchExecute = async () => [268, [86400], 100]
+    assert.strictEqual(
+      JSON.stringify(await sandbox.test_getDailySessionQuota({})),
+      JSON.stringify({ used: 268, limit: 100, remaining: 0 })
+    )
+  })
+
+  it('returns null for an unrecognised shape', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.callBatchExecute = async () => null
+    assert.strictEqual(await sandbox.test_getDailySessionQuota({}), null)
   })
 })
 
