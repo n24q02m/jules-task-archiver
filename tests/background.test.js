@@ -297,6 +297,29 @@ describe('runInPool', () => {
     const results = await sandbox.test_runInPool(['a', 'b', 'c'], 2, async (item, idx) => `${item}${idx}`)
     assert.deepStrictEqual(results, ['a0', 'b1', 'c2'])
   })
+
+  it('should handle limit = 0 by using a minimum concurrency of 1', async () => {
+    const { sandbox } = setupEnvironment()
+    const results = await sandbox.test_runInPool([1, 2, 3], 0, async (n) => n * 2)
+    assert.deepStrictEqual(results, [2, 4, 6])
+  })
+
+  it('should handle non-integer limits by rounding down', async () => {
+    const { sandbox } = setupEnvironment()
+    const results = await sandbox.test_runInPool([1, 2, 3], 2.9, async (n) => n * 2)
+    assert.deepStrictEqual(results, [2, 4, 6])
+  })
+
+  it('should propagate worker errors', async () => {
+    const { sandbox } = setupEnvironment()
+    await assert.rejects(
+      sandbox.test_runInPool([1, 2, 3], 2, async (n) => {
+        if (n === 2) throw new Error('worker failed')
+        return n
+      }),
+      { message: 'worker failed' }
+    )
+  })
 })
 
 describe('listSources', () => {

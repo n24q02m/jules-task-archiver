@@ -82,7 +82,7 @@ async function runInPool(items, limit, worker) {
     }
   }
 
-  const poolSize = Math.min(limit, items.length)
+  const poolSize = items.length > 0 ? Math.max(1, Math.min(Math.floor(limit), items.length)) : 0
   const pool = []
   for (let i = 0; i < poolSize; i++) {
     pool.push(drain())
