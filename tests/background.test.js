@@ -138,6 +138,7 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_stopKeepAlive = stopKeepAlive;
     globalThis.test_getKeepAliveInterval = () => keepAliveInterval;
     globalThis.test_listSuggestions = listSuggestions;
+    globalThis.test_listSources = listSources;
     globalThis.test_ensureContentScript = ensureContentScript;
     globalThis.test_getTabConfig = getTabConfig;
   `
@@ -295,6 +296,29 @@ describe('runInPool', () => {
     const { sandbox } = setupEnvironment()
     const results = await sandbox.test_runInPool(['a', 'b', 'c'], 2, async (item, idx) => `${item}${idx}`)
     assert.deepStrictEqual(results, ['a0', 'b1', 'c2'])
+  })
+})
+
+describe('listSources', () => {
+  it('extracts github sources from a YqkSHd response (independent of tasks)', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.callBatchExecute = async () => [
+      [
+        ['github/n24q02m/.github', [[false, '.github', 'n24q02m']], [1], [1], 1],
+        ['github/n24q02m/Aiora', [[true, 'Aiora', 'n24q02m']], [1], [1], 1],
+        ['not-a-github-source', [[]], [1], [1], 1],
+        [null, [[]], [1], [1], 1]
+      ]
+    ]
+    const repos = await sandbox.test_listSources({})
+    assert.deepStrictEqual(repos, ['github/n24q02m/.github', 'github/n24q02m/Aiora'])
+  })
+
+  it('returns [] when the response has no sources', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.callBatchExecute = async () => null
+    // JSON.stringify avoids cross-VM Array realm mismatch in deepStrictEqual.
+    assert.strictEqual(JSON.stringify(await sandbox.test_listSources({})), '[]')
   })
 })
 

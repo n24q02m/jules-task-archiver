@@ -392,6 +392,16 @@ async function listSuggestions(repo, config) {
   }, [])
 }
 
+// List the account's connected repos (sources) directly, independent of tasks.
+// Response shape (YqkSHd): result[0] is an array of source entries whose [0]
+// is the "github/owner/repo" id. Deriving repos from tasks instead meant that
+// archiving every task hid all repos from Suggestions.
+async function listSources(config) {
+  const result = await callBatchExecute('YqkSHd', [null, 'source_status=SOURCE_STATUS_ACTIVE'], config)
+  if (!result?.[0]) return []
+  return result[0].map((s) => s?.[0]).filter((src) => typeof src === 'string' && src.startsWith('github/'))
+}
+
 // =============================================================================
 // Prompt Builder
 // =============================================================================
@@ -553,27 +563,23 @@ async function processSuggestionsForTab(tab, options) {
     addLog(`[${label}] Tip: Click Start on any suggestion in Jules UI to capture config.`)
   }
 
-  // Get repos from existing tasks
-  addLog(`[${label}] Fetching task list to discover repos...`)
-  let tasks
+  // Discover connected repos directly (independent of tasks). Deriving repos
+  // from active tasks meant archiving all tasks hid every repo from Suggestions.
+  addLog(`[${label}] Fetching connected repos...`)
+  let repos
   try {
-    tasks = await listTasks('', config)
+    repos = await listSources(config)
   } catch (e) {
-    addLog(`[${label}] ERROR listing tasks: ${e.message}`)
+    addLog(`[${label}] ERROR listing sources: ${e.message}`)
     return 0
   }
 
-  const repoSet = new Set()
-  for (const t of tasks) {
-    if (t.source) repoSet.add(t.source)
-  }
-  const repos = [...repoSet]
   if (repos.length === 0) {
-    addLog(`[${label}] No repos found from tasks.`)
+    addLog(`[${label}] No connected repos found.`)
     return 0
   }
 
-  addLog(`[${label}] Found ${repos.length} repos: ${repos.join(', ')}`)
+  addLog(`[${label}] Found ${repos.length} connected repos`)
 
   addLog(`\n[${label}] Fetching suggestions for ${repos.length} repos concurrently...`)
   const allSuggestions = await runInPool(repos, PER_ACCOUNT_CONCURRENCY, (repo) =>

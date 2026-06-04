@@ -78,11 +78,12 @@ describe('Orchestrator Performance Optimization', () => {
       }
     })
 
-    // Mock dependencies
-    let listTasksCalled = 0
-    sandbox.listTasks = async () => {
-      listTasksCalled++
-      return [{ source: 'github/owner/repo1' }, { source: 'github/owner/repo2' }]
+    // Mock dependencies. Repos are now discovered via listSources (connected
+    // repos), independent of tasks.
+    let listSourcesCalled = 0
+    sandbox.listSources = async () => {
+      listSourcesCalled++
+      return ['github/owner/repo1', 'github/owner/repo2']
     }
 
     let listSuggestionsCount = 0
@@ -109,7 +110,7 @@ describe('Orchestrator Performance Optimization', () => {
 
     await sandbox.processSuggestionsForTab(tab, options)
 
-    assert.strictEqual(listTasksCalled, 1, 'listTasks should be called once')
+    assert.strictEqual(listSourcesCalled, 1, 'listSources should be called once')
     assert.strictEqual(listSuggestionsCount, 2, 'listSuggestions should be called for each repo')
     assert.strictEqual(
       startSuggestionCount,
