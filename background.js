@@ -627,29 +627,75 @@ const DEFAULT_STATE = {
   error: null
 }
 
-let state = { ...DEFAULT_STATE }
+// A bulk run can emit thousands of log lines (one per task across several
+// accounts). Cap the retained log so each persisted snapshot and popup render
+// stays bounded — otherwise the array grows without limit and every write
+// re-serializes the whole thing.
+const MAX_LOG_LINES = 2000
 
-const stateReadyPromise = chrome.storage.session.get('archiveState').then((data) => {
-  if (data.archiveState) {
-    state = data.archiveState
-    if (state.status === 'running') {
-      state.status = 'error'
-      state.error = 'Operation interrupted (browser killed service worker)'
-      state.log.push('\n[!] Service worker was terminated during operation.')
-      chrome.storage.session.set({ archiveState: state })
-    }
+let state = { ...DEFAULT_STATE }
+let pendingFlush = null
+
+function trimLog() {
+  if (state.log.length > MAX_LOG_LINES) {
+    state.log.splice(0, state.log.length - MAX_LOG_LINES)
   }
-})
+}
+
+// Persisting on every addLog/updateState writes the whole (growing) state to
+// chrome.storage.session per line — O(n^2) writes over a bulk run, plus an
+// onChanged event (and full popup re-render) each time, which froze both the
+// service worker and the popup. Coalesce rapid updates into one deferred write;
+// flush status transitions immediately so the popup always sees the terminal
+// state without waiting.
+function persistNow() {
+  if (pendingFlush) {
+    clearTimeout(pendingFlush)
+    pendingFlush = null
+  }
+  chrome.storage.session.set({ archiveState: state })
+}
+
+function persistSoon() {
+  if (pendingFlush) return
+  pendingFlush = setTimeout(() => {
+    pendingFlush = null
+    chrome.storage.session.set({ archiveState: state })
+  }, 150)
+}
 
 function updateState(patch) {
   Object.assign(state, patch)
-  chrome.storage.session.set({ archiveState: state })
+  // Status milestones (running/done/error/idle) are user-visible — flush right
+  // away; progress ticks and log spam coalesce into the deferred write.
+  if ('status' in patch) {
+    persistNow()
+  } else {
+    persistSoon()
+  }
 }
 
 function addLog(message) {
   state.log.push(message)
-  updateState({})
+  trimLog()
+  persistSoon()
 }
+
+const stateReadyPromise = chrome.storage.session.get('archiveState').then((data) => {
+  if (data.archiveState) {
+    state = data.archiveState
+    if (!Array.isArray(state.log)) state.log = []
+    // A previous (pre-cap) run may have persisted a huge log that freezes the
+    // popup on open; bound it defensively on load.
+    trimLog()
+    if (state.status === 'running') {
+      state.status = 'error'
+      state.error = 'Operation interrupted (browser killed service worker)'
+      state.log.push('\n[!] Service worker was terminated during operation.')
+      persistNow()
+    }
+  }
+})
 
 // =============================================================================
 // KeepAlive (unchanged from v1)

@@ -58,6 +58,7 @@ function setupEnvironment(initialStorage = {}) {
     chrome: chromeMock,
     fetch: async () => ({ ok: true, json: async () => [], text: async () => ")]}'\n\n4\n[[]]" }),
     setTimeout,
+    clearTimeout,
     // No-op timer mocks: the real keepAlive interval would otherwise keep the
     // Node event loop alive and hang the test process after all tests pass.
     setInterval: (fn, ms) => {
@@ -962,7 +963,7 @@ describe('state management', () => {
     assert.strictEqual(sessionSetData.length, 1)
   })
 
-  it('should add log messages and persist state', async () => {
+  it('should add log messages and persist state (coalesced)', async () => {
     const { sandbox, sessionSetData } = setupEnvironment({})
     await sandbox.test_stateReadyPromise
     await new Promise((resolve) => setTimeout(resolve, 10))
@@ -970,11 +971,38 @@ describe('state management', () => {
 
     sandbox.test_addLog('Processing task 1')
     const state = sandbox.test_state()
+    // In-memory state updates immediately...
     assert.strictEqual(state.log.length, 1)
     assert.strictEqual(state.log[0], 'Processing task 1')
+    // ...but the storage write is coalesced into a deferred flush.
+    await new Promise((resolve) => setTimeout(resolve, 200))
     assert.strictEqual(sessionSetData.length, 1)
     // Use JSON.stringify to avoid cross-VM reference issues with deepStrictEqual
     assert.strictEqual(JSON.stringify(sessionSetData[0].archiveState.log), JSON.stringify(['Processing task 1']))
+  })
+
+  it('caps the retained log at MAX_LOG_LINES, dropping the oldest lines', () => {
+    const { sandbox } = setupEnvironment({})
+    for (let i = 0; i < 2500; i++) sandbox.test_addLog(`line ${i}`)
+    const log = sandbox.test_state().log
+    assert.strictEqual(log.length, 2000)
+    assert.strictEqual(log[log.length - 1], 'line 2499')
+    assert.strictEqual(log[0], 'line 500') // oldest 500 lines dropped
+  })
+
+  it('coalesces a storm of log writes into a single storage write', async () => {
+    const { sandbox, sessionSetData } = setupEnvironment({})
+    await sandbox.test_stateReadyPromise
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    sessionSetData.length = 0
+
+    for (let i = 0; i < 500; i++) sandbox.test_addLog(`line ${i}`)
+    // No synchronous write-per-line storm (the O(n^2) freeze).
+    assert.strictEqual(sessionSetData.length, 0)
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    // 500 rapid log lines collapse into one deferred flush.
+    assert.strictEqual(sessionSetData.length, 1)
+    assert.strictEqual(sessionSetData[0].archiveState.log.length, 500)
   })
 })
 
