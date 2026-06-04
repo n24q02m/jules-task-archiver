@@ -512,6 +512,13 @@ const DEFAULT_FEATURE_FLAGS = [
   ['enable_jules_cheatsheet', 1],
   ['enable_messages_every_turn', 1]
 ]
+function buildModelConfig(modelId, featureFlags) {
+  return [null, modelId, null, [], 1, null, null, null, null, [360], featureFlags]
+}
+
+function buildSuggestionMetadata(suggestionId, experimentIds) {
+  return [9, null, null, null, experimentIds, [null, [1, 1]], null, null, null, null, null, [null, suggestionId]]
+}
 
 function buildStartPayload(suggestion, repo, config, startConfig) {
   const prompt = buildSuggestionPrompt(suggestion)
@@ -519,23 +526,10 @@ function buildStartPayload(suggestion, repo, config, startConfig) {
   const featureFlags = startConfig?.featureFlags || DEFAULT_FEATURE_FLAGS
   const experimentIds = startConfig?.experimentIds || []
 
-  return [
-    prompt,
-    null,
-    [null, modelId, null, [], 1, null, null, null, null, [360], featureFlags],
-    null,
-    repo,
-    null,
-    null,
-    null,
-    null,
-    [9, null, null, null, experimentIds, [null, [1, 1]], null, null, null, null, null, [null, suggestion.id]],
-    null,
-    null,
-    null,
-    null,
-    1
-  ]
+  const modelConfig = buildModelConfig(modelId, featureFlags)
+  const metadata = buildSuggestionMetadata(suggestion.id, experimentIds)
+
+  return [prompt, null, modelConfig, null, repo, null, null, null, null, metadata, null, null, null, null, 1]
 }
 
 async function startSuggestion(suggestion, repo, config, startConfig) {
