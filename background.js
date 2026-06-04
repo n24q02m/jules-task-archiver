@@ -230,8 +230,13 @@ const TASK = {
   DISPLAY_TITLE: 26
 }
 
-// Task states that indicate the task is finished and safe to archive
-const ARCHIVABLE_STATES = new Set([3, 9]) // 3=completed, 9=failed
+// Task states that indicate the task is finished and safe to archive.
+// Verified 2026-06-04 against 725 real tasks from the live batchexecute API:
+// finished tasks settle into states 2, 4, 12, or null. Any OTHER state is
+// treated as still-active and left untouched in the default flow (Force
+// archives regardless). Keeping this an allowlist means an unknown/new state
+// is protected by default rather than silently archived.
+const ARCHIVABLE_STATES = new Set([2, 4, 12])
 
 function parseTask(raw) {
   const source = raw[TASK.SOURCE] || ''
@@ -249,7 +254,8 @@ function parseTask(raw) {
 }
 
 function isArchivable(task) {
-  return ARCHIVABLE_STATES.has(task.state)
+  // A null/undefined state is emitted for one class of completed tasks.
+  return task.state == null || ARCHIVABLE_STATES.has(task.state)
 }
 
 async function listTasks(filter, config) {
@@ -786,7 +792,7 @@ async function processTab(tab, options) {
     return 0
   }
 
-  // Filter by task state: only completed/failed are candidates
+  // Partition into archivable (terminal) vs active (still-running) tasks.
   const candidates = []
   const active = []
   for (const t of tasks) {
@@ -797,33 +803,41 @@ async function processTab(tab, options) {
     }
   }
 
-  addLog(`[${label}] ${tasks.length} total: ${candidates.length} completed/failed, ${active.length} active`)
+  addLog(`[${label}] ${tasks.length} total: ${candidates.length} archivable, ${active.length} active`)
 
-  if (candidates.length === 0) {
-    addLog(`[${label}] No completed/failed tasks to archive.`)
-    return 0
-  }
-
-  // Group candidates by repo
-  const byRepo = new Map()
-  for (const task of candidates) {
-    const key = task.repo || '(no repo)'
-    if (!byRepo.has(key)) byRepo.set(key, [])
-    byRepo.get(key).push(task)
-  }
-
-  // PR check: task-level matching (skip tasks with open matching PRs)
   const toArchive = []
   const toSkip = []
 
-  const { ghOwner } = await chrome.storage.sync.get(['ghOwner'])
-  const { ghToken } = await chrome.storage.local.get(['ghToken'])
-
   if (options.force) {
-    addLog(`[${label}] FORCE: skipping PR check`)
-    for (const task of candidates) toArchive.push(task)
+    // Escape hatch: archive EVERY listed task, ignoring both the state filter
+    // and the PR check. Independent of the (reverse-engineered, drift-prone)
+    // state codes, so Force keeps working even if Jules changes them. Archiving
+    // is reversible in Jules.
+    addLog(`[${label}] FORCE: archiving all ${tasks.length} tasks (skip state filter + PR check)`)
+    for (const task of tasks) toArchive.push(task)
   } else {
+    if (candidates.length === 0) {
+      // Surface drift instead of silently archiving nothing: if Jules changes
+      // its state codes, the operator sees the unrecognized states and the
+      // Force hint rather than a mysterious no-op.
+      const states = [...new Set(tasks.map((t) => t.state))].join(', ')
+      addLog(`[${label}] No archivable tasks among ${tasks.length} (states seen: ${states}).`)
+      addLog(`[${label}] Enable Force to archive regardless of state.`)
+      return 0
+    }
+
+    // Group candidates by repo for per-repo open-PR lookups.
+    const byRepo = new Map()
+    for (const task of candidates) {
+      const key = task.repo || '(no repo)'
+      if (!byRepo.has(key)) byRepo.set(key, [])
+      byRepo.get(key).push(task)
+    }
+
     addLog(`\n[${label}] Checking open PRs per task...`)
+    const { ghOwner } = await chrome.storage.sync.get(['ghOwner'])
+    const { ghToken } = await chrome.storage.local.get(['ghToken'])
+
     // Fetch open PRs concurrently for all repos (bounded)
     const repoEntries = [...byRepo.entries()]
     const allPRs = await runInPool(repoEntries, API_CONCURRENCY, ([_repo, repoTasks]) => {
@@ -838,10 +852,10 @@ async function processTab(tab, options) {
       addLog(`  ${repo}: ${repoTasks.length} tasks, ${openPRs.length} open PRs`)
 
       for (const task of repoTasks) {
-        if (task.state === 9) {
-          // Failed tasks: always archive (no PR created)
-          toArchive.push(task)
-        } else if (taskHasOpenPR(task, openPRs)) {
+        // A task whose title matches an open PR is likely still active work,
+        // so skip it in the default flow. Tasks with no matching PR (including
+        // failed runs, which never opened one) are archived.
+        if (taskHasOpenPR(task, openPRs)) {
           toSkip.push(task)
           addLog(`    SKIP [${task.id}] ${task.title} (matching open PR)`)
         } else {
