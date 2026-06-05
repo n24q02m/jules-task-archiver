@@ -23,6 +23,17 @@ const API_CONCURRENCY = 5
 const PER_ACCOUNT_CONCURRENCY = 6
 const GLOBAL_CONCURRENCY = 12
 
+function getRandomInt(max) {
+  const randomArray = new Uint32Array(1)
+  const limit = 2 ** 32 - (2 ** 32 % max)
+  let result
+  do {
+    crypto.getRandomValues(randomArray)
+    result = randomArray[0]
+  } while (result >= limit)
+  return result % max
+}
+
 function extractAccountNum(url) {
   try {
     const parts = new URL(url).pathname.split('/')
@@ -343,7 +354,7 @@ async function withRetry(fn) {
       return await fn()
     } catch (e) {
       if (attempt === RETRY_ATTEMPTS - 1 || !isRetryable(e.message)) throw e
-      const delay = RETRY_BASE_MS * 2 ** attempt + Math.random() * 200
+      const delay = RETRY_BASE_MS * 2 ** attempt + getRandomInt(200)
       await new Promise((r) => setTimeout(r, delay))
     }
   }
@@ -1094,9 +1105,7 @@ async function processTab(tab, options) {
 
 function initOperationState(options) {
   prCache.clear()
-  const randomArray = new Uint32Array(1)
-  crypto.getRandomValues(randomArray)
-  reqCounter = (randomArray[0] % 900000) + 100000
+  reqCounter = getRandomInt(900000) + 100000
   startKeepAlive()
   updateState({
     status: 'running',
