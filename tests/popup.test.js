@@ -110,7 +110,7 @@ function setupPopupSandbox() {
   elements['#force'].parentElement = createMockElement('div')
   elements['#progressFill'].parentElement = createMockElement('div')
 
-  elements['#force'].closest = (sel) => sel === '.setting-row' ? elements['#force'].parentElement : null
+  elements['#force'].closest = (sel) => (sel === '.setting-row' ? elements['#force'].parentElement : null)
 
   const opModeButtons = [
     createMockElement('button', { dataset: { value: 'archive' } }),
