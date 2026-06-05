@@ -23,12 +23,15 @@ const API_CONCURRENCY = 5
 const PER_ACCOUNT_CONCURRENCY = 6
 const GLOBAL_CONCURRENCY = 12
 
+// ⚡ Bolt Optimization: After parsing the URL, use a fast regex test to extract
+// the account ID instead of allocating string arrays via `.split('/')`. This avoids
+// object allocation overhead while preserving the original strict URL validation.
+const ACCOUNT_NUM_REGEX = /\/u\/(\d+)(?:\/|$)/
 function extractAccountNum(url) {
   try {
-    const parts = new URL(url).pathname.split('/')
-    const uIdx = parts.indexOf('u')
-    const val = uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
-    return /^\d+$/.test(val) ? val : '0'
+    const pathname = new URL(url).pathname
+    const match = ACCOUNT_NUM_REGEX.exec(pathname)
+    return match ? match[1] : '0'
   } catch (_e) {
     return '0'
   }
