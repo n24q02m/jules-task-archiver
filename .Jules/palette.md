@@ -19,3 +19,6 @@
 ## 2025-06-25 - Differentiating Loading vs Disabled States
 **Learning:** Using the same disabled styling (grayed out) for an active, processing state (e.g., when a button is clicked and waiting for an async operation) makes the UI feel unresponsive and "dead," confusing users about whether the action is actually occurring.
 **Action:** Always visually distinguish a loading state from a purely disabled state. If a button is disabled because it is busy (`[aria-busy="true"]`), maintain the primary visual context (like color) but indicate processing (e.g., cursor: wait, partial opacity). Additionally, add subtle interactive feedback like `transform: scale(0.98)` on active states to improve tactile feel.
+## 2025-07-15 - Directional Progressive Disclosure
+**Learning:** When using progressive disclosure to hide/show UI sections based on a toggle state, the controlled sections must always be placed *below* the controlling toggle. If sections above the toggle are hidden, it causes a jarring layout shift that yanks the toggle out from under the user's cursor/finger, breaking visual continuity.
+**Action:** Always structure multi-mode UIs top-to-bottom: primary mode selectors first, followed by the context-specific settings they control.

@@ -11,6 +11,16 @@
       <span class="version">v2.0</span>
     </header>
 
+    <section class="operation-mode">
+      <div class="setting-row">
+        <label id="opModeLabel">Operation</label>
+        <div class="segmented" id="opMode" role="group" aria-labelledby="opModeLabel">
+          <button type="button" data-value="archive" class="active" aria-pressed="true">Archive Tasks</button>
+          <button type="button" data-value="suggestions" aria-pressed="false">Start Suggestions</button>
+        </div>
+      </div>
+    </section>
+
     <section class="settings">
       <h2>Settings</h2>
       <label for="ghOwner">
@@ -32,13 +42,6 @@
 
     <section class="options">
       <h2>Options</h2>
-      <div class="setting-row">
-        <label id="opModeLabel">Operation</label>
-        <div class="segmented" id="opMode" role="group" aria-labelledby="opModeLabel">
-          <button type="button" data-value="archive" class="active" aria-pressed="true">Archive Tasks</button>
-          <button type="button" data-value="suggestions" aria-pressed="false">Start Suggestions</button>
-        </div>
-      </div>
       <div class="setting-row">
         <label id="execModeLabel">Execution Mode</label>
         <div class="radio-group" role="radiogroup" aria-labelledby="execModeLabel">
