@@ -337,13 +337,22 @@ function isRetryable(message) {
   return /HTTP 429|HTTP 5\d\d|Failed to fetch|NetworkError/i.test(message || '')
 }
 
+function getRandomInt(max) {
+  const randomArray = new Uint32Array(1)
+  const limit = 2 ** 32 - (2 ** 32 % max)
+  do {
+    crypto.getRandomValues(randomArray)
+  } while (randomArray[0] >= limit)
+  return randomArray[0] % max
+}
+
 async function withRetry(fn) {
   for (let attempt = 0; attempt < RETRY_ATTEMPTS; attempt++) {
     try {
       return await fn()
     } catch (e) {
       if (attempt === RETRY_ATTEMPTS - 1 || !isRetryable(e.message)) throw e
-      const delay = RETRY_BASE_MS * 2 ** attempt + Math.random() * 200
+      const delay = RETRY_BASE_MS * 2 ** attempt + getRandomInt(200)
       await new Promise((r) => setTimeout(r, delay))
     }
   }
@@ -1094,9 +1103,7 @@ async function processTab(tab, options) {
 
 function initOperationState(options) {
   prCache.clear()
-  const randomArray = new Uint32Array(1)
-  crypto.getRandomValues(randomArray)
-  reqCounter = (randomArray[0] % 900000) + 100000
+  reqCounter = getRandomInt(900000) + 100000
   startKeepAlive()
   updateState({
     status: 'running',
