@@ -629,17 +629,21 @@ async function processSuggestionsForTab(tab, options) {
   // Flatten (repo, suggestion) pairs across all repos so the pool stays
   // saturated instead of draining one repo at a time.
   const work = []
+  const logBatch = []
   for (const { repo, suggestions, error } of allSuggestions) {
     if (error) {
-      addLog(`\n[${label}] ERROR fetching suggestions for ${repo}: ${error}`)
+      logBatch.push(`\n[${label}] ERROR fetching suggestions for ${repo}: ${error}`)
       continue
     }
     if (suggestions.length === 0) {
-      addLog(`\n[${label}] ${repo}: No suggestions found`)
+      logBatch.push(`\n[${label}] ${repo}: No suggestions found`)
       continue
     }
-    addLog(`\n[${label}] ${repo}: Found ${suggestions.length} suggestions`)
+    logBatch.push(`\n[${label}] ${repo}: Found ${suggestions.length} suggestions`)
     for (const s of suggestions) work.push({ repo, s })
+  }
+  if (logBatch.length > 0) {
+    addLog(logBatch.join('\n'))
   }
 
   if (work.length === 0) {
@@ -1017,10 +1021,11 @@ async function processTab(tab, options) {
       return owner && repoName ? getOpenPRs(owner, repoName, ghToken) : Promise.resolve([])
     })
 
+    const logBatch = []
     for (let i = 0; i < repoEntries.length; i++) {
       const [repo, repoTasks] = repoEntries[i]
       const openPRs = allPRs[i]
-      addLog(`  ${repo}: ${repoTasks.length} tasks, ${openPRs.length} open PRs`)
+      logBatch.push(`  ${repo}: ${repoTasks.length} tasks, ${openPRs.length} open PRs`)
 
       for (const task of repoTasks) {
         // A task whose title matches an open PR is likely still active work,
@@ -1028,11 +1033,14 @@ async function processTab(tab, options) {
         // failed runs, which never opened one) are archived.
         if (taskHasOpenPR(task, openPRs)) {
           toSkip.push(task)
-          addLog(`    SKIP [${task.id}] ${task.title} (matching open PR)`)
+          logBatch.push(`    SKIP [${task.id}] ${task.title} (matching open PR)`)
         } else {
           toArchive.push(task)
         }
       }
+    }
+    if (logBatch.length > 0) {
+      addLog(logBatch.join('\n'))
     }
   }
 
@@ -1050,7 +1058,7 @@ async function processTab(tab, options) {
   addLog(`\n[${label}] Archiving ${totalTasks} tasks`)
 
   if (options.dryRun) {
-    addLog(`[${label}] DRY RUN - would archive ${totalTasks} tasks`)
+    const dryRunLogs = [`[${label}] DRY RUN - would archive ${totalTasks} tasks`]
     const archiveByRepo = new Map()
     for (const t of toArchive) {
       const key = t.repo || '(no repo)'
@@ -1058,11 +1066,12 @@ async function processTab(tab, options) {
       archiveByRepo.get(key).push(t)
     }
     for (const [repo, repoTasks] of archiveByRepo) {
-      addLog(`  ${repo}: ${repoTasks.length} tasks`)
+      dryRunLogs.push(`  ${repo}: ${repoTasks.length} tasks`)
       for (const t of repoTasks) {
-        addLog(`    [${t.id}] ${t.title} (state=${t.state})`)
+        dryRunLogs.push(`    [${t.id}] ${t.title} (state=${t.state})`)
       }
     }
+    addLog(dryRunLogs.join('\n'))
     return 0
   }
 
