@@ -472,49 +472,47 @@ async function getDailySessionQuota(config) {
 // Prompt Builder
 // =============================================================================
 
+const SECURITY_CONFIG = {
+  icon: '[SECURITY]',
+  name: 'Security Vulnerability Fix',
+  role: 'security-focused',
+  codeLabel: 'Vulnerable Code'
+}
+
+const PERFORMANCE_CONFIG = {
+  icon: '[PERF]',
+  name: 'Performance Optimization',
+  role: 'performance-focused',
+  codeLabel: 'Inefficient Code'
+}
+
+const CLEANUP_CONFIG = {
+  icon: '[CLEANUP]',
+  name: 'Code Cleanup',
+  role: 'code-quality-focused',
+  codeLabel: 'Code to Clean'
+}
+
+const TESTING_CONFIG = {
+  icon: '[TEST]',
+  name: 'Test Coverage',
+  role: 'testing-focused',
+  codeLabel: 'Untested Code'
+}
+
 const CATEGORY_CONFIG = {
-  'input-validation': {
-    icon: '[SECURITY]',
-    name: 'Security Vulnerability Fix',
-    role: 'security-focused',
-    codeLabel: 'Vulnerable Code'
-  },
-  'insecure-config': {
-    icon: '[SECURITY]',
-    name: 'Security Vulnerability Fix',
-    role: 'security-focused',
-    codeLabel: 'Vulnerable Code'
-  },
-  injection: {
-    icon: '[SECURITY]',
-    name: 'Security Vulnerability Fix',
-    role: 'security-focused',
-    codeLabel: 'Vulnerable Code'
-  },
-  'async-io': {
-    icon: '[PERF]',
-    name: 'Performance Optimization',
-    role: 'performance-focused',
-    codeLabel: 'Inefficient Code'
-  },
-  'loop-optimization': {
-    icon: '[PERF]',
-    name: 'Performance Optimization',
-    role: 'performance-focused',
-    codeLabel: 'Inefficient Code'
-  },
-  'data-structure': {
-    icon: '[PERF]',
-    name: 'Performance Optimization',
-    role: 'performance-focused',
-    codeLabel: 'Inefficient Code'
-  },
-  'dead-code': { icon: '[CLEANUP]', name: 'Code Cleanup', role: 'code-quality-focused', codeLabel: 'Code to Clean' },
-  other: { icon: '[CLEANUP]', name: 'Code Cleanup', role: 'code-quality-focused', codeLabel: 'Code to Clean' },
-  'untested-function': { icon: '[TEST]', name: 'Test Coverage', role: 'testing-focused', codeLabel: 'Untested Code' },
-  'missing-error-test': { icon: '[TEST]', name: 'Test Coverage', role: 'testing-focused', codeLabel: 'Untested Code' },
-  'missing-edge-case': { icon: '[TEST]', name: 'Test Coverage', role: 'testing-focused', codeLabel: 'Untested Code' },
-  'missing-test-file': { icon: '[TEST]', name: 'Test Coverage', role: 'testing-focused', codeLabel: 'Untested Code' }
+  'input-validation': SECURITY_CONFIG,
+  'insecure-config': SECURITY_CONFIG,
+  injection: SECURITY_CONFIG,
+  'async-io': PERFORMANCE_CONFIG,
+  'loop-optimization': PERFORMANCE_CONFIG,
+  'data-structure': PERFORMANCE_CONFIG,
+  'dead-code': CLEANUP_CONFIG,
+  other: CLEANUP_CONFIG,
+  'untested-function': TESTING_CONFIG,
+  'missing-error-test': TESTING_CONFIG,
+  'missing-edge-case': TESTING_CONFIG,
+  'missing-test-file': TESTING_CONFIG
 }
 
 const DEFAULT_CATEGORY = { icon: '[FIX]', name: 'Code Improvement', role: 'engineering-focused', codeLabel: 'Code' }
