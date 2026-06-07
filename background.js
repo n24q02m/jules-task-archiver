@@ -35,6 +35,23 @@ function extractAccountNum(url) {
 }
 
 // =============================================================================
+// Security Utilities
+// =============================================================================
+
+/**
+ * Returns a cryptographically strong, uniform random integer in [0, max-1].
+ * Uses rejection sampling to avoid modulo bias.
+ */
+function getRandomInt(max) {
+  const array = new Uint32Array(1)
+  const limit = 2 ** 32 - (2 ** 32 % max)
+  while (true) {
+    crypto.getRandomValues(array)
+    if (array[0] < limit) return array[0] % max
+  }
+}
+
+// =============================================================================
 // Network Utilities
 // =============================================================================
 
@@ -343,7 +360,7 @@ async function withRetry(fn) {
       return await fn()
     } catch (e) {
       if (attempt === RETRY_ATTEMPTS - 1 || !isRetryable(e.message)) throw e
-      const delay = RETRY_BASE_MS * 2 ** attempt + Math.random() * 200
+      const delay = RETRY_BASE_MS * 2 ** attempt + getRandomInt(200)
       await new Promise((r) => setTimeout(r, delay))
     }
   }
@@ -1094,9 +1111,7 @@ async function processTab(tab, options) {
 
 function initOperationState(options) {
   prCache.clear()
-  const randomArray = new Uint32Array(1)
-  crypto.getRandomValues(randomArray)
-  reqCounter = (randomArray[0] % 900000) + 100000
+  reqCounter = getRandomInt(900000) + 100000
   startKeepAlive()
   updateState({
     status: 'running',
