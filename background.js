@@ -1135,18 +1135,16 @@ async function discoverTabs(options) {
 async function processAllTabs(tabs, options, isSuggestions) {
   // Process accounts in parallel. Per-account pools and the shared global
   // limiter keep total in-flight requests bounded; results preserve tab order.
-  return Promise.all(
-    tabs.map(async (tab) => {
-      const label = getTabLabel(tab)
-      try {
-        const count = isSuggestions ? await processSuggestionsForTab(tab, options) : await processTab(tab, options)
-        return { label, count }
-      } catch (e) {
-        addLog(`ERROR [${label}]: ${e.message}`)
-        return { label, count: 0, err: e.message }
-      }
-    })
-  )
+  return runInPool(tabs, API_CONCURRENCY, async (tab) => {
+    const label = getTabLabel(tab)
+    try {
+      const count = isSuggestions ? await processSuggestionsForTab(tab, options) : await processTab(tab, options)
+      return { label, count }
+    } catch (e) {
+      addLog(`ERROR [${label}]: ${e.message}`)
+      return { label, count: 0, err: e.message }
+    }
+  })
 }
 
 function finalizeOperation(results, isSuggestions) {
