@@ -326,6 +326,20 @@ async function listTasks(filter, config) {
   return result[0].map(parseTask)
 }
 
+async function safeListTasks(label, config) {
+  try {
+    const tasks = await listTasks('', config)
+    if (tasks.length === 0) {
+      addLog(`[${label}] No tasks found.`)
+      return null
+    }
+    return tasks
+  } catch (e) {
+    addLog(`[${label}] ERROR listing tasks: ${e.message}`)
+    return null
+  }
+}
+
 async function archiveTask(taskId, config) {
   await callBatchExecute('Tjmm5c', [[taskId], 1], config)
 }
@@ -427,6 +441,20 @@ async function listSuggestionEnabledSources(config) {
       (row) => isSuggestionEnabled(row) && typeof row?.[SOURCE.ID] === 'string' && row[SOURCE.ID].startsWith('github/')
     )
     .map((row) => row[SOURCE.ID])
+}
+
+async function safeListSources(label, config) {
+  try {
+    const repos = await listSuggestionEnabledSources(config)
+    if (repos.length === 0) {
+      addLog(`[${label}] No repos have Suggestions enabled. Nothing to do.`)
+      return null
+    }
+    return repos
+  } catch (e) {
+    addLog(`[${label}] ERROR listing sources: ${e.message}`)
+    return null
+  }
 }
 
 // Jules caps suggestion sessions per account per day. KQOO7 returns
@@ -605,18 +633,8 @@ async function processSuggestionsForTab(tab, options) {
   // source instead caused the extension to start suggestions on repos the user
   // never enabled (and blow past the daily session limit).
   addLog(`[${label}] Fetching Suggestions-enabled repos...`)
-  let repos
-  try {
-    repos = await listSuggestionEnabledSources(config)
-  } catch (e) {
-    addLog(`[${label}] ERROR listing sources: ${e.message}`)
-    return 0
-  }
-
-  if (repos.length === 0) {
-    addLog(`[${label}] No repos have Suggestions enabled. Nothing to do.`)
-    return 0
-  }
+  const repos = await safeListSources(label, config)
+  if (!repos) return 0
 
   addLog(
     `[${label}] ${repos.length} repo(s) with Suggestions enabled: ${repos.map((r) => r.replace(/^github\//, '')).join(', ')}`
@@ -953,18 +971,8 @@ async function processTab(tab, options) {
 
   // List all active tasks via API
   addLog(`[${label}] Fetching tasks via API...`)
-  let tasks
-  try {
-    tasks = await listTasks('', config)
-  } catch (e) {
-    addLog(`[${label}] ERROR listing tasks: ${e.message}`)
-    return 0
-  }
-
-  if (tasks.length === 0) {
-    addLog(`[${label}] No tasks found.`)
-    return 0
-  }
+  const tasks = await safeListTasks(label, config)
+  if (!tasks) return 0
 
   // Partition into archivable (terminal) vs active (still-running) tasks.
   const candidates = []
