@@ -299,6 +299,28 @@ describe('runInPool', () => {
     const results = await sandbox.test_runInPool(['a', 'b', 'c'], 2, async (item, idx) => `${item}${idx}`)
     assert.deepStrictEqual(results, ['a0', 'b1', 'c2'])
   })
+
+  it('should treat a limit of 0 as 1', async () => {
+    const { sandbox } = setupEnvironment()
+    const results = await sandbox.test_runInPool([1, 2, 3], 0, async (n) => n * 10)
+    assert.deepStrictEqual(results, [10, 20, 30])
+  })
+
+  it('should handle a limit of 1 (sequential)', async () => {
+    const { sandbox } = setupEnvironment()
+    let inFlight = 0
+    let peak = 0
+    const worker = async (n) => {
+      inFlight++
+      peak = Math.max(peak, inFlight)
+      await new Promise((r) => setTimeout(r, 5))
+      inFlight--
+      return n * 10
+    }
+    const results = await sandbox.test_runInPool([1, 2, 3], 1, worker)
+    assert.strictEqual(peak, 1)
+    assert.deepStrictEqual(results, [10, 20, 30])
+  })
 })
 
 describe('isSuggestionEnabled', () => {
