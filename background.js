@@ -629,18 +629,20 @@ async function processSuggestionsForTab(tab, options) {
   // Flatten (repo, suggestion) pairs across all repos so the pool stays
   // saturated instead of draining one repo at a time.
   const work = []
+  const fetchLogs = []
   for (const { repo, suggestions, error } of allSuggestions) {
     if (error) {
-      addLog(`\n[${label}] ERROR fetching suggestions for ${repo}: ${error}`)
+      fetchLogs.push(`\n[${label}] ERROR fetching suggestions for ${repo}: ${error}`)
       continue
     }
     if (suggestions.length === 0) {
-      addLog(`\n[${label}] ${repo}: No suggestions found`)
+      fetchLogs.push(`\n[${label}] ${repo}: No suggestions found`)
       continue
     }
-    addLog(`\n[${label}] ${repo}: Found ${suggestions.length} suggestions`)
+    fetchLogs.push(`\n[${label}] ${repo}: Found ${suggestions.length} suggestions`)
     for (const s of suggestions) work.push({ repo, s })
   }
+  if (fetchLogs.length > 0) addLog(fetchLogs.join('\n'))
 
   if (work.length === 0) {
     addLog(`\n[${label}] TOTAL: 0 suggestions started`)
@@ -677,12 +679,11 @@ async function processSuggestionsForTab(tab, options) {
       return
     }
 
-    updateState({ currentRepo: repo.replace(/^github\//, '') })
+    Object.assign(state, { currentRepo: repo.replace(/^github\//, '') })
     try {
       await globalLimit(() => withRetry(() => startSuggestion(s, repo, config, startConfig)))
       totalStarted++
       state.progress.archived += 1
-      updateState({})
       addLog(`  Started [${label}] ${s.title}`)
     } catch (err) {
       addLog(`  [!] Failed to start "${s.title}": ${err.message}`)
@@ -1050,7 +1051,7 @@ async function processTab(tab, options) {
   addLog(`\n[${label}] Archiving ${totalTasks} tasks`)
 
   if (options.dryRun) {
-    addLog(`[${label}] DRY RUN - would archive ${totalTasks} tasks`)
+    const dryLogs = [`[${label}] DRY RUN - would archive ${totalTasks} tasks`]
     const archiveByRepo = new Map()
     for (const t of toArchive) {
       const key = t.repo || '(no repo)'
@@ -1058,11 +1059,12 @@ async function processTab(tab, options) {
       archiveByRepo.get(key).push(t)
     }
     for (const [repo, repoTasks] of archiveByRepo) {
-      addLog(`  ${repo}: ${repoTasks.length} tasks`)
+      dryLogs.push(`  ${repo}: ${repoTasks.length} tasks`)
       for (const t of repoTasks) {
-        addLog(`    [${t.id}] ${t.title} (state=${t.state})`)
+        dryLogs.push(`    [${t.id}] ${t.title} (state=${t.state})`)
       }
     }
+    addLog(dryLogs.join('\n'))
     return 0
   }
 
@@ -1081,7 +1083,7 @@ async function processTab(tab, options) {
       await globalLimit(() => archiveTaskWithRetry(task.id, config))
       grandTotal++
       state.progress.archived += 1
-      updateState({ currentRepo: task.repo || '(no repo)' })
+      Object.assign(state, { currentRepo: task.repo || '(no repo)' })
       addLog(`  Archived [${label}] [${task.id}] ${task.title}`)
     } catch (e) {
       addLog(`  ERROR [${label}] archiving ${task.id}: ${e.message}`)
