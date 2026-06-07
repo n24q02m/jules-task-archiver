@@ -46,8 +46,8 @@
     <section class="settings">
       <h2>Settings</h2>
       <label for="ghOwner">
-        GitHub Owner
-        <input type="text" id="ghOwner" placeholder="your-github-username" spellcheck="false" autocomplete="username" />
+        GitHub Owner <span class="hint" id="ghOwnerHint">(optional, used for PR checks)</span>
+        <input type="text" id="ghOwner" placeholder="your-github-username" spellcheck="false" autocomplete="username" aria-describedby="ghOwnerHint" />
       </label>
       <label for="ghToken">
         GitHub Token <span class="hint" id="ghTokenHint">(optional, for private repos)</span>
