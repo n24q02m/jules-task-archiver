@@ -629,18 +629,20 @@ async function processSuggestionsForTab(tab, options) {
   // Flatten (repo, suggestion) pairs across all repos so the pool stays
   // saturated instead of draining one repo at a time.
   const work = []
+  const discoveryLogs = []
   for (const { repo, suggestions, error } of allSuggestions) {
     if (error) {
-      addLog(`\n[${label}] ERROR fetching suggestions for ${repo}: ${error}`)
+      discoveryLogs.push(`\n[${label}] ERROR fetching suggestions for ${repo}: ${error}`)
       continue
     }
     if (suggestions.length === 0) {
-      addLog(`\n[${label}] ${repo}: No suggestions found`)
+      discoveryLogs.push(`\n[${label}] ${repo}: No suggestions found`)
       continue
     }
-    addLog(`\n[${label}] ${repo}: Found ${suggestions.length} suggestions`)
+    discoveryLogs.push(`\n[${label}] ${repo}: Found ${suggestions.length} suggestions`)
     for (const s of suggestions) work.push({ repo, s })
   }
+  if (discoveryLogs.length > 0) addLog(discoveryLogs.join('\n'))
 
   if (work.length === 0) {
     addLog(`\n[${label}] TOTAL: 0 suggestions started`)
@@ -677,12 +679,11 @@ async function processSuggestionsForTab(tab, options) {
       return
     }
 
-    updateState({ currentRepo: repo.replace(/^github\//, '') })
+    state.currentRepo = repo.replace(/^github\//, '')
     try {
       await globalLimit(() => withRetry(() => startSuggestion(s, repo, config, startConfig)))
       totalStarted++
       state.progress.archived += 1
-      updateState({})
       addLog(`  Started [${label}] ${s.title}`)
     } catch (err) {
       addLog(`  [!] Failed to start "${s.title}": ${err.message}`)
@@ -1017,23 +1018,22 @@ async function processTab(tab, options) {
       return owner && repoName ? getOpenPRs(owner, repoName, ghToken) : Promise.resolve([])
     })
 
+    const checkLogs = []
     for (let i = 0; i < repoEntries.length; i++) {
       const [repo, repoTasks] = repoEntries[i]
       const openPRs = allPRs[i]
-      addLog(`  ${repo}: ${repoTasks.length} tasks, ${openPRs.length} open PRs`)
+      checkLogs.push(`  ${repo}: ${repoTasks.length} tasks, ${openPRs.length} open PRs`)
 
       for (const task of repoTasks) {
-        // A task whose title matches an open PR is likely still active work,
-        // so skip it in the default flow. Tasks with no matching PR (including
-        // failed runs, which never opened one) are archived.
         if (taskHasOpenPR(task, openPRs)) {
           toSkip.push(task)
-          addLog(`    SKIP [${task.id}] ${task.title} (matching open PR)`)
+          checkLogs.push(`    SKIP [${task.id}] ${task.title} (matching open PR)`)
         } else {
           toArchive.push(task)
         }
       }
     }
+    if (checkLogs.length > 0) addLog(checkLogs.join('\n'))
   }
 
   if (toSkip.length > 0) {
@@ -1081,7 +1081,7 @@ async function processTab(tab, options) {
       await globalLimit(() => archiveTaskWithRetry(task.id, config))
       grandTotal++
       state.progress.archived += 1
-      updateState({ currentRepo: task.repo || '(no repo)' })
+      state.currentRepo = task.repo || '(no repo)'
       addLog(`  Archived [${label}] [${task.id}] ${task.title}`)
     } catch (e) {
       addLog(`  ERROR [${label}] archiving ${task.id}: ${e.message}`)
