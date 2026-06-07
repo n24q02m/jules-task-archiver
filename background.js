@@ -665,18 +665,24 @@ async function processSuggestionsForTab(tab, options) {
   // Flatten (repo, suggestion) pairs across all repos so the pool stays
   // saturated instead of draining one repo at a time.
   const work = []
+
+  // ⚡ Bolt Optimization: Batch discovery loop logs into an array to avoid triggering O(N^2)
+  // synchronous storage writes via redundant persistSoon calls.
+  // Impact: Eliminates UI/worker freezing when discovering many repositories simultaneously.
+  const logs = []
   for (const { repo, suggestions, error } of allSuggestions) {
     if (error) {
-      addLog(`\n[${label}] ERROR fetching suggestions for ${repo}: ${error}`)
+      logs.push(`\n[${label}] ERROR fetching suggestions for ${repo}: ${error}`)
       continue
     }
     if (suggestions.length === 0) {
-      addLog(`\n[${label}] ${repo}: No suggestions found`)
+      logs.push(`\n[${label}] ${repo}: No suggestions found`)
       continue
     }
-    addLog(`\n[${label}] ${repo}: Found ${suggestions.length} suggestions`)
+    logs.push(`\n[${label}] ${repo}: Found ${suggestions.length} suggestions`)
     for (const s of suggestions) work.push({ repo, s })
   }
+  if (logs.length > 0) addLog(logs.join(''))
 
   if (work.length === 0) {
     addLog(`\n[${label}] TOTAL: 0 suggestions started`)
@@ -1038,10 +1044,14 @@ async function processTab(tab, options) {
       return owner && repoName ? getOpenPRs(owner, repoName, ghToken) : Promise.resolve([])
     })
 
+    // ⚡ Bolt Optimization: Batch PR-check logging to collapse N individual storage sync events
+    // into a single write.
+    // Impact: Smooths memory pressure and significantly reduces async IO scheduling on bulk tasks.
+    const prLogs = []
     for (let i = 0; i < repoEntries.length; i++) {
       const [repo, repoTasks] = repoEntries[i]
       const openPRs = allPRs[i]
-      addLog(`  ${repo}: ${repoTasks.length} tasks, ${openPRs.length} open PRs`)
+      prLogs.push(`  ${repo}: ${repoTasks.length} tasks, ${openPRs.length} open PRs`)
 
       for (const task of repoTasks) {
         // A task whose title matches an open PR is likely still active work,
@@ -1049,12 +1059,13 @@ async function processTab(tab, options) {
         // failed runs, which never opened one) are archived.
         if (taskHasOpenPR(task, openPRs)) {
           toSkip.push(task)
-          addLog(`    SKIP [${task.id}] ${task.title} (matching open PR)`)
+          prLogs.push(`    SKIP [${task.id}] ${task.title} (matching open PR)`)
         } else {
           toArchive.push(task)
         }
       }
     }
+    if (prLogs.length > 0) addLog(prLogs.join('\n'))
   }
 
   if (toSkip.length > 0) {
@@ -1071,14 +1082,18 @@ async function processTab(tab, options) {
   addLog(`\n[${label}] Archiving ${totalTasks} tasks`)
 
   if (options.dryRun) {
-    addLog(`[${label}] DRY RUN - would archive ${totalTasks} tasks`)
+    // ⚡ Bolt Optimization: Buffer dry-run logs in memory. Prevents Chrome extension API
+    // flooding when outputting large un-filtered dry run lists.
+    // Impact: Keeps the main execution thread unblocked and responsive.
+    const dryLogs = [`[${label}] DRY RUN - would archive ${totalTasks} tasks`]
     const archiveByRepo = groupTasksByRepo(toArchive)
     for (const [repo, repoTasks] of archiveByRepo) {
-      addLog(`  ${repo}: ${repoTasks.length} tasks`)
+      dryLogs.push(`  ${repo}: ${repoTasks.length} tasks`)
       for (const t of repoTasks) {
-        addLog(`    [${t.id}] ${t.title} (state=${t.state})`)
+        dryLogs.push(`    [${t.id}] ${t.title} (state=${t.state})`)
       }
     }
+    addLog(dryLogs.join('\n'))
     return 0
   }
 
