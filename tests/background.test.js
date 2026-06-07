@@ -108,6 +108,7 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_findJsonEnd = findJsonEnd;
     globalThis.test_parseResponse = parseResponse;
     globalThis.test_parseTask = parseTask;
+    globalThis.test_groupTasksByRepo = groupTasksByRepo;
     globalThis.test_isArchivable = isArchivable;
     globalThis.test_TASK = TASK;
     globalThis.test_ARCHIVABLE_STATES = ARCHIVABLE_STATES;
@@ -1717,5 +1718,20 @@ describe('ensureContentScript', () => {
     await assert.rejects(sandbox.test_ensureContentScript(tabId), {
       message: 'Content script failed to initialize within 3s'
     })
+  })
+})
+
+describe('groupTasksByRepo Internal', () => {
+  it('should correctly group tasks using the internal function', () => {
+    const { sandbox } = setupEnvironment()
+    const tasks = [
+      { id: '1', repo: 'repo-1' },
+      { id: '2', repo: 'repo-2' },
+      { id: '3', repo: 'repo-1' }
+    ]
+    const result = sandbox.test_groupTasksByRepo(tasks)
+    assert.strictEqual(result.size, 2)
+    assert.strictEqual(result.get('repo-1').length, 2)
+    assert.strictEqual(result.get('repo-2').length, 1)
   })
 })

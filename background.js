@@ -318,6 +318,15 @@ function isArchivable(task) {
   // A null/undefined state is emitted for one class of completed tasks.
   return task.state == null || ARCHIVABLE_STATES.has(task.state)
 }
+function groupTasksByRepo(tasks) {
+  const map = new Map()
+  for (const t of tasks) {
+    const key = t.repo || '(no repo)'
+    if (!map.has(key)) map.set(key, [])
+    map.get(key).push(t)
+  }
+  return map
+}
 
 async function listTasks(filter, config) {
   const payload = [filter, 4]
@@ -1015,12 +1024,7 @@ async function processTab(tab, options) {
     }
 
     // Group candidates by repo for per-repo open-PR lookups.
-    const byRepo = new Map()
-    for (const task of candidates) {
-      const key = task.repo || '(no repo)'
-      if (!byRepo.has(key)) byRepo.set(key, [])
-      byRepo.get(key).push(task)
-    }
+    const byRepo = groupTasksByRepo(candidates)
 
     addLog(`\n[${label}] Checking open PRs per task...`)
     const { ghOwner } = await chrome.storage.sync.get(['ghOwner'])
@@ -1068,12 +1072,7 @@ async function processTab(tab, options) {
 
   if (options.dryRun) {
     addLog(`[${label}] DRY RUN - would archive ${totalTasks} tasks`)
-    const archiveByRepo = new Map()
-    for (const t of toArchive) {
-      const key = t.repo || '(no repo)'
-      if (!archiveByRepo.has(key)) archiveByRepo.set(key, [])
-      archiveByRepo.get(key).push(t)
-    }
+    const archiveByRepo = groupTasksByRepo(toArchive)
     for (const [repo, repoTasks] of archiveByRepo) {
       addLog(`  ${repo}: ${repoTasks.length} tasks`)
       for (const t of repoTasks) {
