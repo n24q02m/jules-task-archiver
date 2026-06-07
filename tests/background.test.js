@@ -134,6 +134,7 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_handleOperationError = handleOperationError;
     globalThis.test_listTasks = listTasks;
     globalThis.test_startOperation = startOperation;
+    globalThis.test_startSuggestion = startSuggestion;
     globalThis.test_startKeepAlive = startKeepAlive;
     globalThis.test_stopKeepAlive = stopKeepAlive;
     globalThis.test_getKeepAliveInterval = () => keepAliveInterval;
@@ -1050,6 +1051,46 @@ describe('buildStartPayload', () => {
     assert.ok(flags.length > 0)
     // Compare via JSON to avoid cross-VM reference issues
     assert.strictEqual(JSON.stringify(flags[0]), JSON.stringify(['enable_bash_session_tool', 1]))
+  })
+})
+
+describe('startSuggestion', () => {
+  it('should call callBatchExecute with the correct RPC ID and payload', async () => {
+    const { sandbox } = setupEnvironment()
+    let capturedId = null
+    let capturedPayload = null
+    let capturedConfig = null
+
+    sandbox.callBatchExecute = async (id, payload, config) => {
+      capturedId = id
+      capturedPayload = payload
+      capturedConfig = config
+      return { success: true }
+    }
+
+    const suggestion = {
+      id: 'test-123',
+      title: 'Fix bug',
+      filePath: 'src/a.ts',
+      line: 1,
+      language: 'typescript',
+      codeSnippet: 'code',
+      rationale: 'reason',
+      categorySlug: 'dead-code'
+    }
+    const repo = 'github/owner/repo'
+    const config = { modelId: 'test-model' }
+    const startConfig = { featureFlags: [] }
+
+    const result = await sandbox.test_startSuggestion(suggestion, repo, config, startConfig)
+
+    assert.strictEqual(capturedId, 'Rja83d')
+    assert.deepStrictEqual(result, { success: true })
+    assert.strictEqual(capturedConfig, config)
+
+    // Verify payload is what buildStartPayload would produce
+    const expectedPayload = sandbox.test_buildStartPayload(suggestion, repo, config, startConfig)
+    assert.deepStrictEqual(capturedPayload, expectedPayload)
   })
 })
 
