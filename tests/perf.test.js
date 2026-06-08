@@ -166,14 +166,14 @@ describe('Throttling Optimization', () => {
     // Mock 10 tasks to archive
     const tasks = []
     for (let i = 0; i < 10; i++) {
-        tasks.push({ id: `t${i}`, title: `Task ${i}`, state: 3, source: 'github/owner/repo' })
+      tasks.push({ id: `t${i}`, title: `Task ${i}`, state: 3, source: 'github/owner/repo' })
     }
     sandbox.listTasks = async () => tasks
     sandbox.getOpenPRs = async () => []
 
     sandbox.archiveTaskWithRetry = async () => {
-        // Fast execution to trigger throttling
-        return Promise.resolve()
+      // Fast execution to trigger throttling
+      return Promise.resolve()
     }
 
     const tab = { id: 123, url: 'https://jules.google.com/u/0/' }
