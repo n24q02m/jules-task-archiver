@@ -324,6 +324,18 @@ describe('runInPool', () => {
       { message: 'worker failed' }
     )
   })
+
+  it('should handle NaN limit by using a minimum concurrency of 1', async () => {
+    const { sandbox } = setupEnvironment()
+    const results = await sandbox.test_runInPool([1, 2, 3], NaN, async (n) => n * 2)
+    assert.deepStrictEqual(results, [2, 4, 6])
+  })
+
+  it('should handle negative limit by using a minimum concurrency of 1', async () => {
+    const { sandbox } = setupEnvironment()
+    const results = await sandbox.test_runInPool([1, 2, 3], -5, async (n) => n * 2)
+    assert.deepStrictEqual(results, [2, 4, 6])
+  })
 })
 
 describe('isSuggestionEnabled', () => {
