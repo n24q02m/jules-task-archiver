@@ -164,9 +164,10 @@ async function callBatchExecute(rpcId, payload, config) {
       credentials: 'include',
       body
     })
-    return parseResponse(await res.text(), rpcId)
+    const text = await res.text()
+    return parseResponse(text, rpcId)
   } catch (e) {
-    throw new Error(`batchexecute ${rpcId} failed: ${e.message}`)
+    return { error: e.message }
   }
 }
 
@@ -331,6 +332,7 @@ function groupTasksByRepo(tasks) {
 async function listTasks(filter, config) {
   const payload = [filter, 4]
   const result = await callBatchExecute('p1Takd', payload, config)
+  if (result?.error) throw new Error(result.error)
   if (!result?.[0]) return []
   return result[0].map(parseTask)
 }
@@ -350,7 +352,8 @@ async function safeListTasks(label, config) {
 }
 
 async function archiveTask(taskId, config) {
-  await callBatchExecute('Tjmm5c', [[taskId], 1], config)
+  const result = await callBatchExecute('Tjmm5c', [[taskId], 1], config)
+  if (result?.error) throw new Error(result.error)
 }
 
 const RETRY_ATTEMPTS = 4
@@ -429,6 +432,7 @@ function parseSuggestion(raw) {
 
 async function listSuggestions(repo, config) {
   const result = await callBatchExecute('hQP40d', [repo], config)
+  if (result?.error) throw new Error(result.error)
   if (!result || !Array.isArray(result) || !Array.isArray(result[0])) return []
   return result[0].reduce((acc, s) => {
     const parsed = parseSuggestion(s)
@@ -444,6 +448,7 @@ async function listSuggestions(repo, config) {
 // extension to start hundreds of unwanted suggestion tasks across all repos.
 async function listSuggestionEnabledSources(config) {
   const result = await callBatchExecute('YqkSHd', [null, 'source_status=SOURCE_STATUS_ACTIVE'], config)
+  if (result?.error) throw new Error(result.error)
   if (!result?.[0]) return []
   return result[0]
     .filter(
@@ -473,6 +478,7 @@ async function safeListSources(label, config) {
 // guard rather than block the run.
 async function getDailySessionQuota(config) {
   const result = await callBatchExecute('KQOO7', [], config)
+  if (result?.error) throw new Error(result.error)
   if (!Array.isArray(result) || typeof result[0] !== 'number' || typeof result[2] !== 'number') return null
   return { used: result[0], limit: result[2], remaining: Math.max(0, result[2] - result[0]) }
 }
@@ -621,7 +627,9 @@ function buildStartPayload(suggestion, repo, config, startConfig) {
 
 async function startSuggestion(suggestion, repo, config, startConfig) {
   const payload = buildStartPayload(suggestion, repo, config, startConfig)
-  return callBatchExecute('Rja83d', payload, config)
+  const result = await callBatchExecute('Rja83d', payload, config)
+  if (result?.error) throw new Error(result.error)
+  return result
 }
 
 async function getStartConfig() {

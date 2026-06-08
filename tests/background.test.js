@@ -1473,7 +1473,7 @@ describe('KeepAlive', () => {
 })
 
 describe('callBatchExecute', () => {
-  it('should throw error when jFetch fails with HTTP error', async () => {
+  it('should return error object when jFetch fails with HTTP error', async () => {
     const { sandbox } = setupEnvironment()
     sandbox.fetch = async () => ({
       ok: false,
@@ -1482,21 +1482,33 @@ describe('callBatchExecute', () => {
     })
 
     const config = { accountNum: '0' }
-    await assert.rejects(sandbox.test_callBatchExecute('rpcId', {}, config), {
-      message: 'batchexecute rpcId failed: HTTP 500'
-    })
+    const result = await sandbox.test_callBatchExecute('rpcId', {}, config)
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(result)), { error: 'HTTP 500' })
   })
 
-  it('should throw error when fetch throws network error', async () => {
+  it('should return error object when fetch throws network error', async () => {
     const { sandbox } = setupEnvironment()
     sandbox.fetch = async () => {
       throw new Error('Network Error')
     }
 
     const config = { accountNum: '0' }
-    await assert.rejects(sandbox.test_callBatchExecute('rpcId', {}, config), {
-      message: 'batchexecute rpcId failed: Network Error'
+    const result = await sandbox.test_callBatchExecute('rpcId', {}, config)
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(result)), { error: 'Network Error' })
+  })
+
+  it('should return error object when res.text() fails', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.fetch = async () => ({
+      ok: true,
+      text: async () => {
+        throw new Error('text failure')
+      }
     })
+
+    const config = { accountNum: '0' }
+    const result = await sandbox.test_callBatchExecute('rpcId', {}, config)
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(result)), { error: 'text failure' })
   })
 })
 
