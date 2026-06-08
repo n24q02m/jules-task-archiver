@@ -481,33 +481,24 @@ async function getDailySessionQuota(config) {
 // Prompt Builder
 // =============================================================================
 
-const SECURITY_CONFIG = {
-  icon: '[SECURITY]',
-  name: 'Security Vulnerability Fix',
-  role: 'security-focused',
-  codeLabel: 'Vulnerable Code'
+function createRoleConfig(icon, name, role, codeLabel) {
+  return { icon, name, role, codeLabel }
 }
 
-const PERFORMANCE_CONFIG = {
-  icon: '[PERF]',
-  name: 'Performance Optimization',
-  role: 'performance-focused',
-  codeLabel: 'Inefficient Code'
-}
-
-const CLEANUP_CONFIG = {
-  icon: '[CLEANUP]',
-  name: 'Code Cleanup',
-  role: 'code-quality-focused',
-  codeLabel: 'Code to Clean'
-}
-
-const TESTING_CONFIG = {
-  icon: '[TEST]',
-  name: 'Test Coverage',
-  role: 'testing-focused',
-  codeLabel: 'Untested Code'
-}
+const SECURITY_CONFIG = createRoleConfig(
+  '[SECURITY]',
+  'Security Vulnerability Fix',
+  'security-focused',
+  'Vulnerable Code'
+)
+const PERFORMANCE_CONFIG = createRoleConfig(
+  '[PERF]',
+  'Performance Optimization',
+  'performance-focused',
+  'Inefficient Code'
+)
+const CLEANUP_CONFIG = createRoleConfig('[CLEANUP]', 'Code Cleanup', 'code-quality-focused', 'Code to Clean')
+const TESTING_CONFIG = createRoleConfig('[TEST]', 'Test Coverage', 'testing-focused', 'Untested Code')
 
 const CATEGORY_CONFIG = {
   'input-validation': SECURITY_CONFIG,
@@ -524,7 +515,7 @@ const CATEGORY_CONFIG = {
   'missing-test-file': TESTING_CONFIG
 }
 
-const DEFAULT_CATEGORY = { icon: '[FIX]', name: 'Code Improvement', role: 'engineering-focused', codeLabel: 'Code' }
+const DEFAULT_CATEGORY = createRoleConfig('[FIX]', 'Code Improvement', 'engineering-focused', 'Code')
 
 function buildSuggestionPrompt(suggestion) {
   const cat = CATEGORY_CONFIG[suggestion.categorySlug] || DEFAULT_CATEGORY
