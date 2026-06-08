@@ -24,7 +24,7 @@ popup.js (UI) <-> background.js (batchexecute client) <-> content.js (token extr
 ```
 
 Two operation modes:
-1. **Archive Tasks** -- ListTasks (p1Takd) -> check GitHub PRs -> ArchiveTask (Tjmm5c)
+1. **Archive Tasks** -- ListTasks (p1Takd) -> check GitHub PRs -> ArchiveTask (A0Q2Z)
 2. **Start Suggestions** -- ListTasks -> discover repos -> ListSuggestions (hQP40d) -> StartSuggestion (Rja83d)
 
 Content script extracts auth tokens (SNlM0e, cfb2h, FdrFJe) from `WIZ_global_data` via MAIN world script injection. Also observes fetch() for Rja83d calls to capture model config and experiment IDs.
@@ -34,7 +34,7 @@ Background service worker makes all API calls. No DOM automation.
 ## Key RPC IDs
 
 - `p1Takd` -- ListTasks (filter, state)
-- `Tjmm5c` -- ArchiveTask (taskId, action)
+- `A0Q2Z` -- ArchiveTask (taskId, action)
 - `hQP40d` -- ListSuggestions (repo)
 - `Rja83d` -- StartSuggestion (prompt, model config, repo, experiment IDs)
 

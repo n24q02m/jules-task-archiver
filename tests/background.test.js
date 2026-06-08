@@ -102,6 +102,7 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_callBatchExecute = callBatchExecute;
     globalThis.test_runInPool = runInPool;
     globalThis.test_createLimiter = createLimiter;
+    globalThis.test_archiveTask = archiveTask;
     globalThis.test_archiveTaskWithRetry = archiveTaskWithRetry;
     globalThis.test_isRetryable = isRetryable;
     globalThis.test_fixJsonControlChars = fixJsonControlChars;
@@ -185,15 +186,15 @@ describe('buildBatchRequest', () => {
   it('should format correct URL and body', () => {
     const { sandbox } = setupEnvironment()
     const config = { bl: 'build-label', fsid: '123456', at: 'xsrf-token', accountNum: '3' }
-    const result = sandbox.test_buildBatchRequest('Tjmm5c', [['task-id'], 1], config)
+    const result = sandbox.test_buildBatchRequest('A0Q2Z', [['task-id'], 1], config)
 
     assert.ok(result.url.includes('jules.google.com/u/3/_/Swebot/data/batchexecute'))
-    assert.ok(result.url.includes('rpcids=Tjmm5c'))
+    assert.ok(result.url.includes('rpcids=A0Q2Z'))
     assert.ok(result.url.includes('bl=build-label'))
     assert.ok(result.url.includes('f.sid=123456'))
     assert.ok(result.url.includes('rt=c'))
     assert.ok(result.body.includes('at=xsrf-token'))
-    assert.ok(result.body.includes('Tjmm5c'))
+    assert.ok(result.body.includes('A0Q2Z'))
   })
 })
 
@@ -413,10 +414,40 @@ describe('createLimiter', () => {
   })
 })
 
+describe('archiveTask', () => {
+  it('should call callBatchExecute with the correct RPC ID and payload', async () => {
+    const { sandbox } = setupEnvironment()
+    let calledId, calledPayload, calledConfig
+    sandbox.callBatchExecute = async (id, payload, config) => {
+      calledId = id
+      calledPayload = payload
+      calledConfig = config
+      return ['ok']
+    }
+
+    const config = { at: 'token' }
+    const result = await sandbox.test_archiveTask('task-123', config)
+
+    assert.strictEqual(calledId, 'A0Q2Z')
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(calledPayload)), [[['task-123', 3]]])
+    assert.deepStrictEqual(calledConfig, config)
+    assert.deepStrictEqual(result, ['ok'])
+  })
+
+  it('should propagate errors from callBatchExecute', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.callBatchExecute = async () => {
+      throw new Error('Network Error')
+    }
+
+    await assert.rejects(sandbox.test_archiveTask('t1', {}), /Network Error/)
+  })
+})
+
 describe('archiveTaskWithRetry', () => {
   it('isRetryable matches rate-limit and transient errors only', () => {
     const { sandbox } = setupEnvironment()
-    assert.strictEqual(sandbox.test_isRetryable('batchexecute Tjmm5c failed: HTTP 429'), true)
+    assert.strictEqual(sandbox.test_isRetryable('batchexecute A0Q2Z failed: HTTP 429'), true)
     assert.strictEqual(sandbox.test_isRetryable('HTTP 503'), true)
     assert.strictEqual(sandbox.test_isRetryable('Failed to fetch'), true)
     assert.strictEqual(sandbox.test_isRetryable('HTTP 404'), false)
@@ -428,7 +459,7 @@ describe('archiveTaskWithRetry', () => {
     let calls = 0
     sandbox.archiveTask = async () => {
       calls++
-      if (calls === 1) throw new Error('batchexecute Tjmm5c failed: HTTP 429')
+      if (calls === 1) throw new Error('batchexecute A0Q2Z failed: HTTP 429')
     }
     await sandbox.test_archiveTaskWithRetry('t1', {})
     assert.strictEqual(calls, 2)
@@ -458,8 +489,8 @@ describe('parseResponse', () => {
     const { sandbox } = setupEnvironment()
     // A second chunk (byte-length line + sibling array) must be ignored by the
     // offset-based boundary scan.
-    const response = ')]}\'\n\n55\n[["wrb.fr","Tjmm5c","[[\\"ok\\"]]",null,null,null,"generic"]]\n12\n[["di",99]]'
-    const result = sandbox.test_parseResponse(response, 'Tjmm5c')
+    const response = ')]}\'\n\n55\n[["wrb.fr","A0Q2Z","[[\\"ok\\"]]",null,null,null,"generic"]]\n12\n[["di",99]]'
+    const result = sandbox.test_parseResponse(response, 'A0Q2Z')
     assert.deepStrictEqual(result, [['ok']])
   })
 
