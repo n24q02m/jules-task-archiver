@@ -128,6 +128,7 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_SDETAIL = SDETAIL;
     globalThis.test_CATEGORY_CONFIG = CATEGORY_CONFIG;
     globalThis.test_DEFAULT_CATEGORY = DEFAULT_CATEGORY;
+    globalThis.test_DEFAULT_FEATURE_FLAGS = DEFAULT_FEATURE_FLAGS;
     globalThis.test_initOperationState = initOperationState;
     globalThis.test_discoverTabs = discoverTabs;
     globalThis.test_processAllTabs = processAllTabs;
@@ -1584,6 +1585,87 @@ describe('getStartConfig', () => {
 })
 
 // =============================================================================
+
+describe('buildStartPayload', () => {
+  const mockSuggestion = {
+    id: 's1',
+    categorySlug: 'security',
+    filePath: 'test.js',
+    line: 10,
+    title: 'Security Bug',
+    language: 'javascript',
+    codeSnippet: 'eval(x)',
+    rationale: 'Fix it'
+  }
+  const mockRepo = 'my/repo'
+
+  it('should use default values when startConfig and config.modelId are missing', () => {
+    const { sandbox } = setupEnvironment()
+    const payload = sandbox.test_buildStartPayload(mockSuggestion, mockRepo, {}, null)
+
+    assert.ok(payload[0].includes('Security Bug')) // prompt
+    assert.strictEqual(payload[2][1], null) // modelId
+    assert.deepStrictEqual(
+      JSON.parse(JSON.stringify(payload[2][10])),
+      JSON.parse(JSON.stringify(sandbox.test_DEFAULT_FEATURE_FLAGS))
+    ) // featureFlags
+    assert.strictEqual(payload[4], mockRepo) // repo
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(payload[9][4])), []) // experimentIds
+    assert.strictEqual(payload[9][11][1], 's1') // suggestionId
+  })
+
+  it('should override defaults with startConfig', () => {
+    const { sandbox } = setupEnvironment()
+    const startConfig = {
+      modelConfig: [null, 'start-model'],
+      featureFlags: [['flag1', 1]],
+      experimentIds: ['exp1']
+    }
+    const payload = sandbox.test_buildStartPayload(mockSuggestion, mockRepo, {}, startConfig)
+
+    assert.strictEqual(payload[2][1], 'start-model')
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(payload[2][10])), [['flag1', 1]])
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(payload[9][4])), ['exp1'])
+  })
+
+  it('should prioritize config.modelId over startConfig.modelConfig', () => {
+    const { sandbox } = setupEnvironment()
+    const startConfig = { modelConfig: [null, 'start-model'] }
+    const config = { modelId: 'config-model' }
+    const payload = sandbox.test_buildStartPayload(mockSuggestion, mockRepo, config, startConfig)
+
+    assert.strictEqual(payload[2][1], 'config-model')
+  })
+})
+
+describe('startSuggestion', () => {
+  it('should call callBatchExecute with correct RPC ID and payload', async () => {
+    const { sandbox } = setupEnvironment()
+    let capturedRpcId = null
+    let capturedPayload = null
+    let capturedConfig = null
+
+    sandbox.callBatchExecute = async (rpcId, payload, config) => {
+      capturedRpcId = rpcId
+      capturedPayload = payload
+      capturedConfig = config
+      return { success: true }
+    }
+
+    const suggestion = { id: 's1', categorySlug: 'security' }
+    const repo = 'repo'
+    const config = { at: 'token' }
+    const startConfig = { experimentIds: ['exp'] }
+
+    const result = await sandbox.test_startSuggestion(suggestion, repo, config, startConfig)
+
+    assert.strictEqual(capturedRpcId, 'Rja83d')
+    assert.strictEqual(capturedPayload[9][11][1], 's1')
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(capturedPayload[9][4])), ['exp'])
+    assert.deepStrictEqual(capturedConfig, config)
+    assert.deepStrictEqual(result, { success: true })
+  })
+})
 // getTabConfig Tests
 // =============================================================================
 
