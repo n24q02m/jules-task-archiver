@@ -150,3 +150,41 @@ describe('Orchestrator Performance Optimization', () => {
     assert.strictEqual(archiveTaskCount, 2, 'archiveTask should be called for each task')
   })
 })
+
+describe('Throttling Optimization', () => {
+  it('processTab should throttle updateState calls', async () => {
+    const sandbox = setupEnvironment()
+    let updateStateCalls = 0
+    const originalUpdateState = sandbox.updateState
+    sandbox.updateState = (patch) => {
+      updateStateCalls++
+      return originalUpdateState(patch)
+    }
+
+    sandbox.getTabConfig = async () => ({ at: 'at', bl: 'bl_v1', fsid: 'fsid', accountNum: '0' })
+
+    // Mock 10 tasks to archive
+    const tasks = []
+    for (let i = 0; i < 10; i++) {
+        tasks.push({ id: `t${i}`, title: `Task ${i}`, state: 3, source: 'github/owner/repo' })
+    }
+    sandbox.listTasks = async () => tasks
+    sandbox.getOpenPRs = async () => []
+
+    sandbox.archiveTaskWithRetry = async () => {
+        // Fast execution to trigger throttling
+        return Promise.resolve()
+    }
+
+    const tab = { id: 123, url: 'https://jules.google.com/u/0/' }
+    const options = { force: true }
+
+    await sandbox.processTab(tab, options)
+
+    // 1 call for prepareTab
+    // 1 call for initial progress
+    // Some calls for loop (should be fewer than 20 if throttled)
+    // 1 call for finalize
+    assert.ok(updateStateCalls < 10, `Too many updateState calls: ${updateStateCalls}`)
+  })
+})

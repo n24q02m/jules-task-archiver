@@ -665,18 +665,20 @@ async function processSuggestionsForTab(tab, options) {
   // Flatten (repo, suggestion) pairs across all repos so the pool stays
   // saturated instead of draining one repo at a time.
   const work = []
+  const discoveryLogs = []
   for (const { repo, suggestions, error } of allSuggestions) {
     if (error) {
-      addLog(`\n[${label}] ERROR fetching suggestions for ${repo}: ${error}`)
+      discoveryLogs.push(`\n[${label}] ERROR fetching suggestions for ${repo}: ${error}`)
       continue
     }
     if (suggestions.length === 0) {
-      addLog(`\n[${label}] ${repo}: No suggestions found`)
+      discoveryLogs.push(`\n[${label}] ${repo}: No suggestions found`)
       continue
     }
-    addLog(`\n[${label}] ${repo}: Found ${suggestions.length} suggestions`)
+    discoveryLogs.push(`\n[${label}] ${repo}: Found ${suggestions.length} suggestions`)
     for (const s of suggestions) work.push({ repo, s })
   }
+  if (discoveryLogs.length > 0) addLog(discoveryLogs.join(''))
 
   if (work.length === 0) {
     addLog(`\n[${label}] TOTAL: 0 suggestions started`)
@@ -705,6 +707,7 @@ async function processSuggestionsForTab(tab, options) {
   }
 
   let totalStarted = 0
+  let lastUpdate = 0
   await runInPool(toStart, PER_ACCOUNT_CONCURRENCY, async ({ repo, s }) => {
     if (state.status === 'cancelled') return
 
@@ -713,12 +716,19 @@ async function processSuggestionsForTab(tab, options) {
       return
     }
 
-    updateState({ currentRepo: repo.replace(/^github\//, '') })
+    const now = Date.now()
+    if (now - lastUpdate > 500) {
+      updateState({ currentRepo: repo.replace(/^github\//, '') })
+      lastUpdate = now
+    }
     try {
       await globalLimit(() => withRetry(() => startSuggestion(s, repo, config, startConfig)))
       totalStarted++
       state.progress.archived += 1
-      updateState({})
+      if (Date.now() - lastUpdate > 500) {
+        updateState({})
+        lastUpdate = Date.now()
+      }
       addLog(`  Started [${label}] ${s.title}`)
     } catch (err) {
       addLog(`  [!] Failed to start "${s.title}": ${err.message}`)
@@ -1038,10 +1048,11 @@ async function processTab(tab, options) {
       return owner && repoName ? getOpenPRs(owner, repoName, ghToken) : Promise.resolve([])
     })
 
+    const prLogs = []
     for (let i = 0; i < repoEntries.length; i++) {
       const [repo, repoTasks] = repoEntries[i]
       const openPRs = allPRs[i]
-      addLog(`  ${repo}: ${repoTasks.length} tasks, ${openPRs.length} open PRs`)
+      prLogs.push(`  ${repo}: ${repoTasks.length} tasks, ${openPRs.length} open PRs`)
 
       for (const task of repoTasks) {
         // A task whose title matches an open PR is likely still active work,
@@ -1049,12 +1060,13 @@ async function processTab(tab, options) {
         // failed runs, which never opened one) are archived.
         if (taskHasOpenPR(task, openPRs)) {
           toSkip.push(task)
-          addLog(`    SKIP [${task.id}] ${task.title} (matching open PR)`)
+          prLogs.push(`    SKIP [${task.id}] ${task.title} (matching open PR)`)
         } else {
           toArchive.push(task)
         }
       }
     }
+    if (prLogs.length > 0) addLog(prLogs.join('\n'))
   }
 
   if (toSkip.length > 0) {
@@ -1073,12 +1085,14 @@ async function processTab(tab, options) {
   if (options.dryRun) {
     addLog(`[${label}] DRY RUN - would archive ${totalTasks} tasks`)
     const archiveByRepo = groupTasksByRepo(toArchive)
+    const dryRunLogs = []
     for (const [repo, repoTasks] of archiveByRepo) {
-      addLog(`  ${repo}: ${repoTasks.length} tasks`)
+      dryRunLogs.push(`  ${repo}: ${repoTasks.length} tasks`)
       for (const t of repoTasks) {
-        addLog(`    [${t.id}] ${t.title} (state=${t.state})`)
+        dryRunLogs.push(`    [${t.id}] ${t.title} (state=${t.state})`)
       }
     }
+    if (dryRunLogs.length > 0) addLog(dryRunLogs.join('\n'))
     return 0
   }
 
@@ -1088,16 +1102,25 @@ async function processTab(tab, options) {
   updateState({})
 
   let grandTotal = 0
+  let lastUpdate = 0
 
   // Flatten across repos: one pool over every task keeps the fan-out saturated
   // instead of idling between per-repo batches. Each network call passes through
   // the shared global limiter so all accounts together stay under budget.
   await runInPool(toArchive, PER_ACCOUNT_CONCURRENCY, async (task) => {
+    const now = Date.now()
+    if (now - lastUpdate > 500) {
+      updateState({ currentRepo: task.repo || '(no repo)' })
+      lastUpdate = now
+    }
     try {
       await globalLimit(() => archiveTaskWithRetry(task.id, config))
       grandTotal++
       state.progress.archived += 1
-      updateState({ currentRepo: task.repo || '(no repo)' })
+      if (Date.now() - lastUpdate > 500) {
+        updateState({})
+        lastUpdate = Date.now()
+      }
       addLog(`  Archived [${label}] [${task.id}] ${task.title}`)
     } catch (e) {
       addLog(`  ERROR [${label}] archiving ${task.id}: ${e.message}`)
