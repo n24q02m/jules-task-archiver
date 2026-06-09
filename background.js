@@ -85,7 +85,7 @@ async function runInPool(items, limit, worker) {
     }
   }
 
-  const poolSize = items.length > 0 ? Math.max(1, Math.min(Math.floor(limit), items.length)) : 0
+  const poolSize = items.length > 0 ? Math.max(1, Math.min(Math.floor(limit) || 1, items.length)) : 0
   const pool = []
   for (let i = 0; i < poolSize; i++) {
     pool.push(drain())
@@ -350,7 +350,10 @@ async function safeListTasks(label, config) {
 }
 
 async function archiveTask(taskId, config) {
-  await callBatchExecute('Tjmm5c', [[taskId], 1], config)
+  const payload = new Array(2).fill(null)
+  payload[TJMM5C.TASK_IDS] = [taskId]
+  payload[TJMM5C.ACTION] = 1
+  await callBatchExecute('Tjmm5c', payload, config)
 }
 
 const RETRY_ATTEMPTS = 4
@@ -403,6 +406,34 @@ const SDETAIL = {
   LANGUAGE: 8,
   CATEGORY_SLUG: 9,
   PRIORITY: 10
+}
+
+// Start Suggestion payload layout (Rja83d)
+const RJA83D = {
+  PROMPT: 0,
+  MODEL_CONFIG: 2,
+  REPO: 4,
+  METADATA: 9,
+  START_FLAG: 14
+}
+
+// Model Config array layout (used in Rja83d payload [2])
+const MCONFIG = {
+  MODEL_ID: 1,
+  FEATURE_FLAGS: 10
+}
+
+// Suggestion Metadata array layout (used in Rja83d payload [9])
+const SMETA = {
+  EXPERIMENT_IDS: 4,
+  SUGGESTION_ID_WRAPPER: 11,
+  STATUS_FLAGS: 5
+}
+
+// Archive Task payload layout (Tjmm5c)
+const TJMM5C = {
+  TASK_IDS: 0,
+  ACTION: 1
 }
 
 function parseSuggestion(raw) {
@@ -587,11 +618,23 @@ const DEFAULT_FEATURE_FLAGS = [
 ]
 
 function buildModelConfig(modelId, featureFlags) {
-  return [null, modelId, null, [], 1, null, null, null, null, [360], featureFlags]
+  const config = new Array(11).fill(null)
+  config[MCONFIG.MODEL_ID] = modelId
+  config[MCONFIG.FEATURE_FLAGS] = featureFlags
+  // Schema defaults
+  config[3] = []
+  config[4] = 1
+  config[9] = [360]
+  return config
 }
 
 function buildSuggestionMetadata(suggestionId, experimentIds) {
-  return [9, null, null, null, experimentIds, [null, [1, 1]], null, null, null, null, null, [null, suggestionId]]
+  const meta = new Array(12).fill(null)
+  meta[0] = 9
+  meta[SMETA.EXPERIMENT_IDS] = experimentIds
+  meta[SMETA.STATUS_FLAGS] = [null, [1, 1]]
+  meta[SMETA.SUGGESTION_ID_WRAPPER] = [null, suggestionId]
+  return meta
 }
 
 function buildStartPayload(suggestion, repo, config, startConfig) {
@@ -600,23 +643,13 @@ function buildStartPayload(suggestion, repo, config, startConfig) {
   const featureFlags = startConfig?.featureFlags || DEFAULT_FEATURE_FLAGS
   const experimentIds = startConfig?.experimentIds || []
 
-  return [
-    prompt,
-    null,
-    buildModelConfig(modelId, featureFlags),
-    null,
-    repo,
-    null,
-    null,
-    null,
-    null,
-    buildSuggestionMetadata(suggestion.id, experimentIds),
-    null,
-    null,
-    null,
-    null,
-    1
-  ]
+  const payload = new Array(15).fill(null)
+  payload[RJA83D.PROMPT] = prompt
+  payload[RJA83D.MODEL_CONFIG] = buildModelConfig(modelId, featureFlags)
+  payload[RJA83D.REPO] = repo
+  payload[RJA83D.METADATA] = buildSuggestionMetadata(suggestion.id, experimentIds)
+  payload[RJA83D.START_FLAG] = 1
+  return payload
 }
 
 async function startSuggestion(suggestion, repo, config, startConfig) {
