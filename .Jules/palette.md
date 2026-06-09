@@ -22,3 +22,7 @@
 ## 2026-06-06 - Structural Progressive Disclosure Targeting
 **Learning:** When using progressive disclosure to hide form inputs, targeting only the direct parent element can leave sibling elements (like structural wrappers, descriptive text, or styling boundaries) visible, causing layout issues and orphaned text. Furthermore, if the controlled section is visually placed above the controlling toggle, hiding the section causes the UI to jump, jarring the user experience.
 **Action:** Always target the highest logical structural wrapper (e.g., `.closest('.setting-row')`) rather than just the direct parent. Always position the controlling toggle structurally above the sections it controls to prevent jarring layout shifts when elements are hidden.
+
+## 2026-06-07 - Contextual Helper Text
+**Learning:** Adding context-aware helper text (e.g. explaining what an optional field is used for) improves form usability.
+**Action:** Always include clear helper text for optional fields, especially when their usage might be ambiguous (e.g., used only for specific checks).
