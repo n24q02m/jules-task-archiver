@@ -22,3 +22,9 @@
 ## 2026-06-06 - Structural Progressive Disclosure Targeting
 **Learning:** When using progressive disclosure to hide form inputs, targeting only the direct parent element can leave sibling elements (like structural wrappers, descriptive text, or styling boundaries) visible, causing layout issues and orphaned text. Furthermore, if the controlled section is visually placed above the controlling toggle, hiding the section causes the UI to jump, jarring the user experience.
 **Action:** Always target the highest logical structural wrapper (e.g., `.closest('.setting-row')`) rather than just the direct parent. Always position the controlling toggle structurally above the sections it controls to prevent jarring layout shifts when elements are hidden.
+## 2026-06-07 - Contextual Helper Text
+**Learning:** Adding context-aware helper text (e.g. explaining what an optional field is used for) improves form usability.
+**Action:** Always include clear helper text for optional fields, especially when their usage might be ambiguous (e.g., used only for specific checks).
+## 2026-10-25 - Dark Mode Contrast and State Transitions
+**Learning:** Subtle helper text (like `.hint` or `.version`) and secondary UI elements can easily fail WCAG AA contrast guidelines on dark backgrounds if generic "gray" colors are reused without checking. Additionally, interactive elements without state transitions feel jarring and unresponsive, reducing perceived quality.
+**Action:** Always verify color contrast on dark backgrounds using `#94a3b8` or lighter instead of darker grays like `#64748b`. Always add CSS `transition` properties (e.g., `background-color`, `border-color`, `transform`) to interactive elements like buttons to provide smooth, delightful visual feedback.
