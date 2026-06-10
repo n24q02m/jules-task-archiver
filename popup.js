@@ -228,10 +228,17 @@ function renderState(state) {
 
 // --- Render summary (safe DOM methods, no innerHTML) ---
 function renderSummary(results) {
-  if (!results?.length) return
-
   summarySection.style.display = 'block'
   summaryDiv.textContent = ''
+
+  if (!results?.length) {
+    const emptyDiv = document.createElement('div')
+    emptyDiv.className = 'hint'
+    emptyDiv.style.marginTop = '4px'
+    emptyDiv.textContent = 'No items were processed. Try checking your scope or if tasks exist.'
+    summaryDiv.appendChild(emptyDiv)
+    return
+  }
 
   // ⚡ Bolt Optimization: Use DocumentFragment to batch DOM insertions.
   // This prevents redundant browser reflows/repaints when processing large

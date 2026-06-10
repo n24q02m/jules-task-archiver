@@ -320,6 +320,21 @@ describe('renderState', () => {
 })
 
 describe('renderSummary', () => {
+  it('should render an empty state message when no results are processed', () => {
+    const { sandbox, elements } = setupPopupSandbox()
+    vm.runInContext(popupJs, sandbox)
+
+    sandbox.renderSummary([])
+
+    const summaryDiv = elements['#summary']
+    assert.strictEqual(summaryDiv.children.length, 1)
+    assert.strictEqual(summaryDiv.children[0].className, 'hint')
+    assert.strictEqual(
+      summaryDiv.children[0].textContent,
+      'No items were processed. Try checking your scope or if tasks exist.'
+    )
+  })
+
   it('should create elements for each result and a total', () => {
     const { sandbox, elements } = setupPopupSandbox()
     vm.runInContext(popupJs, sandbox)
