@@ -784,6 +784,23 @@ describe('getOpenPRs', () => {
     assert.strictEqual(cached.length, 1)
     assert.strictEqual(cached[0].title, 'PR')
   })
+  it('should return empty array and log warning on invalid input types', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.test_prCache.clear()
+
+    // Test null owner
+    let prs = await sandbox.test_getOpenPRs(null, 'repo', null)
+    assert.strictEqual(prs.length, 0)
+    assert.ok(sandbox.test_state().log.some((msg) => msg.includes('Owner and repo must be strings')))
+
+    // Test undefined repo
+    prs = await sandbox.test_getOpenPRs('owner', undefined, null)
+    assert.strictEqual(prs.length, 0)
+
+    // Test number repo
+    prs = await sandbox.test_getOpenPRs('owner', 123, null)
+    assert.strictEqual(prs.length, 0)
+  })
 })
 
 describe('taskHasOpenPR', () => {
