@@ -98,11 +98,14 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_state = () => state;
     globalThis.test_updateState = updateState;
     globalThis.test_addLog = addLog;
+    globalThis.test_trimLog = trimLog;
+    globalThis.test_MAX_LOG_LINES = MAX_LOG_LINES;
     globalThis.test_buildBatchRequest = buildBatchRequest;
     globalThis.test_callBatchExecute = callBatchExecute;
     globalThis.test_runInPool = runInPool;
     globalThis.test_createLimiter = createLimiter;
     globalThis.test_archiveTaskWithRetry = archiveTaskWithRetry;
+    globalThis.test_withRetry = withRetry;
     globalThis.test_isRetryable = isRetryable;
     globalThis.test_fixJsonControlChars = fixJsonControlChars;
     globalThis.test_findJsonEnd = findJsonEnd;
@@ -134,6 +137,8 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_finalizeOperation = finalizeOperation;
     globalThis.test_handleOperationError = handleOperationError;
     globalThis.test_listTasks = listTasks;
+    globalThis.test_safeListTasks = safeListTasks;
+    globalThis.test_safeListSources = safeListSources;
     globalThis.test_startOperation = startOperation;
     globalThis.test_startSuggestion = startSuggestion;
     globalThis.test_startKeepAlive = startKeepAlive;
@@ -453,8 +458,86 @@ describe('archiveTaskWithRetry', () => {
       calls++
       throw new Error('HTTP 404')
     }
-    await assert.rejects(() => sandbox.test_archiveTaskWithRetry('t1', {}), /HTTP 404/)
+    await assert.rejects(sandbox.test_archiveTaskWithRetry('t1', {}), { message: 'HTTP 404' })
     assert.strictEqual(calls, 1)
+  })
+
+  describe('withRetry', () => {
+    it('executes successfully on the first attempt', async () => {
+      const { sandbox } = setupEnvironment()
+      let calls = 0
+      const result = await sandbox.test_withRetry(async () => {
+        calls++
+        return 'success'
+      })
+      assert.strictEqual(calls, 1)
+      assert.strictEqual(result, 'success')
+    })
+
+    it('retries on retryable error and succeeds', async () => {
+      const { sandbox } = setupEnvironment()
+      let calls = 0
+      sandbox.setTimeout = (fn) => fn() // Instant retry
+      const result = await sandbox.test_withRetry(async () => {
+        calls++
+        if (calls === 1) throw new Error('HTTP 429')
+        return 'retry-success'
+      })
+      assert.strictEqual(calls, 2)
+      assert.strictEqual(result, 'retry-success')
+    })
+
+    it('stops retrying after RETRY_ATTEMPTS', async () => {
+      const { sandbox } = setupEnvironment()
+      let calls = 0
+      sandbox.setTimeout = (fn) => fn()
+      await assert.rejects(
+        sandbox.test_withRetry(async () => {
+          calls++
+          throw new Error('HTTP 500')
+        }),
+        { message: 'HTTP 500' }
+      )
+      assert.strictEqual(calls, 4) // RETRY_ATTEMPTS is 4
+    })
+
+    it('throws immediately on non-retryable error', async () => {
+      const { sandbox } = setupEnvironment()
+      let calls = 0
+      sandbox.setTimeout = (fn) => fn()
+      await assert.rejects(
+        sandbox.test_withRetry(async () => {
+          calls++
+          throw new Error('HTTP 404')
+        }),
+        { message: 'HTTP 404' }
+      )
+      assert.strictEqual(calls, 1)
+    })
+
+    it('verifies exponential backoff delay', async () => {
+      const { sandbox } = setupEnvironment()
+      const delays = []
+      sandbox.setTimeout = (fn, ms) => {
+        delays.push(ms)
+        fn()
+      }
+      sandbox.Math.random = () => 0.5 // Constant jitter for testing
+
+      let calls = 0
+      await sandbox.test_withRetry(async () => {
+        calls++
+        if (calls < 3) throw new Error('HTTP 429')
+        return 'ok'
+      })
+
+      // RETRY_BASE_MS = 400
+      // attempt 0: 400 * 2^0 + 0.5 * 200 = 400 + 100 = 500
+      // attempt 1: 400 * 2^1 + 0.5 * 200 = 800 + 100 = 900
+      assert.strictEqual(delays.length, 2)
+      assert.strictEqual(delays[0], 500)
+      assert.strictEqual(delays[1], 900)
+    })
   })
 })
 
@@ -1448,6 +1531,51 @@ describe('jFetch', () => {
     await sandbox.test_jFetch('https://api.github.com/api/test', { token: 'valid-token' })
     assert.strictEqual(capturedHeaders.Authorization, 'token valid-token')
   })
+
+  it('should throw an error for HTTP 500 status code', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.fetch = async () => ({
+      ok: false,
+      status: 500,
+      statusText: 'Internal Server Error'
+    })
+
+    await assert.rejects(() => sandbox.test_jFetch('https://jules.google.com/api/test'), {
+      name: 'Error',
+      message: 'HTTP 500'
+    })
+  })
+
+  it('should throw an error if fetch throws a network error', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.fetch = async () => {
+      throw new Error('Network failure')
+    }
+
+    await assert.rejects(() => sandbox.test_jFetch('https://jules.google.com/api/test'), {
+      name: 'Error',
+      message: 'Network failure'
+    })
+  })
+
+  it('should pass custom options correctly to fetch', async () => {
+    const { sandbox } = setupEnvironment()
+    let capturedOptions = null
+    sandbox.fetch = async (_url, options) => {
+      capturedOptions = options
+      return { ok: true }
+    }
+
+    await sandbox.test_jFetch('https://jules.google.com/api/test', {
+      method: 'POST',
+      body: 'test-body',
+      headers: { 'X-Custom': 'value' }
+    })
+
+    assert.strictEqual(capturedOptions.method, 'POST')
+    assert.strictEqual(capturedOptions.body, 'test-body')
+    assert.strictEqual(capturedOptions.headers['X-Custom'], 'value')
+  })
 })
 
 // =============================================================================
@@ -1713,7 +1841,9 @@ describe('ensureContentScript', () => {
     const { sandbox } = setupEnvironment()
     sandbox.chrome.webNavigation.getFrame = async () => ({ url: null, documentId: 'doc1' })
 
-    await assert.rejects(sandbox.test_ensureContentScript(123), { message: 'Security Error: Cannot verify tab origin' })
+    await assert.rejects(sandbox.test_ensureContentScript(123), {
+      message: 'Security Error: Cannot verify tab origin'
+    })
   })
 
   it('should throw security error if origin is invalid', async () => {
@@ -1759,5 +1889,110 @@ describe('groupTasksByRepo Internal', () => {
     assert.strictEqual(result.size, 2)
     assert.strictEqual(result.get('repo-1').length, 2)
     assert.strictEqual(result.get('repo-2').length, 1)
+  })
+})
+
+describe('safeListTasks', () => {
+  it('should return tasks when listTasks succeeds with non-empty list', async () => {
+    const { sandbox } = setupEnvironment()
+    const mockTasks = [
+      ['task-1', 'Title 1', null, null, 'github/owner/repo', 2],
+      ['task-2', 'Title 2', null, null, 'github/owner/repo2', 4]
+    ]
+    sandbox.callBatchExecute = async () => [mockTasks]
+
+    const result = await sandbox.test_safeListTasks('test-label', {})
+    assert.strictEqual(result.length, 2)
+    assert.strictEqual(result[0].id, 'task-1')
+    assert.strictEqual(result[1].id, 'task-2')
+  })
+
+  it('should return null and log message when listTasks returns an empty array', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.callBatchExecute = async () => [[]]
+
+    const result = await sandbox.test_safeListTasks('test-label', {})
+    assert.strictEqual(result, null)
+    const state = sandbox.test_state()
+    assert.ok(state.log.some((l) => l.includes('[test-label] No tasks found.')))
+  })
+
+  it('should return null and log error when listTasks throws', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.callBatchExecute = async () => {
+      throw new Error('Network error')
+    }
+
+    const result = await sandbox.test_safeListTasks('test-label', {})
+    assert.strictEqual(result, null)
+    const state = sandbox.test_state()
+    assert.ok(state.log.some((l) => l.includes('[test-label] ERROR listing tasks: Network error')))
+  })
+})
+
+describe('safeListSources', () => {
+  it('should return sources when listSuggestionEnabledSources succeeds with non-empty list', async () => {
+    const { sandbox } = setupEnvironment()
+    const mockSources = [
+      ['github/owner/repo', null, null, null, null, [true, true, [2], [true]]],
+      ['github/owner/repo2', null, null, null, null, [true, true, [2], [true]]]
+    ]
+    sandbox.callBatchExecute = async () => [mockSources]
+
+    const result = await sandbox.test_safeListSources('test-label', {})
+    assert.strictEqual(result.length, 2)
+    assert.deepStrictEqual(result, ['github/owner/repo', 'github/owner/repo2'])
+  })
+
+  it('should return null and log message when no repos have Suggestions enabled', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.callBatchExecute = async () => [[]]
+
+    const result = await sandbox.test_safeListSources('test-label', {})
+    assert.strictEqual(result, null)
+    const state = sandbox.test_state()
+    assert.ok(state.log.some((l) => l.includes('[test-label] No repos have Suggestions enabled.')))
+  })
+
+  it('should return null and log error when listSuggestionEnabledSources throws', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.callBatchExecute = async () => {
+      throw new Error('API error')
+    }
+
+    const result = await sandbox.test_safeListSources('test-label', {})
+    assert.strictEqual(result, null)
+    const state = sandbox.test_state()
+    assert.ok(state.log.some((l) => l.includes('[test-label] ERROR listing sources: API error')))
+  })
+})
+
+describe('trimLog Internal', () => {
+  it('should not trim if log length is equal to MAX_LOG_LINES', () => {
+    const { sandbox } = setupEnvironment()
+    const max = sandbox.test_MAX_LOG_LINES
+    const state = sandbox.test_state()
+    state.log = Array.from({ length: max }, (_, i) => `line ${i}`)
+
+    sandbox.test_trimLog()
+
+    assert.strictEqual(state.log.length, max)
+    assert.strictEqual(state.log[0], 'line 0')
+    assert.strictEqual(state.log[max - 1], `line ${max - 1}`)
+  })
+
+  it('should trim oldest entries if log length exceeds MAX_LOG_LINES', () => {
+    const { sandbox } = setupEnvironment()
+    const max = sandbox.test_MAX_LOG_LINES
+    const state = sandbox.test_state()
+    // Create max + 10 entries
+    state.log = Array.from({ length: max + 10 }, (_, i) => `line ${i}`)
+
+    sandbox.test_trimLog()
+
+    assert.strictEqual(state.log.length, max)
+    // Should have removed the first 10 entries
+    assert.strictEqual(state.log[0], 'line 10')
+    assert.strictEqual(state.log[max - 1], `line ${max + 9}`)
   })
 })
