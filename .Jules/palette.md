@@ -28,3 +28,6 @@
 ## 2026-10-25 - Dark Mode Contrast and State Transitions
 **Learning:** Subtle helper text (like `.hint` or `.version`) and secondary UI elements can easily fail WCAG AA contrast guidelines on dark backgrounds if generic "gray" colors are reused without checking. Additionally, interactive elements without state transitions feel jarring and unresponsive, reducing perceived quality.
 **Action:** Always verify color contrast on dark backgrounds using `#94a3b8` or lighter instead of darker grays like `#64748b`. Always add CSS `transition` properties (e.g., `background-color`, `border-color`, `transform`) to interactive elements like buttons to provide smooth, delightful visual feedback.
+## 2026-06-09 - Empty State Feedback
+**Learning:** When a list or process finishes with zero results, an empty summary container gives no feedback, leaving the user wondering if it actually ran or failed silently.
+**Action:** Always provide a helpful empty state message explaining why no results might have occurred, using styles consistent with other hints to offer guidance without showing as an error.
