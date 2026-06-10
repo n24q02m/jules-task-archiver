@@ -34,3 +34,8 @@ superpowers/
 docs/superpowers/
 
 .Jules*
+
+# Coverage
+coverage/
+*.lcov
+.c8_output/

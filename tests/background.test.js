@@ -1479,320 +1479,318 @@ describe('jFetch', () => {
     assert.strictEqual(capturedOptions.body, 'test-body')
     assert.strictEqual(capturedOptions.headers['X-Custom'], 'value')
   })
+})
 
-  // =============================================================================
-  // KeepAlive Tests
-  // =============================================================================
+// =============================================================================
+// KeepAlive Tests
+// =============================================================================
 
-  describe('KeepAlive', () => {
-    it('startKeepAlive should set a 25s interval', () => {
-      const { sandbox } = setupEnvironment()
-      sandbox.test_startKeepAlive()
+describe('KeepAlive', () => {
+  it('startKeepAlive should set a 25s interval', () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.test_startKeepAlive()
 
-      assert.strictEqual(sandbox.test_activeTimers.length, 1)
-      assert.strictEqual(sandbox.test_activeTimers[0].ms, 25000)
-      assert.ok(sandbox.test_getKeepAliveInterval() !== null)
+    assert.strictEqual(sandbox.test_activeTimers.length, 1)
+    assert.strictEqual(sandbox.test_activeTimers[0].ms, 25000)
+    assert.ok(sandbox.test_getKeepAliveInterval() !== null)
+  })
+
+  it('startKeepAlive should call chrome.runtime.getPlatformInfo periodically', async () => {
+    const { sandbox } = setupEnvironment()
+    let called = false
+    sandbox.chrome.runtime.getPlatformInfo = async () => {
+      called = true
+    }
+
+    sandbox.test_startKeepAlive()
+    // Manually trigger the interval callback
+    await sandbox.test_activeTimers[0].fn()
+    assert.ok(called)
+  })
+
+  it('startKeepAlive should be idempotent', () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.test_startKeepAlive()
+    sandbox.test_startKeepAlive()
+
+    assert.strictEqual(sandbox.test_activeTimers.length, 1)
+  })
+
+  it('stopKeepAlive should clear the interval and reset state', () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.test_startKeepAlive()
+    const intervalId = sandbox.test_getKeepAliveInterval()
+    assert.ok(intervalId !== null)
+
+    sandbox.test_stopKeepAlive()
+    assert.strictEqual(sandbox.test_clearedTimers.length, 1)
+    assert.strictEqual(sandbox.test_clearedTimers[0], intervalId)
+    assert.strictEqual(sandbox.test_getKeepAliveInterval(), null)
+  })
+})
+
+describe('callBatchExecute', () => {
+  it('should throw error when jFetch fails with HTTP error', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.fetch = async () => ({
+      ok: false,
+      status: 500,
+      statusText: 'Internal Server Error'
     })
 
-    it('startKeepAlive should call chrome.runtime.getPlatformInfo periodically', async () => {
-      const { sandbox } = setupEnvironment()
-      let called = false
-      sandbox.chrome.runtime.getPlatformInfo = async () => {
-        called = true
-      }
-
-      sandbox.test_startKeepAlive()
-      // Manually trigger the interval callback
-      await sandbox.test_activeTimers[0].fn()
-      assert.ok(called)
-    })
-
-    it('startKeepAlive should be idempotent', () => {
-      const { sandbox } = setupEnvironment()
-      sandbox.test_startKeepAlive()
-      sandbox.test_startKeepAlive()
-
-      assert.strictEqual(sandbox.test_activeTimers.length, 1)
-    })
-
-    it('stopKeepAlive should clear the interval and reset state', () => {
-      const { sandbox } = setupEnvironment()
-      sandbox.test_startKeepAlive()
-      const intervalId = sandbox.test_getKeepAliveInterval()
-      assert.ok(intervalId !== null)
-
-      sandbox.test_stopKeepAlive()
-      assert.strictEqual(sandbox.test_clearedTimers.length, 1)
-      assert.strictEqual(sandbox.test_clearedTimers[0], intervalId)
-      assert.strictEqual(sandbox.test_getKeepAliveInterval(), null)
+    const config = { accountNum: '0' }
+    await assert.rejects(sandbox.test_callBatchExecute('rpcId', {}, config), {
+      message: 'batchexecute rpcId failed: HTTP 500'
     })
   })
 
-  describe('callBatchExecute', () => {
-    it('should throw error when jFetch fails with HTTP error', async () => {
-      const { sandbox } = setupEnvironment()
-      sandbox.fetch = async () => ({
-        ok: false,
-        status: 500,
-        statusText: 'Internal Server Error'
-      })
+  it('should throw error when fetch throws network error', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.fetch = async () => {
+      throw new Error('Network Error')
+    }
 
-      const config = { accountNum: '0' }
-      await assert.rejects(sandbox.test_callBatchExecute('rpcId', {}, config), {
-        message: 'batchexecute rpcId failed: HTTP 500'
-      })
-    })
-
-    it('should throw error when fetch throws network error', async () => {
-      const { sandbox } = setupEnvironment()
-      sandbox.fetch = async () => {
-        throw new Error('Network Error')
-      }
-
-      const config = { accountNum: '0' }
-      await assert.rejects(sandbox.test_callBatchExecute('rpcId', {}, config), {
-        message: 'batchexecute rpcId failed: Network Error'
-      })
+    const config = { accountNum: '0' }
+    await assert.rejects(sandbox.test_callBatchExecute('rpcId', {}, config), {
+      message: 'batchexecute rpcId failed: Network Error'
     })
   })
+})
 
-  // =============================================================================
-  // Suggestion Operations Tests
-  // =============================================================================
+// =============================================================================
+// Suggestion Operations Tests
+// =============================================================================
 
-  describe('listSuggestions', () => {
-    it('should return an empty array if callBatchExecute returns null', async () => {
-      const { sandbox } = setupEnvironment()
-      sandbox.callBatchExecute = async () => null
+describe('listSuggestions', () => {
+  it('should return an empty array if callBatchExecute returns null', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.callBatchExecute = async () => null
 
-      const result = await sandbox.test_listSuggestions('repo', {})
-      assert.strictEqual(result.length, 0)
-    })
+    const result = await sandbox.test_listSuggestions('repo', {})
+    assert.strictEqual(result.length, 0)
+  })
 
-    it('should return an empty array if callBatchExecute returns an empty array', async () => {
-      const { sandbox } = setupEnvironment()
-      sandbox.callBatchExecute = async () => []
+  it('should return an empty array if callBatchExecute returns an empty array', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.callBatchExecute = async () => []
 
-      const result = await sandbox.test_listSuggestions('repo', {})
-      assert.strictEqual(result.length, 0)
-    })
+    const result = await sandbox.test_listSuggestions('repo', {})
+    assert.strictEqual(result.length, 0)
+  })
 
-    it('should return an empty array if callBatchExecute returns [null]', async () => {
-      const { sandbox } = setupEnvironment()
-      sandbox.callBatchExecute = async () => [null]
+  it('should return an empty array if callBatchExecute returns [null]', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.callBatchExecute = async () => [null]
 
-      const result = await sandbox.test_listSuggestions('repo', {})
-      assert.strictEqual(result.length, 0)
-    })
+    const result = await sandbox.test_listSuggestions('repo', {})
+    assert.strictEqual(result.length, 0)
+  })
 
-    it('should return an empty array if callBatchExecute returns [[]]', async () => {
-      const { sandbox } = setupEnvironment()
-      sandbox.callBatchExecute = async () => [[]]
+  it('should return an empty array if callBatchExecute returns [[]]', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.callBatchExecute = async () => [[]]
 
-      const result = await sandbox.test_listSuggestions('repo', {})
-      assert.strictEqual(result.length, 0)
-    })
+    const result = await sandbox.test_listSuggestions('repo', {})
+    assert.strictEqual(result.length, 0)
+  })
 
-    it('should return parsed suggestions for valid response data', async () => {
-      const { sandbox } = setupEnvironment()
-      const mockResponse = [
-        [['s1', ['Title', 'Desc', 'url', 'path', 1, 0.9, 'rat', 'code', 'js', 'slug', 1], 1, [], 0]]
+  it('should return parsed suggestions for valid response data', async () => {
+    const { sandbox } = setupEnvironment()
+    const mockResponse = [[['s1', ['Title', 'Desc', 'url', 'path', 1, 0.9, 'rat', 'code', 'js', 'slug', 1], 1, [], 0]]]
+    sandbox.callBatchExecute = async () => mockResponse
+
+    const result = await sandbox.test_listSuggestions('repo', {})
+    assert.strictEqual(result.length, 1)
+    assert.strictEqual(result[0].id, 's1')
+    assert.strictEqual(result[0].title, 'Title')
+    assert.strictEqual(result[0].confidence, 0.9)
+  })
+
+  it('should filter out null/invalid suggestions', async () => {
+    const { sandbox } = setupEnvironment()
+    const mockResponse = [
+      [
+        ['s1', ['Title', 'Desc', 'url', 'path', 1, 0.9, 'rat', 'code', 'js', 'slug', 1], 1, [], 0],
+        null,
+        ['s2', null, 1, [], 0] // parseSuggestion returns null if details is missing
       ]
-      sandbox.callBatchExecute = async () => mockResponse
+    ]
+    sandbox.callBatchExecute = async () => mockResponse
 
-      const result = await sandbox.test_listSuggestions('repo', {})
-      assert.strictEqual(result.length, 1)
-      assert.strictEqual(result[0].id, 's1')
-      assert.strictEqual(result[0].title, 'Title')
-      assert.strictEqual(result[0].confidence, 0.9)
+    const result = await sandbox.test_listSuggestions('repo', {})
+    assert.strictEqual(result.length, 1)
+    assert.strictEqual(result[0].id, 's1')
+  })
+})
+
+describe('getStartConfig', () => {
+  it('should return the config object when it exists in session storage', async () => {
+    const mockConfig = { modelId: 'test-model', features: ['a', 'b'] }
+    const { sandbox } = setupEnvironment({ startConfig: mockConfig })
+
+    const result = await sandbox.test_getStartConfig()
+    assert.deepStrictEqual(result, mockConfig)
+  })
+
+  it('should return null when no config exists in session storage', async () => {
+    const { sandbox } = setupEnvironment({}) // empty storage
+
+    const result = await sandbox.test_getStartConfig()
+    assert.strictEqual(result, null)
+  })
+})
+
+// =============================================================================
+// getTabConfig Tests
+// =============================================================================
+
+describe('getTabConfig', () => {
+  it('should return config and accountNum on success', async () => {
+    const { sandbox } = setupEnvironment()
+    const result = await sandbox.test_getTabConfig(1)
+    assert.strictEqual(result.at, 'token')
+    assert.strictEqual(result.bl, 'build')
+    assert.strictEqual(result.fsid, '123')
+    assert.strictEqual(result.accountNum, '0')
+  })
+
+  it('should throw error when "at" property is missing', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.chrome.tabs.sendMessage = async () => ({
+      config: { bl: 'build', fsid: '123' },
+      accountNum: '0'
     })
-
-    it('should filter out null/invalid suggestions', async () => {
-      const { sandbox } = setupEnvironment()
-      const mockResponse = [
-        [
-          ['s1', ['Title', 'Desc', 'url', 'path', 1, 0.9, 'rat', 'code', 'js', 'slug', 1], 1, [], 0],
-          null,
-          ['s2', null, 1, [], 0] // parseSuggestion returns null if details is missing
-        ]
-      ]
-      sandbox.callBatchExecute = async () => mockResponse
-
-      const result = await sandbox.test_listSuggestions('repo', {})
-      assert.strictEqual(result.length, 1)
-      assert.strictEqual(result[0].id, 's1')
+    await assert.rejects(sandbox.test_getTabConfig(1), {
+      message: 'Could not extract page config (XSRF token missing). Try refreshing the Jules tab.'
     })
   })
 
-  describe('getStartConfig', () => {
-    it('should return the config object when it exists in session storage', async () => {
-      const mockConfig = { modelId: 'test-model', features: ['a', 'b'] }
-      const { sandbox } = setupEnvironment({ startConfig: mockConfig })
-
-      const result = await sandbox.test_getStartConfig()
-      assert.deepStrictEqual(result, mockConfig)
+  it('should throw security error for invalid accountNum format', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.chrome.tabs.sendMessage = async () => ({
+      config: { at: 'token', bl: 'build', fsid: '123' },
+      accountNum: 'invalid-123'
     })
-
-    it('should return null when no config exists in session storage', async () => {
-      const { sandbox } = setupEnvironment({}) // empty storage
-
-      const result = await sandbox.test_getStartConfig()
-      assert.strictEqual(result, null)
-    })
+    await assert.rejects(sandbox.test_getTabConfig(1), { message: 'Security Error: Invalid account number format' })
   })
 
-  // =============================================================================
-  // getTabConfig Tests
-  // =============================================================================
-
-  describe('getTabConfig', () => {
-    it('should return config and accountNum on success', async () => {
-      const { sandbox } = setupEnvironment()
-      const result = await sandbox.test_getTabConfig(1)
-      assert.strictEqual(result.at, 'token')
-      assert.strictEqual(result.bl, 'build')
-      assert.strictEqual(result.fsid, '123')
-      assert.strictEqual(result.accountNum, '0')
+  it('should handle missing accountNum by defaulting to "0"', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.chrome.tabs.sendMessage = async () => ({
+      config: { at: 'token', bl: 'build', fsid: '123' }
     })
-
-    it('should throw error when "at" property is missing', async () => {
-      const { sandbox } = setupEnvironment()
-      sandbox.chrome.tabs.sendMessage = async () => ({
-        config: { bl: 'build', fsid: '123' },
-        accountNum: '0'
-      })
-      await assert.rejects(sandbox.test_getTabConfig(1), {
-        message: 'Could not extract page config (XSRF token missing). Try refreshing the Jules tab.'
-      })
-    })
-
-    it('should throw security error for invalid accountNum format', async () => {
-      const { sandbox } = setupEnvironment()
-      sandbox.chrome.tabs.sendMessage = async () => ({
-        config: { at: 'token', bl: 'build', fsid: '123' },
-        accountNum: 'invalid-123'
-      })
-      await assert.rejects(sandbox.test_getTabConfig(1), { message: 'Security Error: Invalid account number format' })
-    })
-
-    it('should handle missing accountNum by defaulting to "0"', async () => {
-      const { sandbox } = setupEnvironment()
-      sandbox.chrome.tabs.sendMessage = async () => ({
-        config: { at: 'token', bl: 'build', fsid: '123' }
-      })
-      const result = await sandbox.test_getTabConfig(1)
-      assert.strictEqual(result.accountNum, '0')
-    })
+    const result = await sandbox.test_getTabConfig(1)
+    assert.strictEqual(result.accountNum, '0')
   })
+})
 
-  // =============================================================================
-  // ensureContentScript Tests
-  // =============================================================================
+// =============================================================================
+// ensureContentScript Tests
+// =============================================================================
 
-  describe('ensureContentScript', () => {
-    it('should return documentId when initial PING succeeds', async () => {
-      const { sandbox } = setupEnvironment()
-      const tabId = 123
-      let messageSent = null
+describe('ensureContentScript', () => {
+  it('should return documentId when initial PING succeeds', async () => {
+    const { sandbox } = setupEnvironment()
+    const tabId = 123
+    let messageSent = null
 
-      sandbox.chrome.tabs.sendMessage = async (id, msg, options) => {
-        if (msg.action === 'PING') {
-          messageSent = { id, msg, options }
-          return { ok: true }
-        }
-        return null
-      }
-
-      const docId = await sandbox.test_ensureContentScript(tabId)
-      assert.strictEqual(docId, 'doc1')
-      assert.strictEqual(messageSent.id, tabId)
-      assert.strictEqual(messageSent.msg.action, 'PING')
-      assert.strictEqual(messageSent.options.documentId, 'doc1')
-    })
-
-    it('should inject script and retry when initial PING fails', async () => {
-      const { sandbox } = setupEnvironment()
-      const tabId = 123
-      let pings = 0
-      let scriptInjected = false
-
-      sandbox.chrome.tabs.sendMessage = async () => {
-        pings++
-        if (pings === 1) throw new Error('Could not establish connection')
+    sandbox.chrome.tabs.sendMessage = async (id, msg, options) => {
+      if (msg.action === 'PING') {
+        messageSent = { id, msg, options }
         return { ok: true }
       }
+      return null
+    }
 
-      sandbox.chrome.scripting.executeScript = async (opts) => {
-        assert.strictEqual(opts.target.tabId, tabId)
-        // Use JSON.stringify to avoid cross-VM reference issues with deepStrictEqual
-        assert.strictEqual(JSON.stringify(opts.files), JSON.stringify(['content.js']))
-        scriptInjected = true
-      }
+    const docId = await sandbox.test_ensureContentScript(tabId)
+    assert.strictEqual(docId, 'doc1')
+    assert.strictEqual(messageSent.id, tabId)
+    assert.strictEqual(messageSent.msg.action, 'PING')
+    assert.strictEqual(messageSent.options.documentId, 'doc1')
+  })
 
-      // Mock setTimeout to resolve immediately
-      sandbox.setTimeout = (fn) => {
-        fn()
-        return 0
-      }
+  it('should inject script and retry when initial PING fails', async () => {
+    const { sandbox } = setupEnvironment()
+    const tabId = 123
+    let pings = 0
+    let scriptInjected = false
 
-      const docId = await sandbox.test_ensureContentScript(tabId)
-      assert.strictEqual(docId, 'doc1')
-      assert.strictEqual(scriptInjected, true)
-      assert.strictEqual(pings, 2)
-    })
+    sandbox.chrome.tabs.sendMessage = async () => {
+      pings++
+      if (pings === 1) throw new Error('Could not establish connection')
+      return { ok: true }
+    }
 
-    it('should throw security error if frame URL is missing', async () => {
-      const { sandbox } = setupEnvironment()
-      sandbox.chrome.webNavigation.getFrame = async () => ({ url: null, documentId: 'doc1' })
+    sandbox.chrome.scripting.executeScript = async (opts) => {
+      assert.strictEqual(opts.target.tabId, tabId)
+      // Use JSON.stringify to avoid cross-VM reference issues with deepStrictEqual
+      assert.strictEqual(JSON.stringify(opts.files), JSON.stringify(['content.js']))
+      scriptInjected = true
+    }
 
-      await assert.rejects(sandbox.test_ensureContentScript(123), {
-        message: 'Security Error: Cannot verify tab origin'
-      })
-    })
+    // Mock setTimeout to resolve immediately
+    sandbox.setTimeout = (fn) => {
+      fn()
+      return 0
+    }
 
-    it('should throw security error if origin is invalid', async () => {
-      const { sandbox } = setupEnvironment()
-      sandbox.chrome.webNavigation.getFrame = async () => ({ url: 'https://example.com', documentId: 'doc1' })
+    const docId = await sandbox.test_ensureContentScript(tabId)
+    assert.strictEqual(docId, 'doc1')
+    assert.strictEqual(scriptInjected, true)
+    assert.strictEqual(pings, 2)
+  })
 
-      await assert.rejects(sandbox.test_ensureContentScript(123), {
-        message: 'Security Error: Cannot inject script into non-Jules tab'
-      })
-    })
+  it('should throw security error if frame URL is missing', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.chrome.webNavigation.getFrame = async () => ({ url: null, documentId: 'doc1' })
 
-    it('should throw error if content script fails to initialize within 3s', async () => {
-      const { sandbox } = setupEnvironment()
-      const tabId = 123
-      let now = 1000
-
-      sandbox.chrome.tabs.sendMessage = async () => {
-        throw new Error('Still not ready')
-      }
-
-      sandbox.Date.now = () => now
-      sandbox.setTimeout = (fn) => {
-        now += 500 // Advance time by 500ms on each retry (loop has 100ms sleep)
-        fn()
-        return 0
-      }
-
-      await assert.rejects(sandbox.test_ensureContentScript(tabId), {
-        message: 'Content script failed to initialize within 3s'
-      })
+    await assert.rejects(sandbox.test_ensureContentScript(123), {
+      message: 'Security Error: Cannot verify tab origin'
     })
   })
 
-  describe('groupTasksByRepo Internal', () => {
-    it('should correctly group tasks using the internal function', () => {
-      const { sandbox } = setupEnvironment()
-      const tasks = [
-        { id: '1', repo: 'repo-1' },
-        { id: '2', repo: 'repo-2' },
-        { id: '3', repo: 'repo-1' }
-      ]
-      const result = sandbox.test_groupTasksByRepo(tasks)
-      assert.strictEqual(result.size, 2)
-      assert.strictEqual(result.get('repo-1').length, 2)
-      assert.strictEqual(result.get('repo-2').length, 1)
+  it('should throw security error if origin is invalid', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.chrome.webNavigation.getFrame = async () => ({ url: 'https://example.com', documentId: 'doc1' })
+
+    await assert.rejects(sandbox.test_ensureContentScript(123), {
+      message: 'Security Error: Cannot inject script into non-Jules tab'
     })
+  })
+
+  it('should throw error if content script fails to initialize within 3s', async () => {
+    const { sandbox } = setupEnvironment()
+    const tabId = 123
+    let now = 1000
+
+    sandbox.chrome.tabs.sendMessage = async () => {
+      throw new Error('Still not ready')
+    }
+
+    sandbox.Date.now = () => now
+    sandbox.setTimeout = (fn) => {
+      now += 500 // Advance time by 500ms on each retry (loop has 100ms sleep)
+      fn()
+      return 0
+    }
+
+    await assert.rejects(sandbox.test_ensureContentScript(tabId), {
+      message: 'Content script failed to initialize within 3s'
+    })
+  })
+})
+
+describe('groupTasksByRepo Internal', () => {
+  it('should correctly group tasks using the internal function', () => {
+    const { sandbox } = setupEnvironment()
+    const tasks = [
+      { id: '1', repo: 'repo-1' },
+      { id: '2', repo: 'repo-2' },
+      { id: '3', repo: 'repo-1' }
+    ]
+    const result = sandbox.test_groupTasksByRepo(tasks)
+    assert.strictEqual(result.size, 2)
+    assert.strictEqual(result.get('repo-1').length, 2)
+    assert.strictEqual(result.get('repo-2').length, 1)
   })
 })
