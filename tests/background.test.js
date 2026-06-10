@@ -480,6 +480,20 @@ describe('parseResponse', () => {
     const response = ')]}\'\n\n40\n[["wrb.fr","p1Takd","[[]]",null,null,null,"generic"]]'
     assert.strictEqual(sandbox.test_parseResponse(response, 'Rja83d'), null)
   })
+
+  it('should throw when newline is missing after byte length', () => {
+    const { sandbox } = setupEnvironment()
+    const response = ')]}\' 100 [["wrb.fr","p1Takd","[[]]",null,null,null,"generic"]]'
+    assert.throws(() => sandbox.test_parseResponse(response, 'p1Takd'), { message: 'Invalid batchexecute response' })
+  })
+
+  it('should throw when JSON boundary is not found', () => {
+    const { sandbox } = setupEnvironment()
+    const response = ')]}\'\n\n100\n[["wrb.fr","p1Takd","[[]]",null,null,null,"generic"'
+    assert.throws(() => sandbox.test_parseResponse(response, 'p1Takd'), {
+      message: 'Could not find JSON boundary in response'
+    })
+  })
 })
 
 // =============================================================================
