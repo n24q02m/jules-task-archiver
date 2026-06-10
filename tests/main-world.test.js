@@ -206,3 +206,23 @@ describe('main-world.js', () => {
     assert.strictEqual(messages.length, initialCount)
   })
 })
+
+describe('main-world.js idempotency', () => {
+  it('should only initialize once even if script is injected multiple times', () => {
+    const { sandbox, messages, listeners } = setupSandbox({
+      SNlM0e: 'at-token'
+    })
+
+    // First injection
+    vm.runInContext(mainWorldJs, sandbox)
+    assert.strictEqual(messages.length, 1)
+    assert.strictEqual(listeners.message.length, 1)
+    const initialFetch = sandbox.window.fetch
+
+    // Second injection
+    vm.runInContext(mainWorldJs, sandbox)
+    assert.strictEqual(messages.length, 1, 'Should not broadcast config again on second injection')
+    assert.strictEqual(listeners.message.length, 1, 'Should not add duplicate message listener')
+    assert.strictEqual(sandbox.window.fetch, initialFetch, 'Should not wrap fetch again')
+  })
+})
