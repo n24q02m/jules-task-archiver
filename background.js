@@ -920,11 +920,9 @@ async function getJulesTabs() {
   const tabs = await chrome.tabs.query({ url: `${JULES_ORIGIN}/*` })
   return tabs
     .filter((t) => !t.url.includes('accounts.google'))
-    .sort((a, b) => {
-      const na = parseInt(extractAccountNum(a.url), 10)
-      const nb = parseInt(extractAccountNum(b.url), 10)
-      return na - nb
-    })
+    .map((t) => ({ t, n: parseInt(extractAccountNum(t.url), 10) }))
+    .sort((a, b) => a.n - b.n)
+    .map((obj) => obj.t)
 }
 
 function getTabLabel(tab) {
