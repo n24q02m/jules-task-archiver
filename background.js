@@ -1023,19 +1023,6 @@ async function processTab(tab, options) {
   const tasks = await safeListTasks(label, config)
   if (!tasks) return 0
 
-  // Partition into archivable (terminal) vs active (still-running) tasks.
-  const candidates = []
-  const active = []
-  for (const t of tasks) {
-    if (isArchivable(t)) {
-      candidates.push(t)
-    } else {
-      active.push(t)
-    }
-  }
-
-  addLog(`[${label}] ${tasks.length} total: ${candidates.length} archivable, ${active.length} active`)
-
   const toArchive = []
   const toSkip = []
 
@@ -1047,6 +1034,19 @@ async function processTab(tab, options) {
     addLog(`[${label}] FORCE: archiving all ${tasks.length} tasks (skip state filter + PR check)`)
     for (const task of tasks) toArchive.push(task)
   } else {
+    // Partition into archivable (terminal) vs active (still-running) tasks.
+    const candidates = []
+    const active = []
+    for (const t of tasks) {
+      if (isArchivable(t)) {
+        candidates.push(t)
+      } else {
+        active.push(t)
+      }
+    }
+
+    addLog(`[${label}] ${tasks.length} total: ${candidates.length} archivable, ${active.length} active`)
+
     if (candidates.length === 0) {
       // Surface drift instead of silently archiving nothing: if Jules changes
       // its state codes, the operator sees the unrecognized states and the
