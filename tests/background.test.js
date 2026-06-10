@@ -103,6 +103,7 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_runInPool = runInPool;
     globalThis.test_createLimiter = createLimiter;
     globalThis.test_archiveTaskWithRetry = archiveTaskWithRetry;
+    globalThis.test_withRetry = withRetry;
     globalThis.test_isRetryable = isRetryable;
     globalThis.test_fixJsonControlChars = fixJsonControlChars;
     globalThis.test_findJsonEnd = findJsonEnd;
@@ -453,8 +454,86 @@ describe('archiveTaskWithRetry', () => {
       calls++
       throw new Error('HTTP 404')
     }
-    await assert.rejects(() => sandbox.test_archiveTaskWithRetry('t1', {}), /HTTP 404/)
+    await assert.rejects(sandbox.test_archiveTaskWithRetry('t1', {}), { message: 'HTTP 404' })
     assert.strictEqual(calls, 1)
+  })
+
+  describe('withRetry', () => {
+    it('executes successfully on the first attempt', async () => {
+      const { sandbox } = setupEnvironment()
+      let calls = 0
+      const result = await sandbox.test_withRetry(async () => {
+        calls++
+        return 'success'
+      })
+      assert.strictEqual(calls, 1)
+      assert.strictEqual(result, 'success')
+    })
+
+    it('retries on retryable error and succeeds', async () => {
+      const { sandbox } = setupEnvironment()
+      let calls = 0
+      sandbox.setTimeout = (fn) => fn() // Instant retry
+      const result = await sandbox.test_withRetry(async () => {
+        calls++
+        if (calls === 1) throw new Error('HTTP 429')
+        return 'retry-success'
+      })
+      assert.strictEqual(calls, 2)
+      assert.strictEqual(result, 'retry-success')
+    })
+
+    it('stops retrying after RETRY_ATTEMPTS', async () => {
+      const { sandbox } = setupEnvironment()
+      let calls = 0
+      sandbox.setTimeout = (fn) => fn()
+      await assert.rejects(
+        sandbox.test_withRetry(async () => {
+          calls++
+          throw new Error('HTTP 500')
+        }),
+        { message: 'HTTP 500' }
+      )
+      assert.strictEqual(calls, 4) // RETRY_ATTEMPTS is 4
+    })
+
+    it('throws immediately on non-retryable error', async () => {
+      const { sandbox } = setupEnvironment()
+      let calls = 0
+      sandbox.setTimeout = (fn) => fn()
+      await assert.rejects(
+        sandbox.test_withRetry(async () => {
+          calls++
+          throw new Error('HTTP 404')
+        }),
+        { message: 'HTTP 404' }
+      )
+      assert.strictEqual(calls, 1)
+    })
+
+    it('verifies exponential backoff delay', async () => {
+      const { sandbox } = setupEnvironment()
+      const delays = []
+      sandbox.setTimeout = (fn, ms) => {
+        delays.push(ms)
+        fn()
+      }
+      sandbox.Math.random = () => 0.5 // Constant jitter for testing
+
+      let calls = 0
+      await sandbox.test_withRetry(async () => {
+        calls++
+        if (calls < 3) throw new Error('HTTP 429')
+        return 'ok'
+      })
+
+      // RETRY_BASE_MS = 400
+      // attempt 0: 400 * 2^0 + 0.5 * 200 = 400 + 100 = 500
+      // attempt 1: 400 * 2^1 + 0.5 * 200 = 800 + 100 = 900
+      assert.strictEqual(delays.length, 2)
+      assert.strictEqual(delays[0], 500)
+      assert.strictEqual(delays[1], 900)
+    })
   })
 })
 
