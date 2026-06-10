@@ -1517,6 +1517,51 @@ describe('jFetch', () => {
     await sandbox.test_jFetch('https://api.github.com/api/test', { token: 'valid-token' })
     assert.strictEqual(capturedHeaders.Authorization, 'token valid-token')
   })
+
+  it('should throw an error for HTTP 500 status code', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.fetch = async () => ({
+      ok: false,
+      status: 500,
+      statusText: 'Internal Server Error'
+    })
+
+    await assert.rejects(() => sandbox.test_jFetch('https://jules.google.com/api/test'), {
+      name: 'Error',
+      message: 'HTTP 500'
+    })
+  })
+
+  it('should throw an error if fetch throws a network error', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.fetch = async () => {
+      throw new Error('Network failure')
+    }
+
+    await assert.rejects(() => sandbox.test_jFetch('https://jules.google.com/api/test'), {
+      name: 'Error',
+      message: 'Network failure'
+    })
+  })
+
+  it('should pass custom options correctly to fetch', async () => {
+    const { sandbox } = setupEnvironment()
+    let capturedOptions = null
+    sandbox.fetch = async (_url, options) => {
+      capturedOptions = options
+      return { ok: true }
+    }
+
+    await sandbox.test_jFetch('https://jules.google.com/api/test', {
+      method: 'POST',
+      body: 'test-body',
+      headers: { 'X-Custom': 'value' }
+    })
+
+    assert.strictEqual(capturedOptions.method, 'POST')
+    assert.strictEqual(capturedOptions.body, 'test-body')
+    assert.strictEqual(capturedOptions.headers['X-Custom'], 'value')
+  })
 })
 
 // =============================================================================
@@ -1782,7 +1827,9 @@ describe('ensureContentScript', () => {
     const { sandbox } = setupEnvironment()
     sandbox.chrome.webNavigation.getFrame = async () => ({ url: null, documentId: 'doc1' })
 
-    await assert.rejects(sandbox.test_ensureContentScript(123), { message: 'Security Error: Cannot verify tab origin' })
+    await assert.rejects(sandbox.test_ensureContentScript(123), {
+      message: 'Security Error: Cannot verify tab origin'
+    })
   })
 
   it('should throw security error if origin is invalid', async () => {
