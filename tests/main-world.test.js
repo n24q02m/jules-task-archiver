@@ -67,6 +67,7 @@ describe('main-world.js', () => {
     vm.runInContext(mainWorldJs, sandbox)
 
     assert.strictEqual(messages.length, 1)
+    assert.strictEqual(messages[0].targetOrigin, 'https://jules.google.com')
     assert.strictEqual(messages[0].data.type, 'JULES_ARCHIVER_CONFIG')
     assert.strictEqual(messages[0].data.config.at, 'at-token')
     assert.strictEqual(messages[0].data.config.bl, 'bl-label')
@@ -81,6 +82,7 @@ describe('main-world.js', () => {
     vm.runInContext(mainWorldJs, sandbox)
 
     assert.strictEqual(messages.length, 1)
+    assert.strictEqual(messages[0].targetOrigin, 'https://jules.google.com')
     assert.strictEqual(messages[0].data.config, null)
   })
 
@@ -93,6 +95,27 @@ describe('main-world.js', () => {
 
     assert.strictEqual(messages[0].data.config.at, 'at-token')
     assert.strictEqual(messages[0].data.config.bl, null)
+    assert.strictEqual(messages[0].data.config.modelId, null)
+  })
+
+  it('should handle non-matching modelId string', () => {
+    const { sandbox, messages } = setupSandbox({
+      TSDtV: 'invalid-model-string'
+    })
+
+    vm.runInContext(mainWorldJs, sandbox)
+
+    assert.strictEqual(messages[0].data.config.modelId, null)
+  })
+
+  it('should handle empty WIZ_global_data object', () => {
+    const { sandbox, messages } = setupSandbox({})
+
+    vm.runInContext(mainWorldJs, sandbox)
+
+    assert.strictEqual(messages[0].data.config.at, null)
+    assert.strictEqual(messages[0].data.config.bl, null)
+    assert.strictEqual(messages[0].data.config.fsid, null)
     assert.strictEqual(messages[0].data.config.modelId, null)
   })
 
@@ -115,6 +138,7 @@ describe('main-world.js', () => {
     })
 
     assert.strictEqual(messages.length, 2)
+    assert.strictEqual(messages[1].targetOrigin, 'https://jules.google.com')
     assert.strictEqual(messages[1].data.type, 'JULES_ARCHIVER_CONFIG')
   })
 
@@ -189,10 +213,39 @@ describe('main-world.js', () => {
 
     const startMsg = messages.find((m) => m.data.type === 'JULES_START_CONFIG')
     assert.ok(startMsg, 'JULES_START_CONFIG message should be sent')
+    assert.strictEqual(startMsg.targetOrigin, 'https://jules.google.com')
     assert.deepStrictEqual(startMsg.data.config.modelConfig, payload[2])
     assert.deepStrictEqual(startMsg.data.config.experimentIds, ['exp1', 'exp2'])
     assert.deepStrictEqual(startMsg.data.config.featureFlags, ['flag1'])
     assert.strictEqual(startMsg.data.config.capturedAt, 1234567890)
+  })
+
+  it('should gracefully handle malformed fetch payloads', async () => {
+    const { sandbox, messages, windowMock } = setupSandbox({})
+
+    vm.runInContext(mainWorldJs, sandbox)
+    const initialCount = messages.length
+
+    // Call fetch with malformed body
+    await windowMock.fetch('https://jules.google.com/_/Swebot/data/batchexecute?rpcids=Rja83d', {
+      method: 'POST',
+      body: 'f.req=invalid-json'
+    })
+
+    assert.strictEqual(messages.length, initialCount, 'Should not broadcast config on malformed fetch')
+  })
+
+  it('should handle fetch with missing body', async () => {
+    const { sandbox, messages, windowMock } = setupSandbox({})
+
+    vm.runInContext(mainWorldJs, sandbox)
+    const initialCount = messages.length
+
+    await windowMock.fetch('https://jules.google.com/_/Swebot/data/batchexecute?rpcids=Rja83d', {
+      method: 'POST'
+    })
+
+    assert.strictEqual(messages.length, initialCount)
   })
 
   it('should ignore other fetch calls', async () => {
@@ -204,5 +257,16 @@ describe('main-world.js', () => {
     await windowMock.fetch('https://jules.google.com/other-api')
 
     assert.strictEqual(messages.length, initialCount)
+  })
+
+  it('should only install fetch observer once', () => {
+    const { sandbox, windowMock } = setupSandbox({})
+
+    vm.runInContext(mainWorldJs, sandbox)
+    const firstFetch = windowMock.fetch
+
+    // Run script again
+    vm.runInContext(mainWorldJs, sandbox)
+    assert.strictEqual(windowMock.fetch, firstFetch, 'Fetch should not be wrapped again')
   })
 })
