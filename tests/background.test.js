@@ -98,6 +98,8 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_state = () => state;
     globalThis.test_updateState = updateState;
     globalThis.test_addLog = addLog;
+    globalThis.test_trimLog = trimLog;
+    globalThis.test_MAX_LOG_LINES = MAX_LOG_LINES;
     globalThis.test_buildBatchRequest = buildBatchRequest;
     globalThis.test_callBatchExecute = callBatchExecute;
     globalThis.test_runInPool = runInPool;
@@ -1822,5 +1824,35 @@ describe('safeListSources', () => {
     assert.strictEqual(result, null)
     const state = sandbox.test_state()
     assert.ok(state.log.some((l) => l.includes('[test-label] ERROR listing sources: API error')))
+  })
+})
+
+describe('trimLog Internal', () => {
+  it('should not trim if log length is equal to MAX_LOG_LINES', () => {
+    const { sandbox } = setupEnvironment()
+    const max = sandbox.test_MAX_LOG_LINES
+    const state = sandbox.test_state()
+    state.log = Array.from({ length: max }, (_, i) => `line ${i}`)
+
+    sandbox.test_trimLog()
+
+    assert.strictEqual(state.log.length, max)
+    assert.strictEqual(state.log[0], 'line 0')
+    assert.strictEqual(state.log[max - 1], `line ${max - 1}`)
+  })
+
+  it('should trim oldest entries if log length exceeds MAX_LOG_LINES', () => {
+    const { sandbox } = setupEnvironment()
+    const max = sandbox.test_MAX_LOG_LINES
+    const state = sandbox.test_state()
+    // Create max + 10 entries
+    state.log = Array.from({ length: max + 10 }, (_, i) => `line ${i}`)
+
+    sandbox.test_trimLog()
+
+    assert.strictEqual(state.log.length, max)
+    // Should have removed the first 10 entries
+    assert.strictEqual(state.log[0], 'line 10')
+    assert.strictEqual(state.log[max - 1], `line ${max + 9}`)
   })
 })
