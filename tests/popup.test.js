@@ -156,11 +156,11 @@ function createMockChrome(syncStorage, localStorage, sessionStorage, listeners) 
 /**
  * Creates a mock Document object.
  */
-function createMockDocument(elements, opModeButtons) {
+function createMockDocument(elements, opModeButtons, radioStates) {
   return {
     querySelector: (sel) => {
-      if (sel === 'input[name="mode"]:checked') return { value: 'dry' }
-      if (sel === 'input[name="scope"]:checked') return { value: 'all' }
+      if (sel === 'input[name="mode"]:checked') return { value: radioStates.mode }
+      if (sel === 'input[name="scope"]:checked') return { value: radioStates.scope }
       if (elements[sel]) return elements[sel]
       return createMockElement()
     },
@@ -185,6 +185,7 @@ function setupPopupSandbox() {
   const syncStorage = {}
   const localStorage = {}
   const sessionStorage = {}
+  const radioStates = { mode: 'dry', scope: 'all' }
   const listeners = {
     storage: [],
     runtime: []
@@ -216,7 +217,7 @@ function setupPopupSandbox() {
     createMockElement('button', { dataset: { value: 'suggestions' } })
   ]
 
-  const document = createMockDocument(elements, opModeButtons)
+  const document = createMockDocument(elements, opModeButtons, radioStates)
   const chrome = createMockChrome(syncStorage, localStorage, sessionStorage, listeners)
 
   const sandbox = {
@@ -233,7 +234,7 @@ function setupPopupSandbox() {
   }
   vm.createContext(sandbox)
 
-  return { sandbox, elements, opModeButtons, syncStorage, localStorage, listeners }
+  return { sandbox, elements, opModeButtons, syncStorage, localStorage, listeners, radioStates }
 }
 
 describe('setActiveOpMode', () => {
@@ -439,5 +440,78 @@ describe('popup.html accessibility', () => {
     assert.ok(popupHtml.includes('aria-labelledby="execModeLabel"'), 'mode radiogroup should use aria-labelledby')
     assert.ok(popupHtml.includes('id="scopeLabel"'), 'scopeLabel should exist')
     assert.ok(popupHtml.includes('aria-labelledby="scopeLabel"'), 'scope radiogroup should use aria-labelledby')
+  })
+})
+
+describe('updateOpModeUI details', () => {
+  it('should update startBtn text based on opMode and dryRun (Archive/Dry)', () => {
+    const { sandbox, elements, radioStates } = setupPopupSandbox()
+    vm.runInContext(popupJs, sandbox)
+
+    radioStates.mode = 'dry'
+    sandbox.setActiveOpMode('archive')
+    assert.strictEqual(elements['#startBtn'].textContent, 'Dry Run Archive')
+  })
+
+  it('should update startBtn text based on opMode and dryRun (Archive/Live)', () => {
+    const { sandbox, elements, radioStates } = setupPopupSandbox()
+    vm.runInContext(popupJs, sandbox)
+
+    radioStates.mode = 'live'
+    sandbox.setActiveOpMode('archive')
+    assert.strictEqual(elements['#startBtn'].textContent, 'Start Archiving')
+  })
+
+  it('should update startBtn text based on opMode and dryRun (Suggestions/Dry)', () => {
+    const { sandbox, elements, radioStates } = setupPopupSandbox()
+    vm.runInContext(popupJs, sandbox)
+
+    radioStates.mode = 'dry'
+    sandbox.setActiveOpMode('suggestions')
+    assert.strictEqual(elements['#startBtn'].textContent, 'Dry Run Suggestions')
+  })
+
+  it('should update startBtn text based on opMode and dryRun (Suggestions/Live)', () => {
+    const { sandbox, elements, radioStates } = setupPopupSandbox()
+    vm.runInContext(popupJs, sandbox)
+
+    radioStates.mode = 'live'
+    sandbox.setActiveOpMode('suggestions')
+    assert.strictEqual(elements['#startBtn'].textContent, 'Start Suggestions')
+  })
+
+  it('should NOT update startBtn text when button is disabled', () => {
+    const { sandbox, elements, radioStates } = setupPopupSandbox()
+    vm.runInContext(popupJs, sandbox)
+
+    elements['#startBtn'].disabled = true
+    elements['#startBtn'].textContent = 'Original Text'
+
+    radioStates.mode = 'live'
+    sandbox.setActiveOpMode('archive')
+    assert.strictEqual(elements['#startBtn'].textContent, 'Original Text')
+  })
+})
+
+describe('updateOpModeUI direct calls', () => {
+  it('should toggle classes and aria attributes directly', () => {
+    const { sandbox, opModeButtons } = setupPopupSandbox()
+    vm.runInContext(popupJs, sandbox)
+
+    // Reset initial state
+    opModeButtons[0].classList.toggle('active', false)
+    opModeButtons[1].classList.toggle('active', false)
+
+    sandbox.updateOpModeUI('archive')
+    assert.ok(opModeButtons[0].classList.contains('active'))
+    assert.strictEqual(opModeButtons[0].getAttribute('aria-pressed'), 'true')
+    assert.ok(!opModeButtons[1].classList.contains('active'))
+    assert.strictEqual(opModeButtons[1].getAttribute('aria-pressed'), 'false')
+
+    sandbox.updateOpModeUI('suggestions')
+    assert.ok(!opModeButtons[0].classList.contains('active'))
+    assert.strictEqual(opModeButtons[0].getAttribute('aria-pressed'), 'false')
+    assert.ok(opModeButtons[1].classList.contains('active'))
+    assert.strictEqual(opModeButtons[1].getAttribute('aria-pressed'), 'true')
   })
 })
