@@ -134,6 +134,8 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_finalizeOperation = finalizeOperation;
     globalThis.test_handleOperationError = handleOperationError;
     globalThis.test_listTasks = listTasks;
+    globalThis.test_safeListTasks = safeListTasks;
+    globalThis.test_safeListSources = safeListSources;
     globalThis.test_startOperation = startOperation;
     globalThis.test_startSuggestion = startSuggestion;
     globalThis.test_startKeepAlive = startKeepAlive;
@@ -1745,5 +1747,80 @@ describe('groupTasksByRepo Internal', () => {
     assert.strictEqual(result.size, 2)
     assert.strictEqual(result.get('repo-1').length, 2)
     assert.strictEqual(result.get('repo-2').length, 1)
+  })
+})
+
+describe('safeListTasks', () => {
+  it('should return tasks when listTasks succeeds with non-empty list', async () => {
+    const { sandbox } = setupEnvironment()
+    const mockTasks = [
+      ['task-1', 'Title 1', null, null, 'github/owner/repo', 2],
+      ['task-2', 'Title 2', null, null, 'github/owner/repo2', 4]
+    ]
+    sandbox.callBatchExecute = async () => [mockTasks]
+
+    const result = await sandbox.test_safeListTasks('test-label', {})
+    assert.strictEqual(result.length, 2)
+    assert.strictEqual(result[0].id, 'task-1')
+    assert.strictEqual(result[1].id, 'task-2')
+  })
+
+  it('should return null and log message when listTasks returns an empty array', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.callBatchExecute = async () => [[]]
+
+    const result = await sandbox.test_safeListTasks('test-label', {})
+    assert.strictEqual(result, null)
+    const state = sandbox.test_state()
+    assert.ok(state.log.some((l) => l.includes('[test-label] No tasks found.')))
+  })
+
+  it('should return null and log error when listTasks throws', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.callBatchExecute = async () => {
+      throw new Error('Network error')
+    }
+
+    const result = await sandbox.test_safeListTasks('test-label', {})
+    assert.strictEqual(result, null)
+    const state = sandbox.test_state()
+    assert.ok(state.log.some((l) => l.includes('[test-label] ERROR listing tasks: Network error')))
+  })
+})
+
+describe('safeListSources', () => {
+  it('should return sources when listSuggestionEnabledSources succeeds with non-empty list', async () => {
+    const { sandbox } = setupEnvironment()
+    const mockSources = [
+      ['github/owner/repo', null, null, null, null, [true, true, [2], [true]]],
+      ['github/owner/repo2', null, null, null, null, [true, true, [2], [true]]]
+    ]
+    sandbox.callBatchExecute = async () => [mockSources]
+
+    const result = await sandbox.test_safeListSources('test-label', {})
+    assert.strictEqual(result.length, 2)
+    assert.deepStrictEqual(result, ['github/owner/repo', 'github/owner/repo2'])
+  })
+
+  it('should return null and log message when no repos have Suggestions enabled', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.callBatchExecute = async () => [[]]
+
+    const result = await sandbox.test_safeListSources('test-label', {})
+    assert.strictEqual(result, null)
+    const state = sandbox.test_state()
+    assert.ok(state.log.some((l) => l.includes('[test-label] No repos have Suggestions enabled.')))
+  })
+
+  it('should return null and log error when listSuggestionEnabledSources throws', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.callBatchExecute = async () => {
+      throw new Error('API error')
+    }
+
+    const result = await sandbox.test_safeListSources('test-label', {})
+    assert.strictEqual(result, null)
+    const state = sandbox.test_state()
+    assert.ok(state.log.some((l) => l.includes('[test-label] ERROR listing sources: API error')))
   })
 })
