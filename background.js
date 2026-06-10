@@ -476,11 +476,12 @@ async function listSuggestions(repo, config) {
 async function listSuggestionEnabledSources(config) {
   const result = await callBatchExecute('YqkSHd', [null, 'source_status=SOURCE_STATUS_ACTIVE'], config)
   if (!result?.[0]) return []
-  return result[0]
-    .filter(
-      (row) => isSuggestionEnabled(row) && typeof row?.[SOURCE.ID] === 'string' && row[SOURCE.ID].startsWith('github/')
-    )
-    .map((row) => row[SOURCE.ID])
+  return result[0].reduce((acc, row) => {
+    if (isSuggestionEnabled(row) && typeof row?.[SOURCE.ID] === 'string' && row[SOURCE.ID].startsWith('github/')) {
+      acc.push(row[SOURCE.ID])
+    }
+    return acc
+  }, [])
 }
 
 async function safeListSources(label, config) {

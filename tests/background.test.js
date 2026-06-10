@@ -366,7 +366,7 @@ describe('listSuggestionEnabledSources', () => {
       ]
     ]
     const repos = await sandbox.test_listSuggestionEnabledSources({})
-    assert.deepStrictEqual(repos, ['github/n24q02m/on-a', 'github/n24q02m/on-b'])
+    assert.strictEqual(JSON.stringify(repos), JSON.stringify(["github/n24q02m/on-a", "github/n24q02m/on-b"]))
   })
 
   it('returns [] when the response has no sources', async () => {
