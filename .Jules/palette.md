@@ -31,3 +31,7 @@
 ## 2026-06-09 - Empty State Feedback
 **Learning:** When a list or process finishes with zero results, an empty summary container gives no feedback, leaving the user wondering if it actually ran or failed silently.
 **Action:** Always provide a helpful empty state message explaining why no results might have occurred, using styles consistent with other hints to offer guidance without showing as an error.
+
+## 2023-10-27 - Submit on Enter and Inline Error Feedback
+**Learning:** Keyboard users often type inside input fields and instinctively hit 'Enter' to submit. If this is not intercepted to trigger the primary action button, it breaks their workflow and requires them to manually navigate to the button. Furthermore, error states that only change the color of a progress bar without changing the text color make the error state less scannable.
+**Action:** Always add a global `keydown` listener to catch 'Enter' presses on inputs and programmatically click the primary submit button. Use inline style manipulation (e.g. `element.style.color`) tied directly to the state logic to provide immediate visual feedback for errors without relying on complex CSS class management.

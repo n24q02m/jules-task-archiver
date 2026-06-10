@@ -173,6 +173,7 @@ function createMockDocument(elements, opModeButtons, radioStates) {
       return { forEach: () => {} }
     },
     createElement: (tag) => createMockElement(tag),
+    addEventListener: () => {},
     createDocumentFragment: () => {
       const frag = createMockElement('documentfragment')
       frag.nodeType = 11

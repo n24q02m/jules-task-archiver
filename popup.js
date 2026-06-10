@@ -106,7 +106,17 @@ chrome.storage.sync.get(['ghOwner', 'opMode', 'ghToken'], (syncData) => {
     if (localData.ghToken) ghTokenInput.value = localData.ghToken
   })
 })
+
+// --- Submit on Enter for inputs ---
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && e.target.tagName === 'INPUT' && !startBtn.disabled) {
+    e.preventDefault()
+    startBtn.click()
+  }
+})
+
 // --- Save settings on change ---
+
 ghOwnerInput.addEventListener('change', () => {
   chrome.storage.sync.set({ ghOwner: ghOwnerInput.value.trim() })
 })
@@ -156,6 +166,7 @@ startBtn.addEventListener('click', async () => {
   currentInfo.textContent = 'Starting...'
   progressFill.style.width = '0%'
   progressFill.style.background = '' // Reset error color if present
+  currentInfo.style.color = '' // Reset error color if present
   logPre.textContent = ''
 
   chrome.runtime.sendMessage({ action: 'START', options })
@@ -222,6 +233,7 @@ function renderState(state) {
     } else {
       currentInfo.textContent = `Error: ${state.error}`
       progressFill.style.background = '#f87171'
+      currentInfo.style.color = '#f87171'
     }
   }
 }
