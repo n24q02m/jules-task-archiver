@@ -118,4 +118,5 @@ if (typeof globalThis !== 'undefined' && globalThis.TEST_MODE) {
   globalThis.test_extractConfig = extractConfig
   globalThis.test_getAccountNum = getAccountNum
   globalThis.test_getAccountLabel = getAccountLabel
+  globalThis.test_injectMainWorldScript = injectMainWorldScript
 }
