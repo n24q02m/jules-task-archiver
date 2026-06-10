@@ -6,140 +6,89 @@ const vm = require('node:vm')
 
 const popupJs = fs.readFileSync(path.join(__dirname, '../popup.js'), 'utf8')
 
-function setupPopupSandbox() {
-  const syncStorage = {}
-  const localStorage = {}
-  const sessionStorage = {}
-  const listeners = {
-    storage: [],
-    runtime: []
-  }
-
-  const createMockElement = (tag = 'div', attrs = {}) => {
-    const element = {
-      tagName: tag.toUpperCase(),
-      attributes: { ...attrs },
-      dataset: attrs.dataset || {},
-      classList: {
-        classes: new Set(),
-        toggle: (cls, val) => {
-          if (val === undefined) {
-            if (element.classList.classes.has(cls)) element.classList.classes.delete(cls)
-            else element.classList.classes.add(cls)
-          } else if (val) {
-            element.classList.classes.add(cls)
-          } else {
-            element.classList.classes.delete(cls)
-          }
-        },
-        add: (cls) => element.classList.classes.add(cls),
-        contains: (cls) => element.classList.classes.has(cls)
-      },
-      setAttribute: (name, val) => {
-        element.attributes[name] = val
-      },
-      getAttribute: (name) => element.attributes[name],
-      removeAttribute: (name) => {
-        delete element.attributes[name]
-      },
-      addEventListener: (type, cb) => {
-        if (!element.listeners) element.listeners = {}
-        if (!element.listeners[type]) element.listeners[type] = []
-        element.listeners[type].push(cb)
-      },
-      dispatchEvent: (type) => {
-        if (element.listeners?.[type]) {
-          element.listeners[type].forEach((cb) => {
-            cb({ target: element })
-          })
-        }
-      },
-      style: { display: '' },
-      appendChild: (child) => {
-        if (!element.children) element.children = []
-        if (child.nodeType === 11) {
-          // DocumentFragment
-          child.children.forEach((c) => {
-            element.children.push(c)
-            c.parentElement = element
-          })
-          child.children = [] // Clear fragment
+/**
+ * Creates a mock DOM element with basic functionality.
+ */
+function createMockElement(tag = 'div', attrs = {}) {
+  const element = {
+    tagName: tag.toUpperCase(),
+    attributes: { ...attrs },
+    dataset: attrs.dataset || {},
+    classList: {
+      classes: new Set(),
+      toggle: (cls, val) => {
+        if (val === undefined) {
+          if (element.classList.classes.has(cls)) element.classList.classes.delete(cls)
+          else element.classList.classes.add(cls)
+        } else if (val) {
+          element.classList.classes.add(cls)
         } else {
-          element.children.push(child)
-          child.parentElement = element
+          element.classList.classes.delete(cls)
         }
       },
-      remove: () => {
-        if (element.parentElement?.children) {
-          element.parentElement.children = element.parentElement.children.filter((c) => c !== element)
-        }
-      },
-      querySelectorAll: (_sel) => [],
-      querySelector: (_sel) => null,
-      focus: () => {
-        element.focused = true
-      },
-      textContent: '',
-      value: '',
-      checked: false,
-      disabled: false,
-      focused: false,
-      scrollHeight: 0,
-      scrollTop: 0
-    }
-    return element
-  }
-
-  const elements = {
-    '#ghOwner': createMockElement('input'),
-    '#ghToken': createMockElement('input'),
-    '#force': createMockElement('input', { type: 'checkbox' }),
-    '#startBtn': createMockElement('button'),
-    'input[name="mode"]:checked': createMockElement('input', { value: 'dry' }),
-    '#resetBtn': createMockElement('button'),
-    '#progressSection': createMockElement('section'),
-    '#summarySection': createMockElement('section'),
-    '#currentInfo': createMockElement('div'),
-    '#progressFill': createMockElement('div'),
-    '#log': createMockElement('pre'),
-    '#summary': createMockElement('div'),
-    '.settings': createMockElement('section'),
-    '.setting-row': createMockElement('div')
-  }
-
-  // Parent element for elements that use .parentElement in popup.js
-  elements['#force'].closest = (sel) => (sel === '.setting-row' ? elements['.setting-row'] : null)
-  elements['#progressFill'].parentElement = createMockElement('div')
-
-  const opModeButtons = [
-    createMockElement('button', { dataset: { value: 'archive' } }),
-    createMockElement('button', { dataset: { value: 'suggestions' } })
-  ]
-
-  const document = {
-    querySelector: (sel) => {
-      if (sel === 'input[name="mode"]:checked') return { value: 'dry' }
-      if (sel === 'input[name="scope"]:checked') return { value: 'all' }
-      if (elements[sel]) return elements[sel]
-      return createMockElement()
+      add: (cls) => element.classList.classes.add(cls),
+      contains: (cls) => element.classList.classes.has(cls)
     },
-    querySelectorAll: (sel) => {
-      if (sel === '#opMode button') {
-        return {
-          forEach: (cb) => opModeButtons.forEach(cb)
-        }
+    setAttribute: (name, val) => {
+      element.attributes[name] = val
+    },
+    getAttribute: (name) => element.attributes[name],
+    removeAttribute: (name) => {
+      delete element.attributes[name]
+    },
+    addEventListener: (type, cb) => {
+      if (!element.listeners) element.listeners = {}
+      if (!element.listeners[type]) element.listeners[type] = []
+      element.listeners[type].push(cb)
+    },
+    dispatchEvent: (type) => {
+      if (element.listeners?.[type]) {
+        element.listeners[type].forEach((cb) => {
+          cb({ target: element })
+        })
       }
-      return { forEach: () => {} }
     },
-    createElement: (tag) => createMockElement(tag),
-    createDocumentFragment: () => {
-      const frag = createMockElement('documentfragment')
-      frag.nodeType = 11
-      return frag
-    }
+    style: { display: '' },
+    appendChild: (child) => {
+      if (!element.children) element.children = []
+      if (child.nodeType === 11) {
+        // DocumentFragment
+        child.children.forEach((c) => {
+          element.children.push(c)
+          c.parentElement = element
+        })
+        child.children = [] // Clear fragment
+      } else {
+        element.children.push(child)
+        child.parentElement = element
+      }
+    },
+    remove: () => {
+      if (element.parentElement?.children) {
+        element.parentElement.children = element.parentElement.children.filter((c) => c !== element)
+      }
+    },
+    querySelectorAll: (_sel) => [],
+    querySelector: (_sel) => null,
+    focus: () => {
+      element.focused = true
+    },
+    textContent: '',
+    value: '',
+    checked: false,
+    disabled: false,
+    focused: false,
+    scrollHeight: 0,
+    scrollTop: 0
   }
+  return element
+}
 
-  const chrome = {
+/**
+ * Creates a mock Chrome extension API.
+ */
+function createMockChrome(syncStorage, localStorage, sessionStorage, listeners) {
+  return {
     storage: {
       sync: {
         get: (keys, cb) => {
@@ -202,6 +151,73 @@ function setupPopupSandbox() {
       query: (_opts) => Promise.resolve([{ id: 123 }])
     }
   }
+}
+
+/**
+ * Creates a mock Document object.
+ */
+function createMockDocument(elements, opModeButtons) {
+  return {
+    querySelector: (sel) => {
+      if (sel === 'input[name="mode"]:checked') return { value: 'dry' }
+      if (sel === 'input[name="scope"]:checked') return { value: 'all' }
+      if (elements[sel]) return elements[sel]
+      return createMockElement()
+    },
+    querySelectorAll: (sel) => {
+      if (sel === '#opMode button') {
+        return {
+          forEach: (cb) => opModeButtons.forEach(cb)
+        }
+      }
+      return { forEach: () => {} }
+    },
+    createElement: (tag) => createMockElement(tag),
+    createDocumentFragment: () => {
+      const frag = createMockElement('documentfragment')
+      frag.nodeType = 11
+      return frag
+    }
+  }
+}
+
+function setupPopupSandbox() {
+  const syncStorage = {}
+  const localStorage = {}
+  const sessionStorage = {}
+  const listeners = {
+    storage: [],
+    runtime: []
+  }
+
+  const elements = {
+    '#ghOwner': createMockElement('input'),
+    '#ghToken': createMockElement('input'),
+    '#force': createMockElement('input', { type: 'checkbox' }),
+    '#startBtn': createMockElement('button'),
+    'input[name="mode"]:checked': createMockElement('input', { value: 'dry' }),
+    '#resetBtn': createMockElement('button'),
+    '#progressSection': createMockElement('section'),
+    '#summarySection': createMockElement('section'),
+    '#currentInfo': createMockElement('div'),
+    '#progressFill': createMockElement('div'),
+    '#log': createMockElement('pre'),
+    '#summary': createMockElement('div'),
+    '.settings': createMockElement('section'),
+    '.setting-row': createMockElement('div')
+  }
+
+  // Parent element for elements that use .parentElement in popup.js
+  elements['#force'].closest = (sel) => (sel === '.setting-row' ? elements['.setting-row'] : null)
+  elements['#progressFill'].parentElement = createMockElement('div')
+
+  const opModeButtons = [
+    createMockElement('button', { dataset: { value: 'archive' } }),
+    createMockElement('button', { dataset: { value: 'suggestions' } })
+  ]
+
+  const document = createMockDocument(elements, opModeButtons)
+  const chrome = createMockChrome(syncStorage, localStorage, sessionStorage, listeners)
 
   const sandbox = {
     chrome,
