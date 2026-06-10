@@ -1,16 +1,16 @@
 const { describe, it } = require('node:test')
 const assert = require('node:assert')
 const fs = require('node:fs')
-const path = require('node:path')
 const vm = require('node:vm')
+const path = require('node:path')
 
-// --- ghToken Storage Cleanup Tests ---
+const _popupHtml = fs.readFileSync(path.join(__dirname, '..', 'popup.html'), 'utf8')
+const popupJs = fs.readFileSync(path.join(__dirname, '..', 'popup.js'), 'utf8')
+
 describe('Security: ghToken Storage Cleanup', () => {
-  const popupJs = fs.readFileSync(path.join(__dirname, '../popup.js'), 'utf8')
-
-  function setupPopupSandbox(initialSync = {}, initialLocal = {}) {
-    const syncStorage = { ...initialSync }
-    const localStorage = { ...initialLocal }
+  function setupPopupSandbox(syncInitial = {}, localInitial = {}) {
+    const syncStorage = { ...syncInitial }
+    const localStorage = { ...localInitial }
     const syncRemoved = []
     const syncSet = []
     const localSet = []
@@ -169,6 +169,7 @@ function setupEnvironment(initialTabs = {}) {
     console,
     URL,
     URLSearchParams,
+    Math,
     importScripts: () => {}
   }
 
@@ -395,5 +396,51 @@ describe('Orchestrator Privilege Escalation Security', () => {
 
     assert.strictEqual(responseData?.ok, true, 'Should allow CACHE_START_CONFIG from content script')
     assert.deepStrictEqual(sessionData.startConfig, { some: 'data' })
+  })
+})
+
+describe('withRetry Jitter Security', () => {
+  it('should use crypto.getRandomValues for jitter instead of Math.random', async () => {
+    const { sandbox } = setupEnvironment()
+
+    // Inject withRetry into sandbox
+    vm.runInContext(`globalThis.test_withRetry = withRetry; globalThis.test_RETRY_BASE_MS = RETRY_BASE_MS;`, sandbox)
+
+    let calls = 0
+    const fn = async () => {
+      calls++
+      if (calls === 1) throw new Error('HTTP 429')
+      return 'ok'
+    }
+
+    const originalRandom = sandbox.Math.random
+    let randomCalled = false
+    sandbox.Math.random = () => {
+      randomCalled = true
+      return 0.99
+    }
+
+    let cryptoCalled = false
+    sandbox.crypto = {
+      getRandomValues: (arr) => {
+        cryptoCalled = true
+        arr[0] = 2147483648 // 0.5 * 2^32
+        return arr
+      }
+    }
+
+    let lastDelay = 0
+    sandbox.setTimeout = (f, d) => {
+      lastDelay = d
+      f()
+    }
+
+    await sandbox.test_withRetry(fn)
+
+    assert.ok(cryptoCalled, 'crypto.getRandomValues should be called for jitter')
+    assert.strictEqual(randomCalled, false, 'Math.random should NOT be called for jitter')
+    assert.strictEqual(lastDelay, sandbox.test_RETRY_BASE_MS + 100, 'Delay should use jitter from crypto')
+
+    sandbox.Math.random = originalRandom
   })
 })
