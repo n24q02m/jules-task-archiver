@@ -1011,124 +1011,76 @@ async function getTabConfig(tabId) {
 // Orchestrator
 // =============================================================================
 
-async function processTab(tab, options) {
-  const prepared = await prepareTab(tab)
-  if (!prepared) return 0
-  const { label, config } = prepared
-
-  // List all active tasks via API
-  addLog(`[${label}] Fetching tasks via API...`)
-  const tasks = await safeListTasks(label, config)
-  if (!tasks) return 0
-
-  // Partition into archivable (terminal) vs active (still-running) tasks.
-  const candidates = []
-  const active = []
-  for (const t of tasks) {
-    if (isArchivable(t)) {
-      candidates.push(t)
-    } else {
-      active.push(t)
-    }
+async function filterArchivableTasks(label, tasks, options) {
+  if (options.force) {
+    addLog(`[${label}] FORCE: archiving all ${tasks.length} tasks (skip state filter + PR check)`)
+    return { toArchive: [...tasks], toSkip: [] }
   }
 
-  addLog(`[${label}] ${tasks.length} total: ${candidates.length} archivable, ${active.length} active`)
+  const candidates = tasks.filter(isArchivable)
+  const activeCount = tasks.length - candidates.length
+
+  addLog(`[${label}] ${tasks.length} total: ${candidates.length} archivable, ${activeCount} active`)
+
+  if (candidates.length === 0) {
+    const states = [...new Set(tasks.map((t) => t.state))].join(', ')
+    addLog(`[${label}] No archivable tasks among ${tasks.length} (states seen: ${states}).`)
+    addLog(`[${label}] Enable Force to archive regardless of state.`)
+    return { toArchive: [], toSkip: [] }
+  }
+
+  const byRepo = groupTasksByRepo(candidates)
+  addLog(`\n[${label}] Checking open PRs per task...`)
+  const { ghOwner } = await chrome.storage.sync.get(['ghOwner'])
+  const { ghToken } = await chrome.storage.local.get(['ghToken'])
+
+  const repoEntries = [...byRepo.entries()]
+  const allPRs = await runInPool(repoEntries, API_CONCURRENCY, ([_repo, repoTasks]) => {
+    const owner = repoTasks[0]?.owner || ghOwner || ''
+    const repoName = repoTasks[0]?.repoName || ''
+    return owner && repoName ? getOpenPRs(owner, repoName, ghToken) : Promise.resolve([])
+  })
 
   const toArchive = []
   const toSkip = []
+  const prLogs = []
+  for (let i = 0; i < repoEntries.length; i++) {
+    const [repo, repoTasks] = repoEntries[i]
+    const openPRs = allPRs[i]
+    prLogs.push(`  ${repo}: ${repoTasks.length} tasks, ${openPRs.length} open PRs`)
 
-  if (options.force) {
-    // Escape hatch: archive EVERY listed task, ignoring both the state filter
-    // and the PR check. Independent of the (reverse-engineered, drift-prone)
-    // state codes, so Force keeps working even if Jules changes them. Archiving
-    // is reversible in Jules.
-    addLog(`[${label}] FORCE: archiving all ${tasks.length} tasks (skip state filter + PR check)`)
-    for (const task of tasks) toArchive.push(task)
-  } else {
-    if (candidates.length === 0) {
-      // Surface drift instead of silently archiving nothing: if Jules changes
-      // its state codes, the operator sees the unrecognized states and the
-      // Force hint rather than a mysterious no-op.
-      const states = [...new Set(tasks.map((t) => t.state))].join(', ')
-      addLog(`[${label}] No archivable tasks among ${tasks.length} (states seen: ${states}).`)
-      addLog(`[${label}] Enable Force to archive regardless of state.`)
-      return 0
-    }
-
-    // Group candidates by repo for per-repo open-PR lookups.
-    const byRepo = groupTasksByRepo(candidates)
-
-    addLog(`\n[${label}] Checking open PRs per task...`)
-    const { ghOwner } = await chrome.storage.sync.get(['ghOwner'])
-    const { ghToken } = await chrome.storage.local.get(['ghToken'])
-
-    // Fetch open PRs concurrently for all repos (bounded)
-    const repoEntries = [...byRepo.entries()]
-    const allPRs = await runInPool(repoEntries, API_CONCURRENCY, ([_repo, repoTasks]) => {
-      const owner = repoTasks[0]?.owner || ghOwner || ''
-      const repoName = repoTasks[0]?.repoName || ''
-      return owner && repoName ? getOpenPRs(owner, repoName, ghToken) : Promise.resolve([])
-    })
-
-    const prLogs = []
-    for (let i = 0; i < repoEntries.length; i++) {
-      const [repo, repoTasks] = repoEntries[i]
-      const openPRs = allPRs[i]
-      prLogs.push(`  ${repo}: ${repoTasks.length} tasks, ${openPRs.length} open PRs`)
-
-      for (const task of repoTasks) {
-        // A task whose title matches an open PR is likely still active work,
-        // so skip it in the default flow. Tasks with no matching PR (including
-        // failed runs, which never opened one) are archived.
-        if (taskHasOpenPR(task, openPRs)) {
-          toSkip.push(task)
-          prLogs.push(`    SKIP [${task.id}] ${task.title} (matching open PR)`)
-        } else {
-          toArchive.push(task)
-        }
+    for (const task of repoTasks) {
+      if (taskHasOpenPR(task, openPRs)) {
+        toSkip.push(task)
+        prLogs.push(`    SKIP [${task.id}] ${task.title} (matching open PR)`)
+      } else {
+        toArchive.push(task)
       }
     }
-    if (prLogs.length > 0) addLog(prLogs.join('\n'))
   }
+  if (prLogs.length > 0) addLog(prLogs.join('\n'))
 
-  if (toSkip.length > 0) {
-    addLog(`\n[${label}] ${toSkip.length} tasks skipped (open PRs matching)`)
-  }
+  return { toArchive, toSkip }
+}
 
-  if (toArchive.length === 0) {
-    addLog(`[${label}] Nothing to archive (all tasks have matching open PRs).`)
-    return 0
-  }
-
-  // Archive
+function logDryRun(label, toArchive) {
   const totalTasks = toArchive.length
-  addLog(`\n[${label}] Archiving ${totalTasks} tasks`)
-
-  if (options.dryRun) {
-    addLog(`[${label}] DRY RUN - would archive ${totalTasks} tasks`)
-    const archiveByRepo = groupTasksByRepo(toArchive)
-    const dryRunLogs = []
-    for (const [repo, repoTasks] of archiveByRepo) {
-      dryRunLogs.push(`  ${repo}: ${repoTasks.length} tasks`)
-      for (const t of repoTasks) {
-        dryRunLogs.push(`    [${t.id}] ${t.title} (state=${t.state})`)
-      }
+  addLog(`[${label}] DRY RUN - would archive ${totalTasks} tasks`)
+  const archiveByRepo = groupTasksByRepo(toArchive)
+  const dryRunLogs = []
+  for (const [repo, repoTasks] of archiveByRepo) {
+    dryRunLogs.push(`  ${repo}: ${repoTasks.length} tasks`)
+    for (const t of repoTasks) {
+      dryRunLogs.push(`    [${t.id}] ${t.title} (state=${t.state})`)
     }
-    if (dryRunLogs.length > 0) addLog(dryRunLogs.join('\n'))
-    return 0
   }
+  if (dryRunLogs.length > 0) addLog(dryRunLogs.join('\n'))
+}
 
-  // Accumulate into the shared progress total so parallel accounts report one
-  // combined bar. JS is single-threaded, so these increments are race-free.
-  state.progress.total += totalTasks
-  updateState({})
-
+async function executeArchive(label, toArchive, config) {
   let grandTotal = 0
   let lastUpdate = 0
 
-  // Flatten across repos: one pool over every task keeps the fan-out saturated
-  // instead of idling between per-repo batches. Each network call passes through
-  // the shared global limiter so all accounts together stay under budget.
   await runInPool(toArchive, PER_ACCOUNT_CONCURRENCY, async (task) => {
     const now = Date.now()
     if (now - lastUpdate > 500) {
@@ -1148,6 +1100,43 @@ async function processTab(tab, options) {
       addLog(`  ERROR [${label}] archiving ${task.id}: ${e.message}`)
     }
   })
+  return grandTotal
+}
+
+async function processTab(tab, options) {
+  const prepared = await prepareTab(tab)
+  if (!prepared) return 0
+  const { label, config } = prepared
+
+  addLog(`[${label}] Fetching tasks via API...`)
+  const tasks = await safeListTasks(label, config)
+  if (!tasks) return 0
+
+  const { toArchive, toSkip } = await filterArchivableTasks(label, tasks, options)
+
+  if (toSkip.length > 0) {
+    addLog(`\n[${label}] ${toSkip.length} tasks skipped (open PRs matching)`)
+  }
+
+  if (toArchive.length === 0) {
+    if (!options.force && tasks.some(isArchivable)) {
+      addLog(`[${label}] Nothing to archive (all tasks have matching open PRs).`)
+    }
+    return 0
+  }
+
+  const totalTasks = toArchive.length
+  addLog(`\n[${label}] Archiving ${totalTasks} tasks`)
+
+  if (options.dryRun) {
+    logDryRun(label, toArchive)
+    return 0
+  }
+
+  state.progress.total += totalTasks
+  updateState({})
+
+  const grandTotal = await executeArchive(label, toArchive, config)
 
   addLog(`\n[${label}] TOTAL: ${grandTotal} archived`)
   return grandTotal
