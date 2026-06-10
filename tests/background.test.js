@@ -371,7 +371,8 @@ describe('listSuggestionEnabledSources', () => {
       ]
     ]
     const repos = await sandbox.test_listSuggestionEnabledSources({})
-    assert.deepStrictEqual(repos, ['github/n24q02m/on-a', 'github/n24q02m/on-b'])
+    // JSON.stringify avoids cross-VM Array realm mismatch in deepStrictEqual.
+    assert.strictEqual(JSON.stringify(repos), '["github/n24q02m/on-a","github/n24q02m/on-b"]')
   })
 
   it('returns [] when the response has no sources', async () => {
@@ -1958,7 +1959,8 @@ describe('safeListSources', () => {
 
     const result = await sandbox.test_safeListSources('test-label', {})
     assert.strictEqual(result.length, 2)
-    assert.deepStrictEqual(result, ['github/owner/repo', 'github/owner/repo2'])
+    // JSON.stringify avoids cross-VM Array realm mismatch in deepStrictEqual.
+    assert.strictEqual(JSON.stringify(result), '["github/owner/repo","github/owner/repo2"]')
   })
 
   it('should return null and log message when no repos have Suggestions enabled', async () => {

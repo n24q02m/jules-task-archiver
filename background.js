@@ -476,11 +476,12 @@ async function listSuggestions(repo, config) {
 async function listSuggestionEnabledSources(config) {
   const result = await callBatchExecute('YqkSHd', [null, 'source_status=SOURCE_STATUS_ACTIVE'], config)
   if (!result?.[0]) return []
-  return result[0]
-    .filter(
-      (row) => isSuggestionEnabled(row) && typeof row?.[SOURCE.ID] === 'string' && row[SOURCE.ID].startsWith('github/')
-    )
-    .map((row) => row[SOURCE.ID])
+  return result[0].reduce((acc, row) => {
+    if (isSuggestionEnabled(row) && typeof row?.[SOURCE.ID] === 'string' && row[SOURCE.ID].startsWith('github/')) {
+      acc.push(row[SOURCE.ID])
+    }
+    return acc
+  }, [])
 }
 
 async function safeListSources(label, config) {
@@ -919,8 +920,12 @@ function stopKeepAlive() {
 async function getJulesTabs() {
   const tabs = await chrome.tabs.query({ url: `${JULES_ORIGIN}/*` })
   return tabs
-    .filter((t) => !t.url.includes('accounts.google'))
-    .map((t) => ({ t, n: parseInt(extractAccountNum(t.url), 10) }))
+    .reduce((acc, t) => {
+      if (!t.url.includes('accounts.google')) {
+        acc.push({ t, n: parseInt(extractAccountNum(t.url), 10) })
+      }
+      return acc
+    }, [])
     .sort((a, b) => a.n - b.n)
     .map((obj) => obj.t)
 }
