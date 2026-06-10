@@ -134,6 +134,7 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_finalizeOperation = finalizeOperation;
     globalThis.test_handleOperationError = handleOperationError;
     globalThis.test_listTasks = listTasks;
+    globalThis.test_safeListTasks = safeListTasks;
     globalThis.test_startOperation = startOperation;
     globalThis.test_startSuggestion = startSuggestion;
     globalThis.test_startKeepAlive = startKeepAlive;
@@ -141,6 +142,7 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_getKeepAliveInterval = () => keepAliveInterval;
     globalThis.test_listSuggestions = listSuggestions;
     globalThis.test_listSuggestionEnabledSources = listSuggestionEnabledSources;
+    globalThis.test_safeListSources = safeListSources;
     globalThis.test_isSuggestionEnabled = isSuggestionEnabled;
     globalThis.test_getDailySessionQuota = getDailySessionQuota;
     globalThis.test_ensureContentScript = ensureContentScript;
@@ -1745,5 +1747,71 @@ describe('groupTasksByRepo Internal', () => {
     assert.strictEqual(result.size, 2)
     assert.strictEqual(result.get('repo-1').length, 2)
     assert.strictEqual(result.get('repo-2').length, 1)
+  })
+})
+
+describe('safeListSources', () => {
+  it('returns repos when listSuggestionEnabledSources succeeds', async () => {
+    const { sandbox } = setupEnvironment()
+    const mockRepos = ['repo1', 'repo2']
+    sandbox.listSuggestionEnabledSources = async () => mockRepos
+
+    const result = await sandbox.test_safeListSources('test', {})
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(result)), mockRepos)
+  })
+
+  it('returns null and logs message when no repos found', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.listSuggestionEnabledSources = async () => []
+
+    const result = await sandbox.test_safeListSources('test', {})
+    assert.strictEqual(result, null)
+    const state = sandbox.test_state()
+    assert.ok(state.log.some((m) => m.includes('[test] No repos have Suggestions enabled')))
+  })
+
+  it('returns null and logs error message when it throws', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.listSuggestionEnabledSources = async () => {
+      throw new Error('Boom')
+    }
+
+    const result = await sandbox.test_safeListSources('test', {})
+    assert.strictEqual(result, null)
+    const state = sandbox.test_state()
+    assert.ok(state.log.some((m) => m.includes('[test] ERROR listing sources: Boom')))
+  })
+})
+
+describe('safeListTasks', () => {
+  it('returns tasks when listTasks succeeds', async () => {
+    const { sandbox } = setupEnvironment()
+    const mockTasks = [{ id: 't1' }, { id: 't2' }]
+    sandbox.listTasks = async () => mockTasks
+
+    const result = await sandbox.test_safeListTasks('test', {})
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(result)), mockTasks)
+  })
+
+  it('returns null and logs message when no tasks found', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.listTasks = async () => []
+
+    const result = await sandbox.test_safeListTasks('test', {})
+    assert.strictEqual(result, null)
+    const state = sandbox.test_state()
+    assert.ok(state.log.some((m) => m.includes('[test] No tasks found')))
+  })
+
+  it('returns null and logs error message when it throws', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.listTasks = async () => {
+      throw new Error('Failure')
+    }
+
+    const result = await sandbox.test_safeListTasks('test', {})
+    assert.strictEqual(result, null)
+    const state = sandbox.test_state()
+    assert.ok(state.log.some((m) => m.includes('[test] ERROR listing tasks: Failure')))
   })
 })
