@@ -64,6 +64,12 @@ describe('Security: ghToken Storage Cleanup', () => {
     }
 
     const document = {
+      addEventListener: () => {},
+      dispatchEvent: () => {},
+      addEventListener: () => {},
+      dispatchEvent: () => {},
+      addEventListener: () => {},
+      dispatchEvent: () => {},
       querySelector: () => ({
         addEventListener: () => {},
         querySelectorAll: () => [],

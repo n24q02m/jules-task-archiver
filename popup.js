@@ -175,6 +175,16 @@ resetBtn.addEventListener('click', () => {
   startBtn.focus()
 })
 
+// --- Handle Enter key to submit ---
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && e.target.tagName === 'INPUT' && (e.target.type === 'text' || e.target.type === 'password')) {
+    e.preventDefault()
+    if (!startBtn.disabled) {
+      startBtn.click()
+    }
+  }
+})
+
 // --- Listen for state changes ---
 chrome.storage.onChanged.addListener((changes) => {
   if (!changes.archiveState) return

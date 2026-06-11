@@ -158,6 +158,8 @@ function createMockChrome(syncStorage, localStorage, sessionStorage, listeners) 
  */
 function createMockDocument(elements, opModeButtons, radioStates) {
   return {
+    addEventListener: (_event, _handler) => {},
+    dispatchEvent: (_event) => {},
     querySelector: (sel) => {
       if (sel === 'input[name="mode"]:checked') return { value: radioStates.mode }
       if (sel === 'input[name="scope"]:checked') return { value: radioStates.scope }
@@ -371,6 +373,37 @@ describe('Initialization and Storage', () => {
       assert.strictEqual(elements['#ghOwner'].value, 'some-owner')
       done()
     }, 10)
+  })
+})
+
+describe('Keyboard Accessibility', () => {
+  it('should trigger startBtn click when Enter is pressed inside a text input', () => {
+    const { sandbox, elements } = setupPopupSandbox()
+    let startBtnClicked = false
+    elements['#startBtn'].click = () => {
+      startBtnClicked = true
+    }
+
+    // Manually register the listener in our sandbox document mockup
+    let keydownListener = null
+    sandbox.document.addEventListener = (event, handler) => {
+      if (event === 'keydown') keydownListener = handler
+    }
+
+    vm.runInContext(popupJs, sandbox)
+
+    // Simulate Enter keydown on an input
+    const mockEvent = {
+      key: 'Enter',
+      target: { tagName: 'INPUT', type: 'text' },
+      preventDefault: () => {}
+    }
+
+    if (keydownListener) {
+      keydownListener(mockEvent)
+    }
+
+    assert.strictEqual(startBtnClicked, true, 'startBtn should be clicked on Enter')
   })
 })
 

@@ -31,3 +31,6 @@
 ## 2026-06-09 - Empty State Feedback
 **Learning:** When a list or process finishes with zero results, an empty summary container gives no feedback, leaving the user wondering if it actually ran or failed silently.
 **Action:** Always provide a helpful empty state message explaining why no results might have occurred, using styles consistent with other hints to offer guidance without showing as an error.
+## 2026-10-26 - Enter Key Form Submission
+**Learning:** For interfaces with multiple text inputs (e.g., token or username fields), users naturally expect to press the 'Enter' key to trigger the primary action rather than having to manually tab to or click the submit button. A lack of this behavior feels clunky and non-standard.
+**Action:** Always intercept 'Enter' keypresses within text inputs using a global 'keydown' listener to programmatically trigger the primary submit button, improving keyboard accessibility and overall user experience.
