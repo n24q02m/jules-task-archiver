@@ -301,16 +301,38 @@ function isSuggestionEnabled(row) {
 
 function parseTask(raw) {
   const source = raw[TASK.SOURCE] || ''
-  const parts = source.split('/')
+
+  // ⚡ Bolt Optimization: Use indexOf and substring instead of .split('/') to extract
+  // owner and repoName. This prevents allocating string arrays for every task,
+  // reducing GC pressure when parsing payloads with thousands of tasks.
+  let owner = ''
+  let repoName = ''
+  const isGithub = source.startsWith('github/')
+
+  if (isGithub) {
+    const firstSlash = 6 // index of slash in 'github/'
+    const secondSlash = source.indexOf('/', firstSlash + 1)
+    if (secondSlash !== -1) {
+      owner = source.substring(firstSlash + 1, secondSlash)
+      const thirdSlash = source.indexOf('/', secondSlash + 1)
+      repoName = thirdSlash !== -1 ? source.substring(secondSlash + 1, thirdSlash) : source.substring(secondSlash + 1)
+    }
+  } else {
+    // Fallback for non-github sources if they ever occur
+    const parts = source.split('/')
+    owner = parts[1] || ''
+    repoName = parts[2] || ''
+  }
+
   return {
     id: raw[TASK.ID],
     title: raw[TASK.DISPLAY_TITLE] || raw[TASK.SHORT_TITLE] || '(untitled)',
     source,
     state: raw[TASK.STATE],
     statusCode: raw[TASK.STATUS_CODE],
-    repo: source.startsWith('github/') ? source.slice(7) : source,
-    owner: parts[1] || '',
-    repoName: parts[2] || ''
+    repo: isGithub ? source.slice(7) : source,
+    owner,
+    repoName
   }
 }
 
@@ -461,11 +483,16 @@ function parseSuggestion(raw) {
 async function listSuggestions(repo, config) {
   const result = await callBatchExecute('hQP40d', [repo], config)
   if (!result || !Array.isArray(result) || !Array.isArray(result[0])) return []
-  return result[0].reduce((acc, s) => {
-    const parsed = parseSuggestion(s)
-    if (parsed) acc.push(parsed)
-    return acc
-  }, [])
+
+  // ⚡ Bolt Optimization: Use a standard for loop instead of `.reduce()` to
+  // avoid function call overhead per element and intermediate closure allocation.
+  const arr = result[0]
+  const parsedSuggestions = []
+  for (let i = 0; i < arr.length; i++) {
+    const parsed = parseSuggestion(arr[i])
+    if (parsed) parsedSuggestions.push(parsed)
+  }
+  return parsedSuggestions
 }
 
 // List the repos that have the Jules Suggestions toggle ENABLED for this account.
@@ -476,11 +503,18 @@ async function listSuggestions(repo, config) {
 async function listSuggestionEnabledSources(config) {
   const result = await callBatchExecute('YqkSHd', [null, 'source_status=SOURCE_STATUS_ACTIVE'], config)
   if (!result?.[0]) return []
-  return result[0]
-    .filter(
-      (row) => isSuggestionEnabled(row) && typeof row?.[SOURCE.ID] === 'string' && row[SOURCE.ID].startsWith('github/')
-    )
-    .map((row) => row[SOURCE.ID])
+
+  // ⚡ Bolt Optimization: Replace `.filter().map()` chain with a single
+  // standard for loop to avoid intermediate array allocations.
+  const arr = result[0]
+  const sources = []
+  for (let i = 0; i < arr.length; i++) {
+    const row = arr[i]
+    if (isSuggestionEnabled(row) && typeof row?.[SOURCE.ID] === 'string' && row[SOURCE.ID].startsWith('github/')) {
+      sources.push(row[SOURCE.ID])
+    }
+  }
+  return sources
 }
 
 async function safeListSources(label, config) {
@@ -918,11 +952,25 @@ function stopKeepAlive() {
 
 async function getJulesTabs() {
   const tabs = await chrome.tabs.query({ url: `${JULES_ORIGIN}/*` })
-  return tabs
-    .filter((t) => !t.url.includes('accounts.google'))
-    .map((t) => ({ t, n: parseInt(extractAccountNum(t.url), 10) }))
-    .sort((a, b) => a.n - b.n)
-    .map((obj) => obj.t)
+
+  // ⚡ Bolt Optimization: Replace `.filter().map().sort().map()` chain with
+  // standard loops to avoid multiple intermediate array allocations and passes.
+  const parsed = []
+  for (let i = 0; i < tabs.length; i++) {
+    const t = tabs[i]
+    if (!t.url.includes('accounts.google')) {
+      parsed.push({ t, n: parseInt(extractAccountNum(t.url), 10) })
+    }
+  }
+
+  parsed.sort((a, b) => a.n - b.n)
+
+  const result = []
+  for (let i = 0; i < parsed.length; i++) {
+    result.push(parsed[i].t)
+  }
+
+  return result
 }
 
 function getTabLabel(tab) {
