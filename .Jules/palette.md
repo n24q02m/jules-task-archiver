@@ -31,3 +31,6 @@
 ## 2026-06-09 - Empty State Feedback
 **Learning:** When a list or process finishes with zero results, an empty summary container gives no feedback, leaving the user wondering if it actually ran or failed silently.
 **Action:** Always provide a helpful empty state message explaining why no results might have occurred, using styles consistent with other hints to offer guidance without showing as an error.
+## 2025-06-25 - Use Native Semantic HTML Over Implicit ARIA Roles
+**Learning:** The "First Rule of ARIA" states that native HTML elements with built-in semantics should be preferred over retrofitting `<div>` elements with ARIA roles (like `role="group"` or `aria-labelledby`). Relying on ARIA attributes to group related inputs when native `<fieldset>` and `<legend>` tags are available misses an opportunity to provide a more robust semantic structure that works universally out-of-the-box for assistive technologies.
+**Action:** When grouping related UI form controls, always use `<fieldset>` and `<legend>` elements instead of generic `<div>` wrappers with `role="group"`. If visual adjustments are needed to maintain existing designs, apply simple CSS resets (e.g., `border: none; padding: 0; margin: 0`) to the `<fieldset>` rather than reverting to a `<div>`.
