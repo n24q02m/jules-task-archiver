@@ -335,7 +335,8 @@ async function listTasks(filter, config) {
   return result[0].map(parseTask)
 }
 
-async function safeListTasks(label, config) {
+async function fetchTasks(label, config) {
+  addLog(`[${label}] Fetching tasks via API...`)
   try {
     const tasks = await listTasks('', config)
     if (tasks.length === 0) {
@@ -483,14 +484,15 @@ async function listSuggestionEnabledSources(config) {
     .map((row) => row[SOURCE.ID])
 }
 
-async function safeListSources(label, config) {
+async function fetchSources(label, config) {
+  addLog(`[${label}] Fetching Suggestions-enabled repos...`)
   try {
-    const repos = await listSuggestionEnabledSources(config)
-    if (repos.length === 0) {
-      addLog(`[${label}] No repos have Suggestions enabled. Nothing to do.`)
+    const sources = await listSuggestionEnabledSources(config)
+    if (sources.length === 0) {
+      addLog(`[${label}] No repos have Suggestions enabled.`)
       return null
     }
-    return repos
+    return sources
   } catch (e) {
     addLog(`[${label}] ERROR listing sources: ${e.message}`)
     return null
@@ -671,8 +673,7 @@ async function processSuggestionsForTab(tab, options) {
   // Only repos whose Jules Suggestions toggle is ON. Enumerating every connected
   // source instead caused the extension to start suggestions on repos the user
   // never enabled (and blow past the daily session limit).
-  addLog(`[${label}] Fetching Suggestions-enabled repos...`)
-  const repos = await safeListSources(label, config)
+  const repos = await fetchSources(label, config)
   if (!repos) return 0
 
   addLog(
@@ -1060,6 +1061,14 @@ async function filterArchivableTasks(label, tasks, options) {
   }
   if (prLogs.length > 0) addLog(prLogs.join('\n'))
 
+  if (toSkip.length > 0) {
+    addLog(`
+[${label}] ${toSkip.length} tasks skipped (open PRs matching)`)
+  }
+  if (toArchive.length === 0 && !options.force && tasks.some(isArchivable)) {
+    addLog(`[${label}] Nothing to archive (all tasks have matching open PRs).`)
+  }
+
   return { toArchive, toSkip }
 }
 
@@ -1077,7 +1086,14 @@ function logDryRun(label, toArchive) {
   if (dryRunLogs.length > 0) addLog(dryRunLogs.join('\n'))
 }
 
-async function executeArchive(label, toArchive, config) {
+async function executeBatchArchive(label, toArchive, config) {
+  const totalTasks = toArchive.length
+  addLog(`
+[${label}] Archiving ${totalTasks} tasks`)
+
+  state.progress.total += totalTasks
+  updateState({})
+
   let grandTotal = 0
   let lastUpdate = 0
 
@@ -1100,6 +1116,8 @@ async function executeArchive(label, toArchive, config) {
       addLog(`  ERROR [${label}] archiving ${task.id}: ${e.message}`)
     }
   })
+  addLog(`
+[${label}] TOTAL: ${grandTotal} archived`)
   return grandTotal
 }
 
@@ -1108,38 +1126,18 @@ async function processTab(tab, options) {
   if (!prepared) return 0
   const { label, config } = prepared
 
-  addLog(`[${label}] Fetching tasks via API...`)
-  const tasks = await safeListTasks(label, config)
+  const tasks = await fetchTasks(label, config)
   if (!tasks) return 0
 
-  const { toArchive, toSkip } = await filterArchivableTasks(label, tasks, options)
-
-  if (toSkip.length > 0) {
-    addLog(`\n[${label}] ${toSkip.length} tasks skipped (open PRs matching)`)
-  }
-
-  if (toArchive.length === 0) {
-    if (!options.force && tasks.some(isArchivable)) {
-      addLog(`[${label}] Nothing to archive (all tasks have matching open PRs).`)
-    }
-    return 0
-  }
-
-  const totalTasks = toArchive.length
-  addLog(`\n[${label}] Archiving ${totalTasks} tasks`)
+  const { toArchive } = await filterArchivableTasks(label, tasks, options)
+  if (toArchive.length === 0) return 0
 
   if (options.dryRun) {
     logDryRun(label, toArchive)
     return 0
   }
 
-  state.progress.total += totalTasks
-  updateState({})
-
-  const grandTotal = await executeArchive(label, toArchive, config)
-
-  addLog(`\n[${label}] TOTAL: ${grandTotal} archived`)
-  return grandTotal
+  return executeBatchArchive(label, toArchive, config)
 }
 
 function initOperationState(options) {
