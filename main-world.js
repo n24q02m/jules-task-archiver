@@ -8,72 +8,74 @@
  * Communicates with content.js (isolated world) via window.postMessage.
  */
 
-// Extract config and post to isolated world
-function broadcastConfig() {
-  const w = window.WIZ_global_data
-  const modelMatch = w?.TSDtV ? String(w.TSDtV).match(/beyond:models\/[\w-]+/) : null
+;(() => {
+  // Install fetch observer and extract logic (once)
+  if (!window.__julesArchiver) {
+    window.__julesArchiver = true
 
-  window.postMessage(
-    {
-      type: 'JULES_ARCHIVER_CONFIG',
-      config: w
-        ? {
-            at: w.SNlM0e || null,
-            bl: w.cfb2h || null,
-            fsid: w.FdrFJe || null,
-            modelId: modelMatch ? modelMatch[0] : null,
-            timestamp: Date.now()
-          }
-        : null
-    },
-    window.location.origin
-  )
-}
+    // Extract config and post to isolated world
+    const broadcastConfig = () => {
+      const w = window.WIZ_global_data
+      const modelMatch = w?.TSDtV ? String(w.TSDtV).match(/beyond:models\/[\w-]+/) : null
 
-// Install fetch observer for StartSuggestion config capture (once)
-if (!window.__julesArchiver) {
-  window.__julesArchiver = true
-
-  const _origFetch = window.fetch
-  window.fetch = async function (...args) {
-    const [url, opts] = args
-    const resp = await _origFetch.apply(this, args)
-    if (typeof url === 'string' && url.includes('rpcids=Rja83d')) {
-      try {
-        const body = opts?.body || ''
-        const params = new URLSearchParams(body)
-        const freq = JSON.parse(params.get('f.req'))
-        const payload = JSON.parse(freq[0][0][1])
-        window.postMessage(
-          {
-            type: 'JULES_START_CONFIG',
-            config: {
-              modelConfig: payload[2],
-              experimentIds: payload[9]?.[4] || [],
-              featureFlags: payload[2]?.[10] || [],
-              capturedAt: Date.now()
-            }
-          },
-          window.location.origin
-        )
-      } catch (_e) {
-        /* ignore parse errors */
-      }
+      window.postMessage(
+        {
+          type: 'JULES_ARCHIVER_CONFIG',
+          config: w
+            ? {
+                at: w.SNlM0e || null,
+                bl: w.cfb2h || null,
+                fsid: w.FdrFJe || null,
+                modelId: modelMatch ? modelMatch[0] : null,
+                timestamp: Date.now()
+              }
+            : null
+        },
+        window.location.origin
+      )
     }
-    return resp
-  }
-}
 
-// Broadcast config immediately (WIZ_global_data should be ready by document_idle)
-broadcastConfig()
+    const _origFetch = window.fetch
+    window.fetch = async function (...args) {
+      const [url, opts] = args
+      const resp = await _origFetch.apply(this, args)
+      if (typeof url === 'string' && url.includes('rpcids=Rja83d')) {
+        try {
+          const body = opts?.body || ''
+          const params = new URLSearchParams(body)
+          const freq = JSON.parse(params.get('f.req'))
+          const payload = JSON.parse(freq[0][0][1])
+          window.postMessage(
+            {
+              type: 'JULES_START_CONFIG',
+              config: {
+                modelConfig: payload[2],
+                experimentIds: payload[9]?.[4] || [],
+                featureFlags: payload[2]?.[10] || [],
+                capturedAt: Date.now()
+              }
+            },
+            window.location.origin
+          )
+        } catch (_e) {
+          /* ignore parse errors */
+        }
+      }
+      return resp
+    }
 
-// Also listen for explicit re-extract requests from content.js.
-// Only honour requests from this page's own window/origin — a cross-origin
-// frame must not be able to trigger config broadcasts.
-window.addEventListener('message', (event) => {
-  if (event.source !== window) return
-  if (event.origin !== window.location.origin) return
-  if (event.data?.type === 'JULES_REQUEST_CONFIG') {
+    // Broadcast config immediately (WIZ_global_data should be ready by document_idle)
     broadcastConfig()
+
+    // Also listen for explicit re-extract requests from content.js.
+    // Only honour requests from this page's own window/origin — a cross-origin
+    // frame must not be able to trigger config broadcasts.
+    window.addEventListener('message', (event) => {
+      if (event.source !== window) return
+      if (event.origin !== window.location.origin) return
+      if (event.data?.type === 'JULES_REQUEST_CONFIG') {
+        broadcastConfig()
+      }
+    })
   }
-})
+})()
