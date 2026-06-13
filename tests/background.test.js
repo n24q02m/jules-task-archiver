@@ -590,7 +590,7 @@ describe('parseTask', () => {
     raw[0] = '12345'
     raw[1] = 'Short title'
     raw[4] = 'github/owner/repo'
-    raw[5] = 3
+    raw[5] = 2
     raw[26] = 'Display Title'
 
     const task = sandbox.test_parseTask(raw)
@@ -600,7 +600,7 @@ describe('parseTask', () => {
     assert.strictEqual(task.repo, 'owner/repo')
     assert.strictEqual(task.owner, 'owner')
     assert.strictEqual(task.repoName, 'repo')
-    assert.strictEqual(task.state, 3)
+    assert.strictEqual(task.state, 2)
   })
 
   it('should fallback to short title when display title is null', () => {
@@ -609,7 +609,7 @@ describe('parseTask', () => {
     raw[0] = '99999'
     raw[1] = 'Fallback title'
     raw[4] = 'github/a/b'
-    raw[5] = 9
+    raw[5] = 4
 
     const task = sandbox.test_parseTask(raw)
     assert.strictEqual(task.title, 'Fallback title')
@@ -630,7 +630,7 @@ describe('parseTask', () => {
     const { sandbox } = setupEnvironment()
     const raw = new Array(31).fill(null)
     raw[0] = '55555'
-    raw[5] = 3
+    raw[5] = 2
     raw[25] = 6
 
     const task = sandbox.test_parseTask(raw)
@@ -685,11 +685,13 @@ describe('processTab force vs default archiving', () => {
     // Force archived nothing. Force must be independent of the state filter.
     const tasks = [
       { id: 'a', title: 'T1', state: 7, source: 'github/o/r' },
-      { id: 'b', title: 'T2', state: 99, source: 'github/o/r' }
+      { id: 'b', title: 'T2', state: 99, source: 'github/o/r' },
+      { id: 'c', title: 'T3', state: 3, source: 'github/o/r' },
+      { id: 'd', title: 'T4', state: 9, source: 'github/o/r' }
     ]
     const { sandbox, archived } = setupArchiveEnv(tasks)
     await sandbox.processTab(TAB, { force: true, dryRun: false })
-    assert.deepStrictEqual(archived.sort(), ['a', 'b'])
+    assert.deepStrictEqual(archived.sort(), ['a', 'b', 'c', 'd'])
   })
 
   it('FORCE archives real terminal-state tasks (2, 4, 12, null)', async () => {

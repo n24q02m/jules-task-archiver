@@ -132,8 +132,8 @@ describe('Orchestrator Performance Optimization', () => {
 
     sandbox.getTabConfig = async () => ({ at: 'at', bl: 'bl_v1', fsid: 'fsid', accountNum: '0' })
     sandbox.listTasks = async () => [
-      { id: 't1', title: 'Task 1', state: 3, source: 'github/owner/repo' },
-      { id: 't2', title: 'Task 2', state: 3, source: 'github/owner/repo' }
+      { id: 't1', title: 'Task 1', state: 2, source: 'github/owner/repo' },
+      { id: 't2', title: 'Task 2', state: 2, source: 'github/owner/repo' }
     ]
     sandbox.getOpenPRs = async () => [] // No PRs, so they should be archived
 
@@ -166,7 +166,7 @@ describe('Throttling Optimization', () => {
     // Mock 10 tasks to archive
     const tasks = []
     for (let i = 0; i < 10; i++) {
-      tasks.push({ id: `t${i}`, title: `Task ${i}`, state: 3, source: 'github/owner/repo' })
+      tasks.push({ id: `t${i}`, title: `Task ${i}`, state: 2, source: 'github/owner/repo' })
     }
     sandbox.listTasks = async () => tasks
     sandbox.getOpenPRs = async () => []
