@@ -302,9 +302,11 @@ function isSuggestionEnabled(row) {
 function parseTask(raw) {
   const source = raw[TASK.SOURCE] || ''
   const parts = source.split('/')
+  const title = raw[TASK.DISPLAY_TITLE] || raw[TASK.SHORT_TITLE] || '(untitled)'
   return {
     id: raw[TASK.ID],
-    title: raw[TASK.DISPLAY_TITLE] || raw[TASK.SHORT_TITLE] || '(untitled)',
+    title,
+    titleLower: title.toLowerCase(),
     source,
     state: raw[TASK.STATE],
     statusCode: raw[TASK.STATUS_CODE],
@@ -803,9 +805,9 @@ async function getOpenPRs(owner, repo, token) {
 
 function taskHasOpenPR(task, openPRs) {
   if (openPRs.length === 0) return false
-  const taskTitle = (task.title || '').toLowerCase()
-  if (!taskTitle || taskTitle === '(untitled)') return false
-  return openPRs.some((pr) => pr.titleLower.includes(taskTitle) || taskTitle.includes(pr.titleLower))
+  const taskTitleLower = task.titleLower
+  if (!taskTitleLower || taskTitleLower === '(untitled)') return false
+  return openPRs.some((pr) => pr.titleLower.includes(taskTitleLower) || taskTitleLower.includes(pr.titleLower))
 }
 
 // =============================================================================
