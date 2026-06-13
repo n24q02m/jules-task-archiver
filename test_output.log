@@ -1,0 +1,1928 @@
+
+> jules-task-archiver-tests@2.5.0 test /app
+> node --test
+
+TAP version 13
+# Subtest: listTasks
+    # Subtest: should return an empty array when callBatchExecute returns null
+    ok 1 - should return an empty array when callBatchExecute returns null
+      ---
+      duration_ms: 7.573571
+      type: 'test'
+      ...
+    # Subtest: should return an empty array when callBatchExecute returns an empty array
+    ok 2 - should return an empty array when callBatchExecute returns an empty array
+      ---
+      duration_ms: 1.608014
+      type: 'test'
+      ...
+    1..2
+ok 1 - listTasks
+  ---
+  duration_ms: 10.429228
+  type: 'suite'
+  ...
+# Subtest: buildBatchRequest
+    # Subtest: should format correct URL and body
+    ok 1 - should format correct URL and body
+      ---
+      duration_ms: 2.124641
+      type: 'test'
+      ...
+    1..1
+ok 2 - buildBatchRequest
+  ---
+  duration_ms: 2.328679
+  type: 'suite'
+  ...
+# Subtest: fixJsonControlChars
+    # Subtest: should escape CR/LF inside JSON strings
+    ok 1 - should escape CR/LF inside JSON strings
+      ---
+      duration_ms: 2.061905
+      type: 'test'
+      ...
+    # Subtest: should not modify CR/LF outside strings
+    ok 2 - should not modify CR/LF outside strings
+      ---
+      duration_ms: 1.616818
+      type: 'test'
+      ...
+    # Subtest: should handle escaped quotes correctly
+    ok 3 - should handle escaped quotes correctly
+      ---
+      duration_ms: 1.983019
+      type: 'test'
+      ...
+    1..3
+ok 3 - fixJsonControlChars
+  ---
+  duration_ms: 6.321986
+  type: 'suite'
+  ...
+# Subtest: findJsonEnd
+    # Subtest: should find end of balanced array
+    ok 1 - should find end of balanced array
+      ---
+      duration_ms: 2.084845
+      type: 'test'
+      ...
+    # Subtest: should handle strings with brackets
+    ok 2 - should handle strings with brackets
+      ---
+      duration_ms: 1.557031
+      type: 'test'
+      ...
+    # Subtest: should return -1 for unbalanced input
+    ok 3 - should return -1 for unbalanced input
+      ---
+      duration_ms: 3.006044
+      type: 'test'
+      ...
+    # Subtest: should scan from startPos and return an absolute index
+    ok 4 - should scan from startPos and return an absolute index
+      ---
+      duration_ms: 1.780535
+      type: 'test'
+      ...
+    # Subtest: should ignore brackets located before startPos
+    ok 5 - should ignore brackets located before startPos
+      ---
+      duration_ms: 1.459578
+      type: 'test'
+      ...
+    # Subtest: should treat startPos=0 the same as the default
+    ok 6 - should treat startPos=0 the same as the default
+      ---
+      duration_ms: 1.585257
+      type: 'test'
+      ...
+    1..6
+ok 4 - findJsonEnd
+  ---
+  duration_ms: 11.954421
+  type: 'suite'
+  ...
+# Subtest: runInPool
+    # Subtest: should run the worker over every item and preserve order
+    ok 1 - should run the worker over every item and preserve order
+      ---
+      duration_ms: 3.152311
+      type: 'test'
+      ...
+    # Subtest: should never exceed the concurrency limit
+    ok 2 - should never exceed the concurrency limit
+      ---
+      duration_ms: 32.543151
+      type: 'test'
+      ...
+    # Subtest: should return an empty array for empty input
+    ok 3 - should return an empty array for empty input
+      ---
+      duration_ms: 1.824656
+      type: 'test'
+      ...
+    # Subtest: should handle a limit larger than the item count
+    ok 4 - should handle a limit larger than the item count
+      ---
+      duration_ms: 1.660313
+      type: 'test'
+      ...
+    # Subtest: should pass the item index to the worker
+    ok 5 - should pass the item index to the worker
+      ---
+      duration_ms: 1.572435
+      type: 'test'
+      ...
+    # Subtest: should handle limit = 0 by using a minimum concurrency of 1
+    ok 6 - should handle limit = 0 by using a minimum concurrency of 1
+      ---
+      duration_ms: 3.316158
+      type: 'test'
+      ...
+    # Subtest: should handle non-integer limits by rounding down
+    ok 7 - should handle non-integer limits by rounding down
+      ---
+      duration_ms: 1.497464
+      type: 'test'
+      ...
+    # Subtest: should propagate worker errors
+    ok 8 - should propagate worker errors
+      ---
+      duration_ms: 2.115269
+      type: 'test'
+      ...
+    # Subtest: should handle NaN limit by using a minimum concurrency of 1
+    ok 9 - should handle NaN limit by using a minimum concurrency of 1
+      ---
+      duration_ms: 1.388469
+      type: 'test'
+      ...
+    # Subtest: should handle negative limit by using a minimum concurrency of 1
+    ok 10 - should handle negative limit by using a minimum concurrency of 1
+      ---
+      duration_ms: 2.100805
+      type: 'test'
+      ...
+    1..10
+ok 5 - runInPool
+  ---
+  duration_ms: 51.866747
+  type: 'suite'
+  ...
+# Subtest: isSuggestionEnabled
+    # Subtest: treats toggle value 2 as enabled
+    ok 1 - treats toggle value 2 as enabled
+      ---
+      duration_ms: 1.695563
+      type: 'test'
+      ...
+    # Subtest: treats toggle value 1, null block, or missing block as disabled
+    ok 2 - treats toggle value 1, null block, or missing block as disabled
+      ---
+      duration_ms: 1.470575
+      type: 'test'
+      ...
+    1..2
+ok 6 - isSuggestionEnabled
+  ---
+  duration_ms: 3.30167
+  type: 'suite'
+  ...
+# Subtest: listSuggestionEnabledSources
+    # Subtest: returns only github repos whose Suggestions toggle is ON
+    not ok 1 - returns only github repos whose Suggestions toggle is ON
+      ---
+      duration_ms: 2.855475
+      type: 'test'
+      location: '/app/tests/background.test.js:361:3'
+      failureType: 'testCodeFailure'
+      error: |-
+        Values have same structure but are not reference-equal:
+
+        [
+          'github/n24q02m/on-a',
+          'github/n24q02m/on-b'
+        ]
+
+      code: 'ERR_ASSERTION'
+      name: 'AssertionError'
+      expected:
+        0: 'github/n24q02m/on-a'
+        1: 'github/n24q02m/on-b'
+      actual:
+        0: 'github/n24q02m/on-a'
+        1: 'github/n24q02m/on-b'
+      operator: 'deepStrictEqual'
+      stack: |-
+        TestContext.<anonymous> (/app/tests/background.test.js:374:12)
+        async Test.run (node:internal/test_runner/test:1054:7)
+        async Promise.all (index 0)
+        async Suite.run (node:internal/test_runner/test:1442:7)
+        async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+      ...
+    # Subtest: returns [] when the response has no sources
+    ok 2 - returns [] when the response has no sources
+      ---
+      duration_ms: 2.913643
+      type: 'test'
+      ...
+    1..2
+not ok 7 - listSuggestionEnabledSources
+  ---
+  duration_ms: 6.01104
+  type: 'suite'
+  location: '/app/tests/background.test.js:360:1'
+  failureType: 'subtestsFailed'
+  error: '1 subtest failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+# Subtest: getDailySessionQuota
+    # Subtest: parses KQOO7 into used/limit/remaining
+    ok 1 - parses KQOO7 into used/limit/remaining
+      ---
+      duration_ms: 1.472932
+      type: 'test'
+      ...
+    # Subtest: clamps remaining at 0 when over the limit
+    ok 2 - clamps remaining at 0 when over the limit
+      ---
+      duration_ms: 1.531462
+      type: 'test'
+      ...
+    # Subtest: returns null for an unrecognised shape
+    ok 3 - returns null for an unrecognised shape
+      ---
+      duration_ms: 1.369899
+      type: 'test'
+      ...
+    1..3
+ok 8 - getDailySessionQuota
+  ---
+  duration_ms: 4.521034
+  type: 'suite'
+  ...
+# Subtest: createLimiter
+    # Subtest: caps concurrency across independent callers and resolves results
+    ok 1 - caps concurrency across independent callers and resolves results
+      ---
+      duration_ms: 29.859045
+      type: 'test'
+      ...
+    1..1
+ok 9 - createLimiter
+  ---
+  duration_ms: 30.076394
+  type: 'suite'
+  ...
+# Subtest: archiveTaskWithRetry
+    # Subtest: isRetryable matches rate-limit and transient errors only
+    ok 1 - isRetryable matches rate-limit and transient errors only
+      ---
+      duration_ms: 2.055031
+      type: 'test'
+      ...
+    # Subtest: retries on a 429 then succeeds
+    ok 2 - retries on a 429 then succeeds
+      ---
+      duration_ms: 572.395763
+      type: 'test'
+      ...
+    # Subtest: does not retry a non-retryable error
+    ok 3 - does not retry a non-retryable error
+      ---
+      duration_ms: 2.112321
+      type: 'test'
+      ...
+    # Subtest: withRetry
+        # Subtest: executes successfully on the first attempt
+        ok 1 - executes successfully on the first attempt
+          ---
+          duration_ms: 1.662461
+          type: 'test'
+          ...
+        # Subtest: retries on retryable error and succeeds
+        ok 2 - retries on retryable error and succeeds
+          ---
+          duration_ms: 1.784969
+          type: 'test'
+          ...
+        # Subtest: stops retrying after RETRY_ATTEMPTS
+        ok 3 - stops retrying after RETRY_ATTEMPTS
+          ---
+          duration_ms: 1.842704
+          type: 'test'
+          ...
+        # Subtest: throws immediately on non-retryable error
+        ok 4 - throws immediately on non-retryable error
+          ---
+          duration_ms: 3.325037
+          type: 'test'
+          ...
+        # Subtest: verifies exponential backoff delay
+        ok 5 - verifies exponential backoff delay
+          ---
+          duration_ms: 1.553039
+          type: 'test'
+          ...
+        1..5
+    ok 4 - withRetry
+      ---
+      duration_ms: 10.445584
+      type: 'suite'
+      ...
+    1..4
+ok 10 - archiveTaskWithRetry
+  ---
+  duration_ms: 587.376139
+  type: 'suite'
+  ...
+# Subtest: parseResponse
+    # Subtest: should extract payload from batchexecute response
+    ok 1 - should extract payload from batchexecute response
+      ---
+      duration_ms: 1.550958
+      type: 'test'
+      ...
+    # Subtest: should parse correctly when trailing data follows the JSON array
+    ok 2 - should parse correctly when trailing data follows the JSON array
+      ---
+      duration_ms: 1.396375
+      type: 'test'
+      ...
+    # Subtest: should return null when the rpcId is not present
+    ok 3 - should return null when the rpcId is not present
+      ---
+      duration_ms: 1.358407
+      type: 'test'
+      ...
+    # Subtest: should throw when newline is missing after byte length
+    ok 4 - should throw when newline is missing after byte length
+      ---
+      duration_ms: 1.436758
+      type: 'test'
+      ...
+    # Subtest: should throw when JSON boundary is not found
+    ok 5 - should throw when JSON boundary is not found
+      ---
+      duration_ms: 1.332107
+      type: 'test'
+      ...
+    1..5
+ok 11 - parseResponse
+  ---
+  duration_ms: 7.31845
+  type: 'suite'
+  ...
+# Subtest: parseTask
+    # Subtest: should map array indices to named fields
+    ok 1 - should map array indices to named fields
+      ---
+      duration_ms: 1.764101
+      type: 'test'
+      ...
+    # Subtest: should fallback to short title when display title is null
+    ok 2 - should fallback to short title when display title is null
+      ---
+      duration_ms: 1.5437
+      type: 'test'
+      ...
+    # Subtest: should handle missing source gracefully
+    ok 3 - should handle missing source gracefully
+      ---
+      duration_ms: 1.521009
+      type: 'test'
+      ...
+    # Subtest: should include statusCode from index 25
+    ok 4 - should include statusCode from index 25
+      ---
+      duration_ms: 1.529136
+      type: 'test'
+      ...
+    1..4
+ok 12 - parseTask
+  ---
+  duration_ms: 6.545435
+  type: 'suite'
+  ...
+# Subtest: isArchivable
+    # Subtest: should return true for terminal task states (2, 4, 12)
+    ok 1 - should return true for terminal task states (2, 4, 12)
+      ---
+      duration_ms: 1.600985
+      type: 'test'
+      ...
+    # Subtest: should return true for null/undefined state (completed task variant)
+    ok 2 - should return true for null/undefined state (completed task variant)
+      ---
+      duration_ms: 1.521615
+      type: 'test'
+      ...
+    # Subtest: should return false for non-terminal / unknown states
+    ok 3 - should return false for non-terminal / unknown states
+      ---
+      duration_ms: 1.510265
+      type: 'test'
+      ...
+    1..3
+ok 13 - isArchivable
+  ---
+  duration_ms: 4.80892
+  type: 'suite'
+  ...
+# Subtest: processTab force vs default archiving
+    # Subtest: FORCE archives every task even when none are in a terminal state
+    ok 1 - FORCE archives every task even when none are in a terminal state
+      ---
+      duration_ms: 2.947712
+      type: 'test'
+      ...
+    # Subtest: FORCE archives real terminal-state tasks (2, 4, 12, null)
+    ok 2 - FORCE archives real terminal-state tasks (2, 4, 12, null)
+      ---
+      duration_ms: 1.806565
+      type: 'test'
+      ...
+    # Subtest: default mode archives terminal tasks and skips non-terminal ones
+    ok 3 - default mode archives terminal tasks and skips non-terminal ones
+      ---
+      duration_ms: 2.083691
+      type: 'test'
+      ...
+    # Subtest: default mode skips a terminal task with a matching open PR
+    ok 4 - default mode skips a terminal task with a matching open PR
+      ---
+      duration_ms: 3.399701
+      type: 'test'
+      ...
+    # Subtest: FORCE archives a terminal task even when it has a matching open PR
+    ok 5 - FORCE archives a terminal task even when it has a matching open PR
+      ---
+      duration_ms: 1.613231
+      type: 'test'
+      ...
+    1..5
+ok 14 - processTab force vs default archiving
+  ---
+  duration_ms: 12.100747
+  type: 'suite'
+  ...
+# Subtest: JULES_ORIGIN
+    # Subtest: should be the Jules base URL
+    ok 1 - should be the Jules base URL
+      ---
+      duration_ms: 1.537813
+      type: 'test'
+      ...
+    1..1
+ok 15 - JULES_ORIGIN
+  ---
+  duration_ms: 1.612883
+  type: 'suite'
+  ...
+# Subtest: extractAccountNum
+    # Subtest: should extract account number from /u/N paths
+    ok 1 - should extract account number from /u/N paths
+      ---
+      duration_ms: 1.26925
+      type: 'test'
+      ...
+    # Subtest: should return 0 for URLs without /u/N
+    ok 2 - should return 0 for URLs without /u/N
+      ---
+      duration_ms: 1.442391
+      type: 'test'
+      ...
+    1..2
+ok 16 - extractAccountNum
+  ---
+  duration_ms: 2.812834
+  type: 'suite'
+  ...
+# Subtest: getTabLabel
+    # Subtest: should return u/N for account tabs
+    ok 1 - should return u/N for account tabs
+      ---
+      duration_ms: 1.493016
+      type: 'test'
+      ...
+    # Subtest: should return default for tabs without account number
+    ok 2 - should return default for tabs without account number
+      ---
+      duration_ms: 2.261723
+      type: 'test'
+      ...
+    1..2
+ok 17 - getTabLabel
+  ---
+  duration_ms: 3.880904
+  type: 'suite'
+  ...
+# Subtest: getOpenPRs
+    # Subtest: should return mapped PR titles and branches
+    ok 1 - should return mapped PR titles and branches
+      ---
+      duration_ms: 2.342953
+      type: 'test'
+      ...
+    # Subtest: should return cached value on cache hit
+    ok 2 - should return cached value on cache hit
+      ---
+      duration_ms: 1.897218
+      type: 'test'
+      ...
+    # Subtest: should return empty array on HTTP error
+    ok 3 - should return empty array on HTTP error
+      ---
+      duration_ms: 9.411161
+      type: 'test'
+      ...
+    # Subtest: should return empty array on network error
+    ok 4 - should return empty array on network error
+      ---
+      duration_ms: 1.588415
+      type: 'test'
+      ...
+    # Subtest: should encode owner and repo in URL
+    ok 5 - should encode owner and repo in URL
+      ---
+      duration_ms: 1.707525
+      type: 'test'
+      ...
+    # Subtest: should reject tokens with newlines
+    ok 6 - should reject tokens with newlines
+      ---
+      duration_ms: 1.420641
+      type: 'test'
+      ...
+    # Subtest: should use Authorization header when token is provided
+    ok 7 - should use Authorization header when token is provided
+      ---
+      duration_ms: 1.551023
+      type: 'test'
+      ...
+    # Subtest: should handle prCache correctly (integration check)
+    ok 8 - should handle prCache correctly (integration check)
+      ---
+      duration_ms: 1.590604
+      type: 'test'
+      ...
+    # Subtest: should return empty array and log warning on invalid input types
+    ok 9 - should return empty array and log warning on invalid input types
+      ---
+      duration_ms: 1.566042
+      type: 'test'
+      ...
+    1..9
+ok 18 - getOpenPRs
+  ---
+  duration_ms: 23.47943
+  type: 'suite'
+  ...
+# Subtest: taskHasOpenPR
+    # Subtest: should match when PR title contains task title
+    ok 1 - should match when PR title contains task title
+      ---
+      duration_ms: 1.37025
+      type: 'test'
+      ...
+    # Subtest: should match when task title contains PR title
+    ok 2 - should match when task title contains PR title
+      ---
+      duration_ms: 1.433736
+      type: 'test'
+      ...
+    # Subtest: should not match unrelated PR titles
+    ok 3 - should not match unrelated PR titles
+      ---
+      duration_ms: 1.431964
+      type: 'test'
+      ...
+    # Subtest: should return false for empty PR list
+    ok 4 - should return false for empty PR list
+      ---
+      duration_ms: 1.631528
+      type: 'test'
+      ...
+    # Subtest: should return false for untitled tasks
+    ok 5 - should return false for untitled tasks
+      ---
+      duration_ms: 1.297087
+      type: 'test'
+      ...
+    # Subtest: should be case-insensitive
+    ok 6 - should be case-insensitive
+      ---
+      duration_ms: 1.509331
+      type: 'test'
+      ...
+    1..6
+ok 19 - taskHasOpenPR
+  ---
+  duration_ms: 8.909564
+  type: 'suite'
+  ...
+# Subtest: parseSuggestion
+    # Subtest: should parse suggestion from hQP40d response
+    ok 1 - should parse suggestion from hQP40d response
+      ---
+      duration_ms: 1.544399
+      type: 'test'
+      ...
+    # Subtest: should return null for null input
+    ok 2 - should return null for null input
+      ---
+      duration_ms: 1.344328
+      type: 'test'
+      ...
+    # Subtest: should return null for empty array
+    ok 3 - should return null for empty array
+      ---
+      duration_ms: 1.423418
+      type: 'test'
+      ...
+    # Subtest: should return null when details array is missing
+    ok 4 - should return null when details array is missing
+      ---
+      duration_ms: 1.250917
+      type: 'test'
+      ...
+    1..4
+ok 20 - parseSuggestion
+  ---
+  duration_ms: 5.749905
+  type: 'suite'
+  ...
+# Subtest: buildSuggestionPrompt
+    # Subtest: should build security prompt for input-validation category
+    ok 1 - should build security prompt for input-validation category
+      ---
+      duration_ms: 1.40577
+      type: 'test'
+      ...
+    # Subtest: should build testing prompt for untested-function category
+    ok 2 - should build testing prompt for untested-function category
+      ---
+      duration_ms: 1.368201
+      type: 'test'
+      ...
+    # Subtest: should build performance prompt for async-io category
+    ok 3 - should build performance prompt for async-io category
+      ---
+      duration_ms: 2.471628
+      type: 'test'
+      ...
+    # Subtest: should build cleanup prompt for dead-code category
+    ok 4 - should build cleanup prompt for dead-code category
+      ---
+      duration_ms: 1.467561
+      type: 'test'
+      ...
+    # Subtest: should use default config for unknown category
+    ok 5 - should use default config for unknown category
+      ---
+      duration_ms: 1.251563
+      type: 'test'
+      ...
+    1..5
+ok 21 - buildSuggestionPrompt
+  ---
+  duration_ms: 8.175296
+  type: 'suite'
+  ...
+# Subtest: buildStartPayload
+    # Subtest: should build correct Rja83d payload structure
+    ok 1 - should build correct Rja83d payload structure
+      ---
+      duration_ms: 1.618453
+      type: 'test'
+      ...
+    # Subtest: should use config.modelId over startConfig when available
+    ok 2 - should use config.modelId over startConfig when available
+      ---
+      duration_ms: 1.362792
+      type: 'test'
+      ...
+    # Subtest: should use default feature flags when startConfig is null
+    ok 3 - should use default feature flags when startConfig is null
+      ---
+      duration_ms: 1.398283
+      type: 'test'
+      ...
+    1..3
+ok 22 - buildStartPayload
+  ---
+  duration_ms: 4.564461
+  type: 'suite'
+  ...
+# Subtest: startSuggestion
+    # Subtest: should call callBatchExecute with the correct RPC ID and payload
+    ok 1 - should call callBatchExecute with the correct RPC ID and payload
+      ---
+      duration_ms: 1.715256
+      type: 'test'
+      ...
+    1..1
+ok 23 - startSuggestion
+  ---
+  duration_ms: 1.785678
+  type: 'suite'
+  ...
+# Subtest: state management
+    # Subtest: should initialize cleanly without existing state
+    ok 1 - should initialize cleanly without existing state
+      ---
+      duration_ms: 1.402336
+      type: 'test'
+      ...
+    # Subtest: should handle interrupted running state
+    ok 2 - should handle interrupted running state
+      ---
+      duration_ms: 30.278705
+      type: 'test'
+      ...
+    # Subtest: should persist state on update
+    ok 3 - should persist state on update
+      ---
+      duration_ms: 11.433815
+      type: 'test'
+      ...
+    # Subtest: should add log messages and persist state (coalesced)
+    ok 4 - should add log messages and persist state (coalesced)
+      ---
+      duration_ms: 211.953722
+      type: 'test'
+      ...
+    # Subtest: caps the retained log at MAX_LOG_LINES, dropping the oldest lines
+    ok 5 - caps the retained log at MAX_LOG_LINES, dropping the oldest lines
+      ---
+      duration_ms: 3.436302
+      type: 'test'
+      ...
+    # Subtest: coalesces a storm of log writes into a single storage write
+    ok 6 - coalesces a storm of log writes into a single storage write
+      ---
+      duration_ms: 213.449858
+      type: 'test'
+      ...
+    1..6
+ok 24 - state management
+  ---
+  duration_ms: 472.427718
+  type: 'suite'
+  ...
+# Subtest: extractAccountNum
+    # Subtest: should extract account number from /u/X/ format
+    ok 1 - should extract account number from /u/X/ format
+      ---
+      duration_ms: 1.561766
+      type: 'test'
+      ...
+    # Subtest: should return "0" for URLs without /u/X/ segment
+    ok 2 - should return "0" for URLs without /u/X/ segment
+      ---
+      duration_ms: 1.571379
+      type: 'test'
+      ...
+    # Subtest: should handle null, undefined, and malformed URLs gracefully
+    ok 3 - should handle null, undefined, and malformed URLs gracefully
+      ---
+      duration_ms: 1.378912
+      type: 'test'
+      ...
+    1..3
+ok 25 - extractAccountNum
+  ---
+  duration_ms: 4.687565
+  type: 'suite'
+  ...
+# Subtest: getTabLabel
+    # Subtest: should return "default" for account 0
+    ok 1 - should return "default" for account 0
+      ---
+      duration_ms: 1.351606
+      type: 'test'
+      ...
+    # Subtest: should return "u/X" for other account numbers
+    ok 2 - should return "u/X" for other account numbers
+      ---
+      duration_ms: 1.467211
+      type: 'test'
+      ...
+    1..2
+ok 26 - getTabLabel
+  ---
+  duration_ms: 2.966583
+  type: 'suite'
+  ...
+# Subtest: getJulesTabs
+    # Subtest: should filter out accounts.google tabs and sort by account number
+    ok 1 - should filter out accounts.google tabs and sort by account number
+      ---
+      duration_ms: 1.679524
+      type: 'test'
+      ...
+    # Subtest: should handle tabs without account segments correctly (as 0)
+    ok 2 - should handle tabs without account segments correctly (as 0)
+      ---
+      duration_ms: 1.682457
+      type: 'test'
+      ...
+    1..2
+ok 27 - getJulesTabs
+  ---
+  duration_ms: 3.477698
+  type: 'suite'
+  ...
+# Subtest: startOperation refactoring
+    # Subtest: initOperationState should initialize state correctly
+    ok 1 - initOperationState should initialize state correctly
+      ---
+      duration_ms: 5.612318
+      type: 'test'
+      ...
+    # Subtest: discoverTabs should handle no tabs found
+    ok 2 - discoverTabs should handle no tabs found
+      ---
+      duration_ms: 1.452773
+      type: 'test'
+      ...
+    # Subtest: discoverTabs should return filtered tabs
+    ok 3 - discoverTabs should return filtered tabs
+      ---
+      duration_ms: 1.464697
+      type: 'test'
+      ...
+    # Subtest: finalizeOperation should update status to done and log summary
+    ok 4 - finalizeOperation should update status to done and log summary
+      ---
+      duration_ms: 1.755204
+      type: 'test'
+      ...
+    # Subtest: handleOperationError should log error and update status
+    ok 5 - handleOperationError should log error and update status
+      ---
+      duration_ms: 1.415076
+      type: 'test'
+      ...
+    # Subtest: handleOperationError should handle non-Error objects gracefully
+    ok 6 - handleOperationError should handle non-Error objects gracefully
+      ---
+      duration_ms: 1.295223
+      type: 'test'
+      ...
+    # Subtest: startOperation should orchestrate successfully
+    ok 7 - startOperation should orchestrate successfully
+      ---
+      duration_ms: 1.779019
+      type: 'test'
+      ...
+    1..7
+ok 28 - startOperation refactoring
+  ---
+  duration_ms: 15.033806
+  type: 'suite'
+  ...
+# Subtest: jFetch
+    # Subtest: should throw an error for non-OK HTTP responses
+    ok 1 - should throw an error for non-OK HTTP responses
+      ---
+      duration_ms: 1.578907
+      type: 'test'
+      ...
+    # Subtest: should return the response for successful HTTP requests
+    ok 2 - should return the response for successful HTTP requests
+      ---
+      duration_ms: 1.340507
+      type: 'test'
+      ...
+    # Subtest: should throw an error for disallowed fetch origins
+    ok 3 - should throw an error for disallowed fetch origins
+      ---
+      duration_ms: 1.534153
+      type: 'test'
+      ...
+    # Subtest: should throw an error if token is not a string
+    ok 4 - should throw an error if token is not a string
+      ---
+      duration_ms: 1.725916
+      type: 'test'
+      ...
+    # Subtest: should throw an error if token contains newlines
+    ok 5 - should throw an error if token contains newlines
+      ---
+      duration_ms: 1.382312
+      type: 'test'
+      ...
+    # Subtest: should include Authorization header when token is provided
+    ok 6 - should include Authorization header when token is provided
+      ---
+      duration_ms: 1.309621
+      type: 'test'
+      ...
+    # Subtest: should throw an error for HTTP 500 status code
+    ok 7 - should throw an error for HTTP 500 status code
+      ---
+      duration_ms: 1.588589
+      type: 'test'
+      ...
+    # Subtest: should throw an error if fetch throws a network error
+    ok 8 - should throw an error if fetch throws a network error
+      ---
+      duration_ms: 1.578202
+      type: 'test'
+      ...
+    # Subtest: should pass custom options correctly to fetch
+    ok 9 - should pass custom options correctly to fetch
+      ---
+      duration_ms: 1.579315
+      type: 'test'
+      ...
+    1..9
+ok 29 - jFetch
+  ---
+  duration_ms: 13.985772
+  type: 'suite'
+  ...
+# Subtest: KeepAlive
+    # Subtest: startKeepAlive should set a 25s interval
+    ok 1 - startKeepAlive should set a 25s interval
+      ---
+      duration_ms: 1.397748
+      type: 'test'
+      ...
+    # Subtest: startKeepAlive should call chrome.runtime.getPlatformInfo periodically
+    ok 2 - startKeepAlive should call chrome.runtime.getPlatformInfo periodically
+      ---
+      duration_ms: 1.525556
+      type: 'test'
+      ...
+    # Subtest: startKeepAlive should be idempotent
+    ok 3 - startKeepAlive should be idempotent
+      ---
+      duration_ms: 1.509588
+      type: 'test'
+      ...
+    # Subtest: stopKeepAlive should clear the interval and reset state
+    ok 4 - stopKeepAlive should clear the interval and reset state
+      ---
+      duration_ms: 1.868897
+      type: 'test'
+      ...
+    1..4
+ok 30 - KeepAlive
+  ---
+  duration_ms: 6.481923
+  type: 'suite'
+  ...
+# Subtest: callBatchExecute
+    # Subtest: should throw error when jFetch fails with HTTP error
+    ok 1 - should throw error when jFetch fails with HTTP error
+      ---
+      duration_ms: 2.01214
+      type: 'test'
+      ...
+    # Subtest: should throw error when fetch throws network error
+    ok 2 - should throw error when fetch throws network error
+      ---
+      duration_ms: 1.744347
+      type: 'test'
+      ...
+    1..2
+ok 31 - callBatchExecute
+  ---
+  duration_ms: 3.874514
+  type: 'suite'
+  ...
+# Subtest: listSuggestions
+    # Subtest: should return an empty array if callBatchExecute returns null
+    ok 1 - should return an empty array if callBatchExecute returns null
+      ---
+      duration_ms: 1.623756
+      type: 'test'
+      ...
+    # Subtest: should return an empty array if callBatchExecute returns an empty array
+    ok 2 - should return an empty array if callBatchExecute returns an empty array
+      ---
+      duration_ms: 1.541585
+      type: 'test'
+      ...
+    # Subtest: should return an empty array if callBatchExecute returns [null]
+    ok 3 - should return an empty array if callBatchExecute returns [null]
+      ---
+      duration_ms: 1.632647
+      type: 'test'
+      ...
+    # Subtest: should return an empty array if callBatchExecute returns [[]]
+    ok 4 - should return an empty array if callBatchExecute returns [[]]
+      ---
+      duration_ms: 1.593513
+      type: 'test'
+      ...
+    # Subtest: should return parsed suggestions for valid response data
+    ok 5 - should return parsed suggestions for valid response data
+      ---
+      duration_ms: 1.920616
+      type: 'test'
+      ...
+    # Subtest: should filter out null/invalid suggestions
+    ok 6 - should filter out null/invalid suggestions
+      ---
+      duration_ms: 2.543469
+      type: 'test'
+      ...
+    1..6
+ok 32 - listSuggestions
+  ---
+  duration_ms: 11.117912
+  type: 'suite'
+  ...
+# Subtest: getStartConfig
+    # Subtest: should return the config object when it exists in session storage
+    ok 1 - should return the config object when it exists in session storage
+      ---
+      duration_ms: 2.057563
+      type: 'test'
+      ...
+    # Subtest: should return null when no config exists in session storage
+    ok 2 - should return null when no config exists in session storage
+      ---
+      duration_ms: 1.488368
+      type: 'test'
+      ...
+    1..2
+ok 33 - getStartConfig
+  ---
+  duration_ms: 3.710645
+  type: 'suite'
+  ...
+# Subtest: getTabConfig
+    # Subtest: should return config and accountNum on success
+    ok 1 - should return config and accountNum on success
+      ---
+      duration_ms: 2.84188
+      type: 'test'
+      ...
+    # Subtest: should throw error when "at" property is missing
+    ok 2 - should throw error when "at" property is missing
+      ---
+      duration_ms: 1.548756
+      type: 'test'
+      ...
+    # Subtest: should throw security error for invalid accountNum format
+    ok 3 - should throw security error for invalid accountNum format
+      ---
+      duration_ms: 1.963475
+      type: 'test'
+      ...
+    # Subtest: should handle missing accountNum by defaulting to "0"
+    ok 4 - should handle missing accountNum by defaulting to "0"
+      ---
+      duration_ms: 2.411277
+      type: 'test'
+      ...
+    1..4
+ok 34 - getTabConfig
+  ---
+  duration_ms: 9.062322
+  type: 'suite'
+  ...
+# Subtest: ensureContentScript
+    # Subtest: should return documentId when initial PING succeeds
+    ok 1 - should return documentId when initial PING succeeds
+      ---
+      duration_ms: 1.665466
+      type: 'test'
+      ...
+    # Subtest: should inject script and retry when initial PING fails
+    ok 2 - should inject script and retry when initial PING fails
+      ---
+      duration_ms: 4.254447
+      type: 'test'
+      ...
+    # Subtest: should throw security error if frame URL is missing
+    ok 3 - should throw security error if frame URL is missing
+      ---
+      duration_ms: 1.42423
+      type: 'test'
+      ...
+    # Subtest: should throw security error if origin is invalid
+    ok 4 - should throw security error if origin is invalid
+      ---
+      duration_ms: 1.590316
+      type: 'test'
+      ...
+    # Subtest: should throw error if content script fails to initialize within 3s
+    ok 5 - should throw error if content script fails to initialize within 3s
+      ---
+      duration_ms: 1.747402
+      type: 'test'
+      ...
+    1..5
+ok 35 - ensureContentScript
+  ---
+  duration_ms: 10.912163
+  type: 'suite'
+  ...
+# Subtest: groupTasksByRepo Internal
+    # Subtest: should correctly group tasks using the internal function
+    ok 1 - should correctly group tasks using the internal function
+      ---
+      duration_ms: 1.535439
+      type: 'test'
+      ...
+    1..1
+ok 36 - groupTasksByRepo Internal
+  ---
+  duration_ms: 1.608849
+  type: 'suite'
+  ...
+# Subtest: safeListTasks
+    # Subtest: should return tasks when listTasks succeeds with non-empty list
+    ok 1 - should return tasks when listTasks succeeds with non-empty list
+      ---
+      duration_ms: 1.63394
+      type: 'test'
+      ...
+    # Subtest: should return null and log message when listTasks returns an empty array
+    ok 2 - should return null and log message when listTasks returns an empty array
+      ---
+      duration_ms: 1.55525
+      type: 'test'
+      ...
+    # Subtest: should return null and log error when listTasks throws
+    ok 3 - should return null and log error when listTasks throws
+      ---
+      duration_ms: 1.602688
+      type: 'test'
+      ...
+    1..3
+ok 37 - safeListTasks
+  ---
+  duration_ms: 4.937793
+  type: 'suite'
+  ...
+# Subtest: safeListSources
+    # Subtest: should return sources when listSuggestionEnabledSources succeeds with non-empty list
+    not ok 1 - should return sources when listSuggestionEnabledSources succeeds with non-empty list
+      ---
+      duration_ms: 1.935708
+      type: 'test'
+      location: '/app/tests/background.test.js:1951:3'
+      failureType: 'testCodeFailure'
+      error: |-
+        Values have same structure but are not reference-equal:
+
+        [
+          'github/owner/repo',
+          'github/owner/repo2'
+        ]
+
+      code: 'ERR_ASSERTION'
+      name: 'AssertionError'
+      expected:
+        0: 'github/owner/repo'
+        1: 'github/owner/repo2'
+      actual:
+        0: 'github/owner/repo'
+        1: 'github/owner/repo2'
+      operator: 'deepStrictEqual'
+      stack: |-
+        TestContext.<anonymous> (/app/tests/background.test.js:1961:12)
+        async Test.run (node:internal/test_runner/test:1054:7)
+        async Promise.all (index 0)
+        async Suite.run (node:internal/test_runner/test:1442:7)
+        async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+      ...
+    # Subtest: should return null and log message when no repos have Suggestions enabled
+    ok 2 - should return null and log message when no repos have Suggestions enabled
+      ---
+      duration_ms: 1.549686
+      type: 'test'
+      ...
+    # Subtest: should return null and log error when listSuggestionEnabledSources throws
+    ok 3 - should return null and log error when listSuggestionEnabledSources throws
+      ---
+      duration_ms: 2.383747
+      type: 'test'
+      ...
+    1..3
+not ok 38 - safeListSources
+  ---
+  duration_ms: 6.024121
+  type: 'suite'
+  location: '/app/tests/background.test.js:1950:1'
+  failureType: 'subtestsFailed'
+  error: '1 subtest failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+# Subtest: trimLog Internal
+    # Subtest: should not trim if log length is equal to MAX_LOG_LINES
+    ok 1 - should not trim if log length is equal to MAX_LOG_LINES
+      ---
+      duration_ms: 3.216392
+      type: 'test'
+      ...
+    # Subtest: should trim oldest entries if log length exceeds MAX_LOG_LINES
+    ok 2 - should trim oldest entries if log length exceeds MAX_LOG_LINES
+      ---
+      duration_ms: 5.659233
+      type: 'test'
+      ...
+    1..2
+ok 39 - trimLog Internal
+  ---
+  duration_ms: 9.06763
+  type: 'suite'
+  ...
+# Subtest: content.js config extraction logic
+    # Subtest: should extract all 3 tokens from WIZ_global_data
+    ok 1 - should extract all 3 tokens from WIZ_global_data
+      ---
+      duration_ms: 1.258733
+      type: 'test'
+      ...
+    # Subtest: should return null when WIZ_global_data is missing
+    ok 2 - should return null when WIZ_global_data is missing
+      ---
+      duration_ms: 0.325773
+      type: 'test'
+      ...
+    # Subtest: should return null for missing individual tokens
+    ok 3 - should return null for missing individual tokens
+      ---
+      duration_ms: 0.196837
+      type: 'test'
+      ...
+    # Subtest: should parse account number from URL paths
+    ok 4 - should parse account number from URL paths
+      ---
+      duration_ms: 0.311352
+      type: 'test'
+      ...
+    # Subtest: should extract config with modelId from TSDtV
+    ok 5 - should extract config with modelId from TSDtV
+      ---
+      duration_ms: 0.34294
+      type: 'test'
+      ...
+    # Subtest: should return null modelId when TSDtV has no model
+    ok 6 - should return null modelId when TSDtV has no model
+      ---
+      duration_ms: 0.234211
+      type: 'test'
+      ...
+    # Subtest: should return null modelId when TSDtV is missing
+    ok 7 - should return null modelId when TSDtV is missing
+      ---
+      duration_ms: 1.455895
+      type: 'test'
+      ...
+    1..7
+ok 40 - content.js config extraction logic
+  ---
+  duration_ms: 6.049305
+  type: 'suite'
+  ...
+# Subtest: content.js getAccountLabel
+    # Subtest: should return "default" for account 0
+    ok 1 - should return "default" for account 0
+      ---
+      duration_ms: 3.020868
+      type: 'test'
+      ...
+    # Subtest: should return "u/1" for account 1
+    ok 2 - should return "u/1" for account 1
+      ---
+      duration_ms: 1.128668
+      type: 'test'
+      ...
+    # Subtest: should return "default" when no account segment is present
+    ok 3 - should return "default" when no account segment is present
+      ---
+      duration_ms: 1.069568
+      type: 'test'
+      ...
+    # Subtest: should return "default" for trailing "u" without ID
+    ok 4 - should return "default" for trailing "u" without ID
+      ---
+      duration_ms: 2.708797
+      type: 'test'
+      ...
+    # Subtest: should handle malformed URLs gracefully via getAccountNum try-catch
+    ok 5 - should handle malformed URLs gracefully via getAccountNum try-catch
+      ---
+      duration_ms: 0.964405
+      type: 'test'
+      ...
+    1..5
+ok 41 - content.js getAccountLabel
+  ---
+  duration_ms: 10.609959
+  type: 'suite'
+  ...
+# (node:33677) ExperimentalWarning: The MockTimers API is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: content.js extractConfig
+    # Subtest: should return cached config if it is fresh
+    ok 1 - should return cached config if it is fresh
+      ---
+      duration_ms: 3.808443
+      type: 'test'
+      ...
+    # Subtest: should request fresh config if cache is missing
+    ok 2 - should request fresh config if cache is missing
+      ---
+      duration_ms: 2.916165
+      type: 'test'
+      ...
+    # Subtest: should request fresh config if cache is old (> 5 min)
+    ok 3 - should request fresh config if cache is old (> 5 min)
+      ---
+      duration_ms: 1.330997
+      type: 'test'
+      ...
+    # Subtest: should request fresh config if cache exists but lacks timestamp
+    ok 4 - should request fresh config if cache exists but lacks timestamp
+      ---
+      duration_ms: 1.241166
+      type: 'test'
+      ...
+    # Subtest: should resolve with current cached value on timeout
+    ok 5 - should resolve with current cached value on timeout
+      ---
+      duration_ms: 2.379271
+      type: 'test'
+      ...
+    # Subtest: should resolve with null on timeout if no cache exists
+    ok 6 - should resolve with null on timeout if no cache exists
+      ---
+      duration_ms: 1.214698
+      type: 'test'
+      ...
+    # Subtest: should ignore untrusted window messages in extractConfig handler
+    ok 7 - should ignore untrusted window messages in extractConfig handler
+      ---
+      duration_ms: 1.181597
+      type: 'test'
+      ...
+    1..7
+ok 42 - content.js extractConfig
+  ---
+  duration_ms: 16.201521
+  type: 'suite'
+  ...
+# Subtest: content.js Message Listeners
+    # Subtest: should relay JULES_START_CONFIG to background
+    ok 1 - should relay JULES_START_CONFIG to background
+      ---
+      duration_ms: 1.414988
+      type: 'test'
+      ...
+    # Subtest: should ignore untrusted JULES_START_CONFIG messages
+    ok 2 - should ignore untrusted JULES_START_CONFIG messages
+      ---
+      duration_ms: 1.533104
+      type: 'test'
+      ...
+    # Subtest: should handle PING runtime message
+    ok 3 - should handle PING runtime message
+      ---
+      duration_ms: 1.565743
+      type: 'test'
+      ...
+    # Subtest: should handle GET_CONFIG runtime message
+    ok 4 - should handle GET_CONFIG runtime message
+      ---
+      duration_ms: 13.374643
+      type: 'test'
+      ...
+    # Subtest: should handle unknown runtime message
+    ok 5 - should handle unknown runtime message
+      ---
+      duration_ms: 1.371713
+      type: 'test'
+      ...
+    # Subtest: should remove message listener on timeout
+    ok 6 - should remove message listener on timeout
+      ---
+      duration_ms: 1.253889
+      type: 'test'
+      ...
+    1..6
+ok 43 - content.js Message Listeners
+  ---
+  duration_ms: 21.287671
+  type: 'suite'
+  ...
+# Subtest: content.js script injection
+    # Subtest: should inject main-world.js and remove it on load
+    ok 1 - should inject main-world.js and remove it on load
+      ---
+      duration_ms: 3.088269
+      type: 'test'
+      ...
+    # Subtest: should fallback to documentElement if document.head is missing
+    ok 2 - should fallback to documentElement if document.head is missing
+      ---
+      duration_ms: 1.293003
+      type: 'test'
+      ...
+    # Subtest: should allow manual reinjection via test_injectMainWorldScript in TEST_MODE
+    ok 3 - should allow manual reinjection via test_injectMainWorldScript in TEST_MODE
+      ---
+      duration_ms: 1.244626
+      type: 'test'
+      ...
+    1..3
+ok 44 - content.js script injection
+  ---
+  duration_ms: 7.167481
+  type: 'suite'
+  ...
+# Subtest: main-world.js
+    # Subtest: should broadcast config on load
+    ok 1 - should broadcast config on load
+      ---
+      duration_ms: 2.998705
+      type: 'test'
+      ...
+    # Subtest: should handle missing WIZ_global_data
+    ok 2 - should handle missing WIZ_global_data
+      ---
+      duration_ms: 0.8825
+      type: 'test'
+      ...
+    # Subtest: should handle partial WIZ_global_data
+    ok 3 - should handle partial WIZ_global_data
+      ---
+      duration_ms: 2.610502
+      type: 'test'
+      ...
+    # Subtest: should handle non-matching modelId string
+    ok 4 - should handle non-matching modelId string
+      ---
+      duration_ms: 1.021304
+      type: 'test'
+      ...
+    # Subtest: should handle empty WIZ_global_data object
+    ok 5 - should handle empty WIZ_global_data object
+      ---
+      duration_ms: 1.008792
+      type: 'test'
+      ...
+    # Subtest: should respond to JULES_REQUEST_CONFIG message
+    ok 6 - should respond to JULES_REQUEST_CONFIG message
+      ---
+      duration_ms: 1.307887
+      type: 'test'
+      ...
+    # Subtest: should ignore JULES_REQUEST_CONFIG from a foreign origin
+    ok 7 - should ignore JULES_REQUEST_CONFIG from a foreign origin
+      ---
+      duration_ms: 1.154158
+      type: 'test'
+      ...
+    # Subtest: should ignore JULES_REQUEST_CONFIG from other sources
+    ok 8 - should ignore JULES_REQUEST_CONFIG from other sources
+      ---
+      duration_ms: 1.163695
+      type: 'test'
+      ...
+    # Subtest: should intercept Rja83d fetch and broadcast start config
+    ok 9 - should intercept Rja83d fetch and broadcast start config
+      ---
+      duration_ms: 2.595687
+      type: 'test'
+      ...
+    # Subtest: should gracefully handle malformed fetch payloads
+    ok 10 - should gracefully handle malformed fetch payloads
+      ---
+      duration_ms: 1.499927
+      type: 'test'
+      ...
+    # Subtest: should handle fetch with missing body
+    ok 11 - should handle fetch with missing body
+      ---
+      duration_ms: 1.166191
+      type: 'test'
+      ...
+    # Subtest: should ignore other fetch calls
+    ok 12 - should ignore other fetch calls
+      ---
+      duration_ms: 0.890371
+      type: 'test'
+      ...
+    # Subtest: should only install fetch observer once
+    ok 13 - should only install fetch observer once
+      ---
+      duration_ms: 2.748886
+      type: 'test'
+      ...
+    1..13
+ok 45 - main-world.js
+  ---
+  duration_ms: 23.042037
+  type: 'suite'
+  ...
+# Subtest: Origin Validation Security
+    # Subtest: content.js should not use wildcard origin in postMessage
+    ok 1 - content.js should not use wildcard origin in postMessage
+      ---
+      duration_ms: 3.069977
+      type: 'test'
+      ...
+    # Subtest: main-world.js should not use wildcard origin in postMessage
+    ok 2 - main-world.js should not use wildcard origin in postMessage
+      ---
+      duration_ms: 1.123148
+      type: 'test'
+      ...
+    1..2
+ok 46 - Origin Validation Security
+  ---
+  duration_ms: 5.57294
+  type: 'suite'
+  ...
+# Subtest: content.js message handler origin checks
+    # Subtest: should relay JULES_START_CONFIG from the trusted same-origin window
+    ok 1 - should relay JULES_START_CONFIG from the trusted same-origin window
+      ---
+      duration_ms: 2.393243
+      type: 'test'
+      ...
+    # Subtest: should ignore a message from a foreign origin
+    ok 2 - should ignore a message from a foreign origin
+      ---
+      duration_ms: 1.025601
+      type: 'test'
+      ...
+    # Subtest: should ignore a message whose source is not this window
+    ok 3 - should ignore a message whose source is not this window
+      ---
+      duration_ms: 1.0149
+      type: 'test'
+      ...
+    1..3
+ok 47 - content.js message handler origin checks
+  ---
+  duration_ms: 4.735697
+  type: 'suite'
+  ...
+# Subtest: main-world.js message handler origin checks
+    # Subtest: should re-broadcast config for a trusted same-origin request
+    ok 1 - should re-broadcast config for a trusted same-origin request
+      ---
+      duration_ms: 1.180206
+      type: 'test'
+      ...
+    # Subtest: should not broadcast for a foreign-origin request
+    ok 2 - should not broadcast for a foreign-origin request
+      ---
+      duration_ms: 1.046792
+      type: 'test'
+      ...
+    # Subtest: should not broadcast for a request from a different window
+    ok 3 - should not broadcast for a request from a different window
+      ---
+      duration_ms: 1.084772
+      type: 'test'
+      ...
+    1..3
+ok 48 - main-world.js message handler origin checks
+  ---
+  duration_ms: 3.738985
+  type: 'suite'
+  ...
+# Subtest: Orchestrator Performance Optimization
+    # Subtest: processSuggestionsForTab should start multiple suggestions
+    ok 1 - processSuggestionsForTab should start multiple suggestions
+      ---
+      duration_ms: 9.766462
+      type: 'test'
+      ...
+    # Subtest: executeArchive (internal loop) should archive multiple tasks
+    ok 2 - executeArchive (internal loop) should archive multiple tasks
+      ---
+      duration_ms: 4.681731
+      type: 'test'
+      ...
+    1..2
+ok 49 - Orchestrator Performance Optimization
+  ---
+  duration_ms: 16.182323
+  type: 'suite'
+  ...
+# Subtest: Throttling Optimization
+    # Subtest: processTab should throttle updateState calls
+    ok 1 - processTab should throttle updateState calls
+      ---
+      duration_ms: 7.313207
+      type: 'test'
+      ...
+    1..1
+ok 50 - Throttling Optimization
+  ---
+  duration_ms: 7.546549
+  type: 'suite'
+  ...
+# Subtest: setActiveOpMode
+    # Subtest: should toggle active class and aria-pressed on buttons
+    ok 1 - should toggle active class and aria-pressed on buttons
+      ---
+      duration_ms: 3.551647
+      type: 'test'
+      ...
+    # Subtest: should handle progressive disclosure (showing/hiding settings)
+    ok 2 - should handle progressive disclosure (showing/hiding settings)
+      ---
+      duration_ms: 1.061234
+      type: 'test'
+      ...
+    1..2
+ok 51 - setActiveOpMode
+  ---
+  duration_ms: 6.805373
+  type: 'suite'
+  ...
+# Subtest: renderState
+    # Subtest: should update log and progress bar when running
+    ok 1 - should update log and progress bar when running
+      ---
+      duration_ms: 1.627343
+      type: 'test'
+      ...
+    # Subtest: should handle done state correctly
+    ok 2 - should handle done state correctly
+      ---
+      duration_ms: 1.320036
+      type: 'test'
+      ...
+    # Subtest: should handle error state correctly
+    ok 3 - should handle error state correctly
+      ---
+      duration_ms: 1.082766
+      type: 'test'
+      ...
+    1..3
+ok 52 - renderState
+  ---
+  duration_ms: 4.409038
+  type: 'suite'
+  ...
+# Subtest: renderSummary
+    # Subtest: should render an empty state message when no results are processed
+    ok 1 - should render an empty state message when no results are processed
+      ---
+      duration_ms: 2.386965
+      type: 'test'
+      ...
+    # Subtest: should create elements for each result and a total
+    ok 2 - should create elements for each result and a total
+      ---
+      duration_ms: 1.152108
+      type: 'test'
+      ...
+    1..2
+ok 53 - renderSummary
+  ---
+  duration_ms: 3.97192
+  type: 'suite'
+  ...
+# Subtest: Initialization and Storage
+    # Subtest: should migrate ghToken from sync to local storage during init
+    ok 1 - should migrate ghToken from sync to local storage during init
+      ---
+      duration_ms: 11.61775
+      type: 'test'
+      ...
+    1..1
+ok 54 - Initialization and Storage
+  ---
+  duration_ms: 12.070301
+  type: 'suite'
+  ...
+# Subtest: Button Event Handlers
+    # Subtest: should send START message when startBtn is clicked
+    ok 1 - should send START message when startBtn is clicked
+      ---
+      duration_ms: 1.776193
+      type: 'test'
+      ...
+    # Subtest: should send RESET message when resetBtn is clicked
+    ok 2 - should send RESET message when resetBtn is clicked
+      ---
+      duration_ms: 1.324327
+      type: 'test'
+      ...
+    # Subtest: should move keyboard focus to startBtn after reset
+    ok 3 - should move keyboard focus to startBtn after reset
+      ---
+      duration_ms: 1.031665
+      type: 'test'
+      ...
+    1..3
+ok 55 - Button Event Handlers
+  ---
+  duration_ms: 4.335446
+  type: 'suite'
+  ...
+# Subtest: popup.html accessibility
+    # Subtest: should link the GitHub token input to its hint via aria-describedby
+    ok 1 - should link the GitHub token input to its hint via aria-describedby
+      ---
+      duration_ms: 0.200618
+      type: 'test'
+      ...
+    # Subtest: should use explicit visible labels for radio groups via aria-labelledby
+    ok 2 - should use explicit visible labels for radio groups via aria-labelledby
+      ---
+      duration_ms: 0.174381
+      type: 'test'
+      ...
+    1..2
+ok 56 - popup.html accessibility
+  ---
+  duration_ms: 0.49235
+  type: 'suite'
+  ...
+# Subtest: updateOpModeUI details
+    # Subtest: should update startBtn text based on opMode and dryRun (Archive/Dry)
+    ok 1 - should update startBtn text based on opMode and dryRun (Archive/Dry)
+      ---
+      duration_ms: 1.001677
+      type: 'test'
+      ...
+    # Subtest: should update startBtn text based on opMode and dryRun (Archive/Live)
+    ok 2 - should update startBtn text based on opMode and dryRun (Archive/Live)
+      ---
+      duration_ms: 0.936171
+      type: 'test'
+      ...
+    # Subtest: should update startBtn text based on opMode and dryRun (Suggestions/Dry)
+    ok 3 - should update startBtn text based on opMode and dryRun (Suggestions/Dry)
+      ---
+      duration_ms: 1.275081
+      type: 'test'
+      ...
+    # Subtest: should update startBtn text based on opMode and dryRun (Suggestions/Live)
+    ok 4 - should update startBtn text based on opMode and dryRun (Suggestions/Live)
+      ---
+      duration_ms: 2.04202
+      type: 'test'
+      ...
+    # Subtest: should NOT update startBtn text when button is disabled
+    ok 5 - should NOT update startBtn text when button is disabled
+      ---
+      duration_ms: 2.445448
+      type: 'test'
+      ...
+    1..5
+ok 57 - updateOpModeUI details
+  ---
+  duration_ms: 8.018758
+  type: 'suite'
+  ...
+# Subtest: updateOpModeUI direct calls
+    # Subtest: should toggle classes and aria attributes directly
+    ok 1 - should toggle classes and aria attributes directly
+      ---
+      duration_ms: 2.867866
+      type: 'test'
+      ...
+    1..1
+ok 58 - updateOpModeUI direct calls
+  ---
+  duration_ms: 3.235498
+  type: 'suite'
+  ...
+# Subtest: Security: ghToken Storage Cleanup
+    # Subtest: should cleanup ghToken from sync storage during initialization
+    ok 1 - should cleanup ghToken from sync storage during initialization
+      ---
+      duration_ms: 2.90827
+      type: 'test'
+      ...
+    # Subtest: should ensure startBtn click handler removes ghToken from sync
+    ok 2 - should ensure startBtn click handler removes ghToken from sync
+      ---
+      duration_ms: 0.273603
+      type: 'test'
+      ...
+    1..2
+ok 59 - Security: ghToken Storage Cleanup
+  ---
+  duration_ms: 4.344181
+  type: 'suite'
+  ...
+# Subtest: ensureContentScript Security
+    # Subtest: should throw Security Error if frame URL is missing
+    ok 1 - should throw Security Error if frame URL is missing
+      ---
+      duration_ms: 3.940304
+      type: 'test'
+      ...
+    # Subtest: should throw Security Error if URL is malformed
+    ok 2 - should throw Security Error if URL is malformed
+      ---
+      duration_ms: 2.726704
+      type: 'test'
+      ...
+    # Subtest: should throw Security Error if URL has a tricky foreign origin
+    ok 3 - should throw Security Error if URL has a tricky foreign origin
+      ---
+      duration_ms: 1.25386
+      type: 'test'
+      ...
+    # Subtest: should block injection into non-Jules origin
+    ok 4 - should block injection into non-Jules origin
+      ---
+      duration_ms: 1.351161
+      type: 'test'
+      ...
+    # Subtest: should pin execution to documentId to prevent TOCTOU
+    ok 5 - should pin execution to documentId to prevent TOCTOU
+      ---
+      duration_ms: 101.892659
+      type: 'test'
+      ...
+    # Subtest: should allow injection into valid Jules origin
+    ok 6 - should allow injection into valid Jules origin
+      ---
+      duration_ms: 102.428647
+      type: 'test'
+      ...
+    1..6
+ok 60 - ensureContentScript Security
+  ---
+  duration_ms: 214.638671
+  type: 'suite'
+  ...
+# Subtest: jFetch SSRF Security
+    # Subtest: should block requests to unauthorized origins
+    ok 1 - should block requests to unauthorized origins
+      ---
+      duration_ms: 1.847756
+      type: 'test'
+      ...
+    # Subtest: should allow requests to jules.google.com and api.github.com
+    ok 2 - should allow requests to jules.google.com and api.github.com
+      ---
+      duration_ms: 1.795206
+      type: 'test'
+      ...
+    # Subtest: should block sending token to non-GitHub origin
+    ok 3 - should block sending token to non-GitHub origin
+      ---
+      duration_ms: 1.628466
+      type: 'test'
+      ...
+    1..3
+ok 61 - jFetch SSRF Security
+  ---
+  duration_ms: 5.658934
+  type: 'suite'
+  ...
+# Subtest: getTabConfig Path Traversal Security
+    # Subtest: should validate accountNum to prevent path traversal
+    ok 1 - should validate accountNum to prevent path traversal
+      ---
+      duration_ms: 2.079577
+      type: 'test'
+      ...
+    1..1
+ok 62 - getTabConfig Path Traversal Security
+  ---
+  duration_ms: 2.206845
+  type: 'suite'
+  ...
+# Subtest: Orchestrator Privilege Escalation Security
+    # Subtest: should reject privileged actions from content scripts
+    ok 1 - should reject privileged actions from content scripts
+      ---
+      duration_ms: 1.350445
+      type: 'test'
+      ...
+    # Subtest: should allow unprivileged actions from content scripts
+    ok 2 - should allow unprivileged actions from content scripts
+      ---
+      duration_ms: 2.028434
+      type: 'test'
+      ...
+    1..2
+ok 63 - Orchestrator Privilege Escalation Security
+  ---
+  duration_ms: 3.545021
+  type: 'suite'
+  ...
+1..63
+# tests 234
+# suites 64
+# pass 232
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1642.713307
+ ELIFECYCLE  Test failed. See above for more details.
+ WARN   Local package.json exists, but node_modules missing, did you mean to install?
