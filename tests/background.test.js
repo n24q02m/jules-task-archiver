@@ -1509,6 +1509,14 @@ describe('jFetch', () => {
     const res = await sandbox.test_jFetch('https://jules.google.com/api/test')
     assert.strictEqual(res, mockResponse)
   })
+  it('should throw an error when GitHub token is sent to a non-GitHub origin', async () => {
+    const { sandbox } = setupEnvironment()
+
+    await assert.rejects(() => sandbox.test_jFetch('https://jules.google.com/api/test', { token: 'secret' }), {
+      name: 'Error',
+      message: 'Security Error: Refusing to send GitHub token to non-GitHub origin'
+    })
+  })
 
   it('should throw an error for disallowed fetch origins', async () => {
     const { sandbox } = setupEnvironment()
@@ -1535,6 +1543,24 @@ describe('jFetch', () => {
       name: 'Error',
       message: 'Invalid token: contains newline'
     })
+  })
+
+  it('should throw an error for various non-OK HTTP status codes', async () => {
+    const { sandbox } = setupEnvironment()
+    const statusCodes = [401, 403, 429, 503]
+
+    for (const status of statusCodes) {
+      sandbox.fetch = async () => ({
+        ok: false,
+        status,
+        statusText: 'Error'
+      })
+
+      await assert.rejects(() => sandbox.test_jFetch('https://jules.google.com/api/test'), {
+        name: 'Error',
+        message: `HTTP ${status}`
+      })
+    }
   })
 
   it('should include Authorization header when token is provided', async () => {

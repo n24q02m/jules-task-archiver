@@ -1,0 +1,45 @@
+<<<<<<< SEARCH
+  it('should include Authorization header when token is provided', async () => {
+    const { sandbox } = setupEnvironment()
+    it('should throw an error for various non-OK HTTP status codes', async () => {
+      const { sandbox } = setupEnvironment()
+      const statusCodes = [401, 403, 429, 503]
+
+      for (const status of statusCodes) {
+        sandbox.fetch = async () => ({
+          ok: false,
+          status,
+          statusText: 'Error'
+        })
+
+        await assert.rejects(() => sandbox.test_jFetch('https://jules.google.com/api/test'), {
+          name: 'Error',
+          message: `HTTP ${status}`
+        })
+      }
+    })
+
+    let capturedHeaders = null
+=======
+  it('should throw an error for various non-OK HTTP status codes', async () => {
+    const { sandbox } = setupEnvironment()
+    const statusCodes = [401, 403, 429, 503]
+
+    for (const status of statusCodes) {
+      sandbox.fetch = async () => ({
+        ok: false,
+        status,
+        statusText: 'Error'
+      })
+
+      await assert.rejects(() => sandbox.test_jFetch('https://jules.google.com/api/test'), {
+        name: 'Error',
+        message: `HTTP ${status}`
+      })
+    }
+  })
+
+  it('should include Authorization header when token is provided', async () => {
+    const { sandbox } = setupEnvironment()
+    let capturedHeaders = null
+>>>>>>> REPLACE
