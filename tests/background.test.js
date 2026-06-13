@@ -1916,9 +1916,19 @@ describe('safeListTasks', () => {
       ['task-1', 'Title 1', null, null, 'github/owner/repo', 2],
       ['task-2', 'Title 2', null, null, 'github/owner/repo2', 4]
     ]
-    sandbox.callBatchExecute = async () => [mockTasks]
+    let capturedArgs = null
+    sandbox.callBatchExecute = async (id, payload, config) => {
+      capturedArgs = { id, payload, config }
+      return [mockTasks]
+    }
 
-    const result = await sandbox.test_safeListTasks('test-label', {})
+    const result = await sandbox.test_safeListTasks('test-label', { at: 'test-token' })
+
+    // Verify callBatchExecute was called correctly by listTasks
+    assert.strictEqual(capturedArgs.id, 'p1Takd')
+    assert.strictEqual(JSON.stringify(capturedArgs.payload), JSON.stringify(['', 4]))
+    assert.strictEqual(capturedArgs.config.at, 'test-token')
+
     assert.strictEqual(result.length, 2)
     assert.strictEqual(result[0].id, 'task-1')
     assert.strictEqual(result[1].id, 'task-2')
@@ -1936,7 +1946,8 @@ describe('safeListTasks', () => {
 
   it('should return null and log error when listTasks throws', async () => {
     const { sandbox } = setupEnvironment()
-    sandbox.callBatchExecute = async () => {
+    // Mock listTasks directly to test safeListTasks in isolation
+    sandbox.listTasks = async () => {
       throw new Error('Network error')
     }
 
@@ -1954,15 +1965,30 @@ describe('safeListSources', () => {
       ['github/owner/repo', null, null, null, null, [true, true, [2], [true]]],
       ['github/owner/repo2', null, null, null, null, [true, true, [2], [true]]]
     ]
-    sandbox.callBatchExecute = async () => [mockSources]
+    let capturedArgs = null
+    sandbox.callBatchExecute = async (id, payload, config) => {
+      capturedArgs = { id, payload, config }
+      return [mockSources]
+    }
 
-    const result = await sandbox.test_safeListSources('test-label', {})
+    const result = await sandbox.test_safeListSources('test-label', { at: 'test-token' })
+
+    // Verify callBatchExecute was called correctly by listSuggestionEnabledSources
+    assert.strictEqual(capturedArgs.id, 'YqkSHd')
+    assert.strictEqual(
+      JSON.stringify(capturedArgs.payload),
+      JSON.stringify([null, 'source_status=SOURCE_STATUS_ACTIVE'])
+    )
+    assert.strictEqual(capturedArgs.config.at, 'test-token')
+
     assert.strictEqual(result.length, 2)
-    assert.deepStrictEqual(result, ['github/owner/repo', 'github/owner/repo2'])
+    // Use JSON.stringify for robust cross-VM array comparison
+    assert.strictEqual(JSON.stringify(result), JSON.stringify(['github/owner/repo', 'github/owner/repo2']))
   })
 
   it('should return null and log message when no repos have Suggestions enabled', async () => {
     const { sandbox } = setupEnvironment()
+    // Returns an empty array of sources
     sandbox.callBatchExecute = async () => [[]]
 
     const result = await sandbox.test_safeListSources('test-label', {})
@@ -1973,7 +1999,8 @@ describe('safeListSources', () => {
 
   it('should return null and log error when listSuggestionEnabledSources throws', async () => {
     const { sandbox } = setupEnvironment()
-    sandbox.callBatchExecute = async () => {
+    // Mock listSuggestionEnabledSources directly to test safeListSources in isolation
+    sandbox.listSuggestionEnabledSources = async () => {
       throw new Error('API error')
     }
 
@@ -1981,6 +2008,22 @@ describe('safeListSources', () => {
     assert.strictEqual(result, null)
     const state = sandbox.test_state()
     assert.ok(state.log.some((l) => l.includes('[test-label] ERROR listing sources: API error')))
+  })
+
+  it('should return null when all found sources are filtered out', async () => {
+    const { sandbox } = setupEnvironment()
+    const mockSources = [
+      // Suggestions disabled (code 1)
+      ['github/owner/repo', null, null, null, null, [true, true, [1], [true]]],
+      // Not a github source
+      ['gitlab/owner/repo', null, null, null, null, [true, true, [2], [true]]]
+    ]
+    sandbox.callBatchExecute = async () => [mockSources]
+
+    const result = await sandbox.test_safeListSources('test-label', {})
+    assert.strictEqual(result, null)
+    const state = sandbox.test_state()
+    assert.ok(state.log.some((l) => l.includes('[test-label] No repos have Suggestions enabled.')))
   })
 })
 
