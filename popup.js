@@ -50,7 +50,7 @@ function updateOpModeUI(value) {
   // Progressive disclosure: hide archive-specific settings
   const isArchive = value === 'archive'
   const settingsSection = document.querySelector('.settings')
-  const forceCheckboxContainer = forceCheckbox.closest('.setting-row')
+  const forceCheckboxContainer = forceCheckbox?.closest('.setting-row')
 
   if (settingsSection) {
     settingsSection.style.display = isArchive ? 'block' : 'none'
@@ -60,7 +60,7 @@ function updateOpModeUI(value) {
   }
 
   // Context-aware start button text
-  if (!startBtn.disabled) {
+  if (startBtn && !startBtn.disabled) {
     const modeRadio = document.querySelector('input[name="mode"]:checked')
     const isDry = modeRadio && modeRadio.value === 'dry'
     if (isArchive) {

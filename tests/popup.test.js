@@ -515,3 +515,98 @@ describe('updateOpModeUI direct calls', () => {
     assert.strictEqual(opModeButtons[1].getAttribute('aria-pressed'), 'true')
   })
 })
+
+describe('getRunningText', () => {
+  it('should return correct text for Archive mode', () => {
+    const { sandbox, radioStates } = setupPopupSandbox()
+    vm.runInContext(popupJs, sandbox)
+
+    sandbox.setActiveOpMode('archive')
+
+    radioStates.mode = 'dry'
+    assert.strictEqual(sandbox.getRunningText(), '⏳ Dry Running Archive...')
+
+    radioStates.mode = 'run'
+    assert.strictEqual(sandbox.getRunningText(), '⏳ Running Archive...')
+  })
+
+  it('should return correct text for Suggestions mode', () => {
+    const { sandbox, radioStates } = setupPopupSandbox()
+    vm.runInContext(popupJs, sandbox)
+
+    sandbox.setActiveOpMode('suggestions')
+
+    radioStates.mode = 'dry'
+    assert.strictEqual(sandbox.getRunningText(), '⏳ Dry Running Suggestions...')
+
+    radioStates.mode = 'run'
+    assert.strictEqual(sandbox.getRunningText(), '⏳ Running Suggestions...')
+  })
+})
+
+describe('UI events', () => {
+  it('should update button text when execution mode radio changes', () => {
+    const syncStorage = {}
+    const localStorage = {}
+    const sessionStorage = {}
+    const radioStates = { mode: 'dry', scope: 'all' }
+    const listeners = { storage: [], runtime: [] }
+
+    const elements = {
+      '#startBtn': createMockElement('button'),
+      '#ghOwner': createMockElement('input'),
+      '#ghToken': createMockElement('input'),
+      '#force': createMockElement('input'),
+      '#resetBtn': createMockElement('button'),
+      '#progressSection': createMockElement('section'),
+      '#summarySection': createMockElement('section'),
+      '#currentInfo': createMockElement('div'),
+      '#progressFill': createMockElement('div'),
+      '#log': createMockElement('pre'),
+      '#summary': createMockElement('div'),
+      '.settings': createMockElement('section')
+    }
+
+    elements['#force'].closest = () => createMockElement()
+
+    const opModeButtons = [
+      createMockElement('button', { dataset: { value: 'archive' } }),
+      createMockElement('button', { dataset: { value: 'suggestions' } })
+    ]
+
+    const modeRadios = [createMockElement('input', { value: 'dry' }), createMockElement('input', { value: 'run' })]
+
+    const document = {
+      querySelector: (sel) => {
+        if (sel === 'input[name="mode"]:checked') return { value: radioStates.mode }
+        return elements[sel] || createMockElement()
+      },
+      querySelectorAll: (sel) => {
+        if (sel === 'input[name="mode"]') return { forEach: (cb) => modeRadios.forEach(cb) }
+        if (sel === '#opMode button') return { forEach: (cb) => opModeButtons.forEach(cb) }
+        return { forEach: () => {} }
+      }
+    }
+
+    const sandbox = {
+      chrome: createMockChrome(syncStorage, localStorage, sessionStorage, listeners),
+      document,
+      console,
+      setTimeout,
+      setInterval,
+      clearInterval,
+      Math,
+      String,
+      Array,
+      Object
+    }
+    vm.createContext(sandbox)
+    vm.runInContext(popupJs, sandbox)
+
+    sandbox.setActiveOpMode('archive')
+    radioStates.mode = 'run'
+    modeRadios[1].dispatchEvent('change')
+
+    assert.strictEqual(elements['#startBtn'].textContent, 'Start Archiving')
+  })
+})
