@@ -269,4 +269,24 @@ describe('main-world.js', () => {
     vm.runInContext(mainWorldJs, sandbox)
     assert.strictEqual(windowMock.fetch, firstFetch, 'Fetch should not be wrapped again')
   })
+
+  it('should broadcastConfig correctly when called directly', () => {
+    const { sandbox, messages, windowMock } = setupSandbox({
+      SNlM0e: 'initial-at'
+    })
+
+    vm.runInContext(mainWorldJs, sandbox)
+    assert.strictEqual(messages.length, 1) // Initial call
+
+    // Update global data
+    windowMock.WIZ_global_data.SNlM0e = 'updated-at'
+    windowMock.WIZ_global_data.cfb2h = 'new-bl'
+
+    // Call broadcastConfig directly
+    vm.runInContext('broadcastConfig()', sandbox)
+
+    assert.strictEqual(messages.length, 2)
+    assert.strictEqual(messages[1].data.config.at, 'updated-at')
+    assert.strictEqual(messages[1].data.config.bl, 'new-bl')
+  })
 })
