@@ -894,8 +894,16 @@ describe('getOpenPRs', () => {
     prs = await sandbox.test_getOpenPRs('owner', undefined, null)
     assert.strictEqual(prs.length, 0)
 
+    // Test null repo
+    prs = await sandbox.test_getOpenPRs('owner', null, null)
+    assert.strictEqual(prs.length, 0)
+
     // Test number repo
     prs = await sandbox.test_getOpenPRs('owner', 123, null)
+    assert.strictEqual(prs.length, 0)
+
+    // Test object owner
+    prs = await sandbox.test_getOpenPRs({}, 'repo', null)
     assert.strictEqual(prs.length, 0)
   })
 })
