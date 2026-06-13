@@ -3,6 +3,7 @@ const assert = require('node:assert')
 const fs = require('node:fs')
 const path = require('node:path')
 const vm = require('node:vm')
+const { createMockChrome, createMockDocument } = require('./mocks')
 
 // --- ghToken Storage Cleanup Tests ---
 describe('Security: ghToken Storage Cleanup', () => {
@@ -14,75 +15,28 @@ describe('Security: ghToken Storage Cleanup', () => {
     const syncRemoved = []
     const syncSet = []
     const localSet = []
+    const listeners = { storage: [], runtime: [] }
 
-    const chrome = {
-      storage: {
-        sync: {
-          get: (keys, cb) => {
-            const res = {}
-            keys.forEach((k) => {
-              if (syncStorage[k] !== undefined) res[k] = syncStorage[k]
-            })
-            cb(res)
-          },
-          set: (obj) => {
-            Object.assign(syncStorage, obj)
-            syncSet.push(obj)
-          },
-          remove: (key) => {
-            delete syncStorage[key]
-            syncRemoved.push(key)
-          }
-        },
-        local: {
-          get: (keys, cb) => {
-            const res = {}
-            keys.forEach((k) => {
-              if (localStorage[k] !== undefined) res[k] = localStorage[k]
-            })
-            cb(res)
-          },
-          set: (obj, cb) => {
-            Object.assign(localStorage, obj)
-            localSet.push(obj)
-            if (cb) cb()
-          }
-        },
-        onChanged: {
-          addListener: () => {}
-        }
-      },
-      runtime: {
-        sendMessage: () => {},
-        onMessage: {
-          addListener: () => {}
-        }
-      },
-      tabs: {
-        query: () => {}
-      }
+    const chrome = createMockChrome(syncStorage, localStorage, {}, listeners)
+
+    // Overload remove and set to track calls for assertions in this test file
+    const originalSyncRemove = chrome.storage.sync.remove
+    chrome.storage.sync.remove = (key, cb) => {
+      syncRemoved.push(key)
+      originalSyncRemove(key, cb)
+    }
+    const originalSyncSet = chrome.storage.sync.set
+    chrome.storage.sync.set = (obj, cb) => {
+      syncSet.push(obj)
+      originalSyncSet(obj, cb)
+    }
+    const originalLocalSet = chrome.storage.local.set
+    chrome.storage.local.set = (obj, cb) => {
+      localSet.push(obj)
+      originalLocalSet(obj, cb)
     }
 
-    const document = {
-      querySelector: () => ({
-        addEventListener: () => {},
-        querySelectorAll: () => [],
-        appendChild: () => {},
-        dataset: {},
-        classList: { toggle: () => {} },
-        setAttribute: () => {},
-        removeAttribute: () => {},
-        style: {},
-        parentElement: {}
-      }),
-      querySelectorAll: () => ({
-        forEach: () => {}
-      }),
-      createElement: () => ({
-        appendChild: () => {}
-      })
-    }
-
+    const document = createMockDocument()
     const sandbox = { chrome, document, console, setTimeout, setInterval, clearInterval }
     vm.createContext(sandbox)
 
