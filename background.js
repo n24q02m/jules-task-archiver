@@ -299,12 +299,16 @@ function isSuggestionEnabled(row) {
   return Array.isArray(block) && Array.isArray(block[2]) && block[2][0] === SUGGESTION_TOGGLE_ON
 }
 
+// ⚡ Bolt Optimization: Pre-compute and cache the lowercased title during parsing.
+// This prevents O(M*N) lowercasing overhead later when checking M tasks against N open PRs.
 function parseTask(raw) {
   const source = raw[TASK.SOURCE] || ''
   const parts = source.split('/')
+  const title = raw[TASK.DISPLAY_TITLE] || raw[TASK.SHORT_TITLE] || '(untitled)'
   return {
     id: raw[TASK.ID],
-    title: raw[TASK.DISPLAY_TITLE] || raw[TASK.SHORT_TITLE] || '(untitled)',
+    title,
+    titleLower: title.toLowerCase(),
     source,
     state: raw[TASK.STATE],
     statusCode: raw[TASK.STATUS_CODE],
@@ -803,9 +807,9 @@ async function getOpenPRs(owner, repo, token) {
 
 function taskHasOpenPR(task, openPRs) {
   if (openPRs.length === 0) return false
-  const taskTitle = (task.title || '').toLowerCase()
-  if (!taskTitle || taskTitle === '(untitled)') return false
-  return openPRs.some((pr) => pr.titleLower.includes(taskTitle) || taskTitle.includes(pr.titleLower))
+  const taskTitleLower = task.titleLower || (task.title || '').toLowerCase()
+  if (!taskTitleLower || taskTitleLower === '(untitled)') return false
+  return openPRs.some((pr) => pr.titleLower.includes(taskTitleLower) || taskTitleLower.includes(pr.titleLower))
 }
 
 // =============================================================================
