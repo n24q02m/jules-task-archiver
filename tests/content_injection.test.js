@@ -26,6 +26,7 @@ describe('content.js script injection', () => {
           scriptCreated = {
             src: '',
             onload: null,
+            onerror: null,
             remove: () => {
               removed = true
             }
@@ -77,6 +78,56 @@ describe('content.js script injection', () => {
     assert.strictEqual(removed, true, 'Script should be removed after onload')
   })
 
+  it('should remove script on error', () => {
+    let removed = false
+    let scriptCreated = null
+
+    const chrome = {
+      runtime: {
+        getURL: (p) => `chrome-extension://id/${p}`,
+        onMessage: { addListener: () => {} }
+      }
+    }
+
+    const document = {
+      createElement: (tag) => {
+        if (tag === 'script') {
+          scriptCreated = {
+            src: '',
+            onload: null,
+            onerror: null,
+            remove: () => {
+              removed = true
+            }
+          }
+          return scriptCreated
+        }
+      },
+      head: { appendChild: () => {} },
+      documentElement: { appendChild: () => {} }
+    }
+
+    const sandbox = {
+      chrome,
+      document,
+      window: { addEventListener: () => {}, location: { origin: 'https://example.com' } },
+      console,
+      setTimeout,
+      clearTimeout,
+      Date,
+      Promise,
+      URL,
+      location: { origin: 'https://example.com' }
+    }
+
+    vm.createContext(sandbox)
+    vm.runInContext(contentJsCode, sandbox)
+
+    assert.strictEqual(removed, false)
+    scriptCreated.onerror()
+    assert.strictEqual(removed, true, 'Script should be removed after onerror')
+  })
+
   it('should fallback to documentElement if document.head is missing', () => {
     let scriptCreated = null
     let appendedTo = null
@@ -94,6 +145,7 @@ describe('content.js script injection', () => {
           scriptCreated = {
             src: '',
             onload: null,
+            onerror: null,
             remove: () => {}
           }
           return scriptCreated
@@ -132,6 +184,78 @@ describe('content.js script injection', () => {
     assert.strictEqual(appendedTo, 'documentElement', 'Should fallback to documentElement')
   })
 
+  it('should not throw if both head and documentElement are missing', () => {
+    const chrome = {
+      runtime: {
+        getURL: (p) => `chrome-extension://id/${p}`,
+        onMessage: { addListener: () => {} }
+      }
+    }
+
+    const document = {
+      createElement: (_tag) => ({ src: '', onload: null, onerror: null, remove: () => {} }),
+      head: null,
+      documentElement: null
+    }
+
+    const sandbox = {
+      chrome,
+      document,
+      window: { addEventListener: () => {}, location: { origin: 'https://example.com' } },
+      console,
+      setTimeout,
+      clearTimeout,
+      Date,
+      Promise,
+      URL,
+      location: { origin: 'https://example.com' }
+    }
+
+    vm.createContext(sandbox)
+    // Should not throw
+    vm.runInContext(contentJsCode, sandbox)
+  })
+
+  it('should catch and log errors during injection', () => {
+    let loggedError = false
+    const chrome = {
+      runtime: {
+        getURL: (p) => `chrome-extension://id/${p}`,
+        onMessage: { addListener: () => {} }
+      }
+    }
+
+    const document = {
+      createElement: () => {
+        throw new Error('DOM Exception')
+      }
+    }
+
+    const sandbox = {
+      chrome,
+      document,
+      window: { addEventListener: () => {}, location: { origin: 'https://example.com' } },
+      console: {
+        ...console,
+        error: (msg, err) => {
+          if (msg.includes('Jules: Failed to inject') && err.message === 'DOM Exception') {
+            loggedError = true
+          }
+        }
+      },
+      setTimeout,
+      clearTimeout,
+      Date,
+      Promise,
+      URL,
+      location: { origin: 'https://example.com' }
+    }
+
+    vm.createContext(sandbox)
+    vm.runInContext(contentJsCode, sandbox)
+    assert.strictEqual(loggedError, true, 'Should have logged the injection error')
+  })
+
   it('should allow manual reinjection via test_injectMainWorldScript in TEST_MODE', () => {
     let scriptCreatedCount = 0
 
@@ -146,7 +270,7 @@ describe('content.js script injection', () => {
       createElement: (tag) => {
         if (tag === 'script') {
           scriptCreatedCount++
-          return { src: '', onload: null, remove: () => {} }
+          return { src: '', onload: null, onerror: null, remove: () => {} }
         }
       },
       head: { appendChild: () => {} },

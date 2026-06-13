@@ -11,10 +11,18 @@ let cachedConfig = null
 
 // Inject main-world.js into the page to access variables
 function injectMainWorldScript() {
-  const script = document.createElement('script')
-  script.src = chrome.runtime.getURL('main-world.js')
-  script.onload = () => script.remove()
-  ;(document.head || document.documentElement).appendChild(script)
+  try {
+    const script = document.createElement('script')
+    script.src = chrome.runtime.getURL('main-world.js')
+    script.onload = () => script.remove()
+    script.onerror = () => script.remove()
+    const target = document.head || document.documentElement
+    if (target) {
+      target.appendChild(script)
+    }
+  } catch (e) {
+    console.error('Jules: Failed to inject main-world script', e)
+  }
 }
 injectMainWorldScript()
 
