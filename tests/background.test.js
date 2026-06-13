@@ -176,9 +176,39 @@ describe('listTasks', () => {
     const { sandbox } = setupEnvironment()
     // Override the internal callBatchExecute with a mock that returns []
     sandbox.callBatchExecute = async () => []
-
     const tasks = await sandbox.test_listTasks('filter', {})
     assert.strictEqual(JSON.stringify(tasks), '[]')
+  })
+
+  it('should return parsed tasks when callBatchExecute returns valid data', async () => {
+    const { sandbox } = setupEnvironment()
+    const mockRawTasks = [
+      ['task-1', 'Title 1', null, null, 'github/owner/repo', 2],
+      ['task-2', 'Title 2', null, null, 'github/owner/repo2', 4]
+    ]
+    sandbox.callBatchExecute = async () => [mockRawTasks]
+
+    const tasks = await sandbox.test_listTasks('', {})
+    assert.strictEqual(tasks.length, 2)
+    assert.strictEqual(tasks[0].id, 'task-1')
+    assert.strictEqual(tasks[0].repo, 'owner/repo')
+    assert.strictEqual(tasks[1].id, 'task-2')
+  })
+
+  it('should pass filter and config to callBatchExecute', async () => {
+    const { sandbox } = setupEnvironment()
+    let captured = null
+    sandbox.callBatchExecute = async (rpcId, payload, config) => {
+      captured = { rpcId, payload, config }
+      return [[]]
+    }
+
+    const config = { at: 'token' }
+    await sandbox.test_listTasks('my-filter', config)
+
+    assert.strictEqual(captured.rpcId, 'p1Takd')
+    assert.strictEqual(JSON.stringify(captured.payload), JSON.stringify(['my-filter', 4]))
+    assert.strictEqual(captured.config, config)
   })
 })
 
@@ -1922,6 +1952,24 @@ describe('safeListTasks', () => {
     assert.strictEqual(result.length, 2)
     assert.strictEqual(result[0].id, 'task-1')
     assert.strictEqual(result[1].id, 'task-2')
+  })
+
+  it('should pass empty filter and config to listTasks', async () => {
+    const { sandbox } = setupEnvironment()
+    const mockTasks = [['task-1', 'Title 1', null, null, 'github/owner/repo', 2]]
+    const config = { at: 'token' }
+    let capturedPayload = null
+    let capturedConfig = null
+    sandbox.callBatchExecute = async (_rpcId, payload, conf) => {
+      capturedPayload = payload
+      capturedConfig = conf
+      return [mockTasks]
+    }
+
+    const result = await sandbox.test_safeListTasks('test-label', config)
+    assert.strictEqual(result.length, 1)
+    assert.strictEqual(JSON.stringify(capturedPayload), JSON.stringify(['', 4]))
+    assert.strictEqual(capturedConfig, config)
   })
 
   it('should return null and log message when listTasks returns an empty array', async () => {
