@@ -5,8 +5,5 @@
   "main": "background.js",
   "scripts": {
     "test": "node --test"
-  },
-  "dependencies": {
-    "playwright": "^1.60.0"
   }
 }
