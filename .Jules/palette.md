@@ -31,3 +31,6 @@
 ## 2026-06-09 - Empty State Feedback
 **Learning:** When a list or process finishes with zero results, an empty summary container gives no feedback, leaving the user wondering if it actually ran or failed silently.
 **Action:** Always provide a helpful empty state message explaining why no results might have occurred, using styles consistent with other hints to offer guidance without showing as an error.
+## 2026-10-26 - Semantic Grouping over ARIA Workarounds
+**Learning:** Prioritizing native semantic HTML (`<fieldset>` and `<legend>`) over generic `<div>` elements with ARIA attributes (`role="radiogroup"`, `aria-labelledby`) for form groups provides more robust accessibility out of the box, reduces markup bloat, and aligns with HTML standards.
+**Action:** Always use `<fieldset>` to group related form controls (like radio buttons or mode selectors) and `<legend>` for their label. If custom styling is needed, reset default browser styles (`border: none`, `margin: 0`, `padding: 0`) rather than resorting to non-semantic wrappers.

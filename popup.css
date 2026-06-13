@@ -85,7 +85,21 @@ input[type="password"]:focus {
   margin-bottom: 8px;
 }
 
-.setting-row label {
+fieldset {
+  border: none;
+  margin: 0;
+  padding: 0;
+}
+
+legend {
+  display: block;
+  font-size: 12px;
+  color: #94a3b8;
+  margin-bottom: 6px;
+}
+
+.setting-row label,
+.setting-row legend {
   margin-bottom: 4px;
 }
 
