@@ -28,13 +28,9 @@ const GLOBAL_CONCURRENCY = 12
 // object allocation overhead while preserving the original strict URL validation.
 const ACCOUNT_NUM_REGEX = /\/u\/(\d+)(?:\/|$)/
 function extractAccountNum(url) {
-  try {
-    const pathname = new URL(url).pathname
-    const match = ACCOUNT_NUM_REGEX.exec(pathname)
-    return match ? match[1] : '0'
-  } catch (_e) {
-    return '0'
-  }
+  if (!url) return '0'
+  const match = ACCOUNT_NUM_REGEX.exec(url)
+  return match ? match[1] : '0'
 }
 
 // =============================================================================
@@ -918,11 +914,13 @@ function stopKeepAlive() {
 
 async function getJulesTabs() {
   const tabs = await chrome.tabs.query({ url: `${JULES_ORIGIN}/*` })
-  return tabs
-    .filter((t) => !t.url.includes('accounts.google'))
-    .map((t) => ({ t, n: parseInt(extractAccountNum(t.url), 10) }))
-    .sort((a, b) => a.n - b.n)
-    .map((obj) => obj.t)
+  const mapped = []
+  for (const t of tabs) {
+    if (!t.url.includes('accounts.google')) {
+      mapped.push({ t, n: parseInt(extractAccountNum(t.url), 10) })
+    }
+  }
+  return mapped.sort((a, b) => a.n - b.n).map((obj) => obj.t)
 }
 
 function getTabLabel(tab) {
