@@ -522,7 +522,12 @@ describe('archiveTaskWithRetry', () => {
         delays.push(ms)
         fn()
       }
-      sandbox.Math.random = () => 0.5 // Constant jitter for testing
+      sandbox.crypto = {
+        getRandomValues: (arr) => {
+          arr[0] = 2147483648 // 0.5 * 4294967296
+          return arr
+        }
+      } // Constant jitter for testing
 
       let calls = 0
       await sandbox.test_withRetry(async () => {
