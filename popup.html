@@ -14,18 +14,18 @@
     <section class="options">
       <h2>Options</h2>
       <div class="setting-row">
-        <label id="opModeLabel">Operation</label>
-        <div class="segmented" id="opMode" role="group" aria-labelledby="opModeLabel">
+        <fieldset class="segmented" id="opMode" aria-labelledby="opModeLabel">
+          <legend id="opModeLabel">Operation</legend>
           <button type="button" data-value="archive" class="active" aria-pressed="true">Archive Tasks</button>
           <button type="button" data-value="suggestions" aria-pressed="false">Start Suggestions</button>
-        </div>
+        </fieldset>
       </div>
       <div class="setting-row">
-        <label id="execModeLabel">Execution Mode</label>
-        <div class="radio-group" role="radiogroup" aria-labelledby="execModeLabel">
+        <fieldset class="radio-group" aria-labelledby="execModeLabel">
+          <legend id="execModeLabel">Execution Mode</legend>
           <label><input type="radio" name="mode" value="dry" checked /> Dry Run</label>
           <label><input type="radio" name="mode" value="run" /> Run</label>
-        </div>
+        </fieldset>
       </div>
       <div class="setting-row">
         <label class="checkbox">
@@ -35,11 +35,11 @@
         <span class="hint" id="forceHint" style="display: block; margin-left: 20px; margin-top: 2px;">Archive every task, ignoring state and matching open Pull Requests</span>
       </div>
       <div class="setting-row">
-        <label id="scopeLabel">Scope</label>
-        <div class="radio-group" role="radiogroup" aria-labelledby="scopeLabel">
+        <fieldset class="radio-group" aria-labelledby="scopeLabel">
+          <legend id="scopeLabel">Scope</legend>
           <label><input type="radio" name="scope" value="current" /> Current tab</label>
           <label><input type="radio" name="scope" value="all" checked /> All Jules tabs</label>
-        </div>
+        </fieldset>
       </div>
     </section>
 
