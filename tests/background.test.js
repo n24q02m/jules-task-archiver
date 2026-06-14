@@ -596,6 +596,7 @@ describe('parseTask', () => {
     const task = sandbox.test_parseTask(raw)
     assert.strictEqual(task.id, '12345')
     assert.strictEqual(task.title, 'Display Title')
+    assert.strictEqual(task.titleLower, 'display title')
     assert.strictEqual(task.source, 'github/owner/repo')
     assert.strictEqual(task.repo, 'owner/repo')
     assert.strictEqual(task.owner, 'owner')
@@ -613,6 +614,7 @@ describe('parseTask', () => {
 
     const task = sandbox.test_parseTask(raw)
     assert.strictEqual(task.title, 'Fallback title')
+    assert.strictEqual(task.titleLower, 'fallback title')
   })
 
   it('should handle missing source gracefully', () => {
@@ -624,6 +626,7 @@ describe('parseTask', () => {
     assert.strictEqual(task.repo, '')
     assert.strictEqual(task.owner, '')
     assert.strictEqual(task.title, '(untitled)')
+    assert.strictEqual(task.titleLower, '(untitled)')
   })
 
   it('should include statusCode from index 25', () => {
@@ -715,7 +718,17 @@ describe('processTab force vs default archiving', () => {
   })
 
   it('default mode skips a terminal task with a matching open PR', async () => {
-    const tasks = [{ id: 'x', title: 'Fix the bug', state: 12, source: 'github/o/r', owner: 'o', repoName: 'r' }]
+    const tasks = [
+      {
+        id: 'x',
+        title: 'Fix the bug',
+        titleLower: 'fix the bug',
+        state: 12,
+        source: 'github/o/r',
+        owner: 'o',
+        repoName: 'r'
+      }
+    ]
     const { sandbox, archived } = setupArchiveEnv(tasks)
     sandbox.getOpenPRs = async () => [{ title: 'Fix the bug', titleLower: 'fix the bug', branch: 'b' }]
     await sandbox.processTab(TAB, { force: false, dryRun: false })
@@ -723,7 +736,17 @@ describe('processTab force vs default archiving', () => {
   })
 
   it('FORCE archives a terminal task even when it has a matching open PR', async () => {
-    const tasks = [{ id: 'x', title: 'Fix the bug', state: 12, source: 'github/o/r', owner: 'o', repoName: 'r' }]
+    const tasks = [
+      {
+        id: 'x',
+        title: 'Fix the bug',
+        titleLower: 'fix the bug',
+        state: 12,
+        source: 'github/o/r',
+        owner: 'o',
+        repoName: 'r'
+      }
+    ]
     const { sandbox, archived } = setupArchiveEnv(tasks)
     sandbox.getOpenPRs = async () => [{ title: 'Fix the bug', titleLower: 'fix the bug', branch: 'b' }]
     await sandbox.processTab(TAB, { force: true, dryRun: false })
@@ -903,7 +926,7 @@ describe('getOpenPRs', () => {
 describe('taskHasOpenPR', () => {
   it('should match when PR title contains task title', () => {
     const { sandbox } = setupEnvironment()
-    const task = { title: 'Fix ReDoS vulnerability' }
+    const task = { title: 'Fix ReDoS vulnerability', titleLower: 'fix redos vulnerability' }
     const prs = [
       {
         title: '[SECURITY] Fix ReDoS vulnerability',
@@ -916,7 +939,7 @@ describe('taskHasOpenPR', () => {
 
   it('should match when task title contains PR title', () => {
     const { sandbox } = setupEnvironment()
-    const task = { title: 'Unused return value from loadAllTasks' }
+    const task = { title: 'Unused return value from loadAllTasks', titleLower: 'unused return value from loadalltasks' }
     const prs = [
       {
         title: 'Unused return value from loadAllTasks',
@@ -929,7 +952,7 @@ describe('taskHasOpenPR', () => {
 
   it('should not match unrelated PR titles', () => {
     const { sandbox } = setupEnvironment()
-    const task = { title: 'Fix SQL injection' }
+    const task = { title: 'Fix SQL injection', titleLower: 'fix sql injection' }
     const prs = [
       { title: 'Add unit tests', titleLower: 'add unit tests', branch: 'test/unit' },
       { title: 'Update README', titleLower: 'update readme', branch: 'docs/readme' }
@@ -951,7 +974,7 @@ describe('taskHasOpenPR', () => {
 
   it('should be case-insensitive', () => {
     const { sandbox } = setupEnvironment()
-    const task = { title: 'fix REDOS Vulnerability' }
+    const task = { title: 'fix REDOS Vulnerability', titleLower: 'fix redos vulnerability' }
     const prs = [
       {
         title: '[Security] Fix ReDoS vulnerability',
