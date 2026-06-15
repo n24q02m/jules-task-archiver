@@ -903,7 +903,7 @@ describe('getOpenPRs', () => {
 describe('taskHasOpenPR', () => {
   it('should match when PR title contains task title', () => {
     const { sandbox } = setupEnvironment()
-    const task = { title: 'Fix ReDoS vulnerability' }
+    const task = { title: 'Fix ReDoS vulnerability', titleLower: 'fix redos vulnerability' }
     const prs = [
       {
         title: '[SECURITY] Fix ReDoS vulnerability',
@@ -916,7 +916,7 @@ describe('taskHasOpenPR', () => {
 
   it('should match when task title contains PR title', () => {
     const { sandbox } = setupEnvironment()
-    const task = { title: 'Unused return value from loadAllTasks' }
+    const task = { title: 'Unused return value from loadAllTasks', titleLower: 'unused return value from loadalltasks' }
     const prs = [
       {
         title: 'Unused return value from loadAllTasks',
@@ -929,7 +929,7 @@ describe('taskHasOpenPR', () => {
 
   it('should not match unrelated PR titles', () => {
     const { sandbox } = setupEnvironment()
-    const task = { title: 'Fix SQL injection' }
+    const task = { title: 'Fix SQL injection', titleLower: 'fix sql injection' }
     const prs = [
       { title: 'Add unit tests', titleLower: 'add unit tests', branch: 'test/unit' },
       { title: 'Update README', titleLower: 'update readme', branch: 'docs/readme' }
@@ -951,7 +951,7 @@ describe('taskHasOpenPR', () => {
 
   it('should be case-insensitive', () => {
     const { sandbox } = setupEnvironment()
-    const task = { title: 'fix REDOS Vulnerability' }
+    const task = { title: 'fix REDOS Vulnerability', titleLower: 'fix redos vulnerability' }
     const prs = [
       {
         title: '[Security] Fix ReDoS vulnerability',
