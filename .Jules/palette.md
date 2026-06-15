@@ -31,3 +31,6 @@
 ## 2026-06-09 - Empty State Feedback
 **Learning:** When a list or process finishes with zero results, an empty summary container gives no feedback, leaving the user wondering if it actually ran or failed silently.
 **Action:** Always provide a helpful empty state message explaining why no results might have occurred, using styles consistent with other hints to offer guidance without showing as an error.
+## 2026-06-15 - Use Semantic Fieldsets for Form Grouping
+**Learning:** Generic `div` containers and pseudo-labels using `role="group"`, `role="radiogroup"`, and `aria-labelledby` can be entirely avoided by using native `<fieldset>` and `<legend>` elements. This inherently structures grouped form controls (like radio buttons or segmented buttons) for assistive technologies. We can then easily reset browser default `fieldset` styles (`border`, `padding`, `margin`) in CSS.
+**Action:** Next time I encounter `div`s with `role="radiogroup"` or `role="group"`, replace them with native `<fieldset>` and style `<legend>` directly instead of managing `aria-labelledby` attributes.
