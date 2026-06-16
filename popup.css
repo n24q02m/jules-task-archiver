@@ -50,7 +50,8 @@ section {
   border-radius: 6px;
 }
 
-label, legend {
+label,
+legend {
   display: block;
   font-size: 12px;
   color: #94a3b8;
