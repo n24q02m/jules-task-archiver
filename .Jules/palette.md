@@ -31,3 +31,6 @@
 ## 2026-06-09 - Empty State Feedback
 **Learning:** When a list or process finishes with zero results, an empty summary container gives no feedback, leaving the user wondering if it actually ran or failed silently.
 **Action:** Always provide a helpful empty state message explaining why no results might have occurred, using styles consistent with other hints to offer guidance without showing as an error.
+## 2025-02-18 - Semantic Form Group Accessibility
+**Learning:** Generic `<div>` containers combined with `role="group"` or `role="radiogroup"` and `aria-labelledby` attributes are often flagged by linters (like Biome) and can be unnecessarily complex. Native semantic HTML `<fieldset>` and `<legend>` elements implicitly provide this accessibility structure without requiring explicit ARIA roles.
+**Action:** Default to using `<fieldset>` and `<legend>` when grouping related form controls (like radio buttons or segmented controls). Remember to apply a basic CSS reset (`border: none; padding: 0; margin: 0;`) to `<fieldset>` and style `<legend>` to match `<label>` to maintain the intended visual design.
