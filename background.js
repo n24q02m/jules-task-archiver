@@ -933,9 +933,7 @@ async function getJulesTabs() {
     }
   }
 
-  return mapped
-    .sort((a, b) => a.n - b.n)
-    .map((obj) => obj.t)
+  return mapped.sort((a, b) => a.n - b.n).map((obj) => obj.t)
 }
 
 function getTabLabel(tab) {

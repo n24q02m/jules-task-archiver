@@ -715,7 +715,17 @@ describe('processTab force vs default archiving', () => {
   })
 
   it('default mode skips a terminal task with a matching open PR', async () => {
-    const tasks = [{ id: 'x', title: 'Fix the bug', titleLower: 'fix the bug', state: 12, source: 'github/o/r', owner: 'o', repoName: 'r' }]
+    const tasks = [
+      {
+        id: 'x',
+        title: 'Fix the bug',
+        titleLower: 'fix the bug',
+        state: 12,
+        source: 'github/o/r',
+        owner: 'o',
+        repoName: 'r'
+      }
+    ]
     const { sandbox, archived } = setupArchiveEnv(tasks)
     sandbox.getOpenPRs = async () => [{ title: 'Fix the bug', titleLower: 'fix the bug', branch: 'b' }]
     await sandbox.processTab(TAB, { force: false, dryRun: false })
