@@ -302,9 +302,14 @@ function isSuggestionEnabled(row) {
 function parseTask(raw) {
   const source = raw[TASK.SOURCE] || ''
   const parts = source.split('/')
+  const title = raw[TASK.DISPLAY_TITLE] || raw[TASK.SHORT_TITLE] || '(untitled)'
+
+  // ⚡ Bolt Optimization: Pre-calculate titleLower to avoid redundant string
+  // allocations when comparing thousands of tasks against open PRs in O(N*M) loops.
   return {
     id: raw[TASK.ID],
-    title: raw[TASK.DISPLAY_TITLE] || raw[TASK.SHORT_TITLE] || '(untitled)',
+    title,
+    titleLower: title.toLowerCase(),
     source,
     state: raw[TASK.STATE],
     statusCode: raw[TASK.STATUS_CODE],
@@ -803,7 +808,7 @@ async function getOpenPRs(owner, repo, token) {
 
 function taskHasOpenPR(task, openPRs) {
   if (openPRs.length === 0) return false
-  const taskTitle = (task.title || '').toLowerCase()
+  const taskTitle = task.titleLower
   if (!taskTitle || taskTitle === '(untitled)') return false
   return openPRs.some((pr) => pr.titleLower.includes(taskTitle) || taskTitle.includes(pr.titleLower))
 }
@@ -918,9 +923,17 @@ function stopKeepAlive() {
 
 async function getJulesTabs() {
   const tabs = await chrome.tabs.query({ url: `${JULES_ORIGIN}/*` })
-  return tabs
-    .filter((t) => !t.url.includes('accounts.google'))
-    .map((t) => ({ t, n: parseInt(extractAccountNum(t.url), 10) }))
+
+  // ⚡ Bolt Optimization: Combine filter and map into a single loop to reduce
+  // intermediate array allocations during tab discovery.
+  const mapped = []
+  for (const t of tabs) {
+    if (!t.url.includes('accounts.google')) {
+      mapped.push({ t, n: parseInt(extractAccountNum(t.url), 10) })
+    }
+  }
+
+  return mapped
     .sort((a, b) => a.n - b.n)
     .map((obj) => obj.t)
 }
