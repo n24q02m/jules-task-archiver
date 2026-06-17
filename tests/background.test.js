@@ -715,7 +715,17 @@ describe('processTab force vs default archiving', () => {
   })
 
   it('default mode skips a terminal task with a matching open PR', async () => {
-    const tasks = [{ id: 'x', title: 'Fix the bug', state: 12, source: 'github/o/r', owner: 'o', repoName: 'r' }]
+    const tasks = [
+      {
+        id: 'x',
+        title: 'Fix the bug',
+        titleLower: 'fix the bug',
+        state: 12,
+        source: 'github/o/r',
+        owner: 'o',
+        repoName: 'r'
+      }
+    ]
     const { sandbox, archived } = setupArchiveEnv(tasks)
     sandbox.getOpenPRs = async () => [{ title: 'Fix the bug', titleLower: 'fix the bug', branch: 'b' }]
     await sandbox.processTab(TAB, { force: false, dryRun: false })
@@ -723,7 +733,17 @@ describe('processTab force vs default archiving', () => {
   })
 
   it('FORCE archives a terminal task even when it has a matching open PR', async () => {
-    const tasks = [{ id: 'x', title: 'Fix the bug', state: 12, source: 'github/o/r', owner: 'o', repoName: 'r' }]
+    const tasks = [
+      {
+        id: 'x',
+        title: 'Fix the bug',
+        titleLower: 'fix the bug',
+        state: 12,
+        source: 'github/o/r',
+        owner: 'o',
+        repoName: 'r'
+      }
+    ]
     const { sandbox, archived } = setupArchiveEnv(tasks)
     sandbox.getOpenPRs = async () => [{ title: 'Fix the bug', titleLower: 'fix the bug', branch: 'b' }]
     await sandbox.processTab(TAB, { force: true, dryRun: false })
@@ -903,7 +923,7 @@ describe('getOpenPRs', () => {
 describe('taskHasOpenPR', () => {
   it('should match when PR title contains task title', () => {
     const { sandbox } = setupEnvironment()
-    const task = { title: 'Fix ReDoS vulnerability' }
+    const task = { title: 'Fix ReDoS vulnerability', titleLower: 'fix redos vulnerability' }
     const prs = [
       {
         title: '[SECURITY] Fix ReDoS vulnerability',
@@ -916,7 +936,7 @@ describe('taskHasOpenPR', () => {
 
   it('should match when task title contains PR title', () => {
     const { sandbox } = setupEnvironment()
-    const task = { title: 'Unused return value from loadAllTasks' }
+    const task = { title: 'Unused return value from loadAllTasks', titleLower: 'unused return value from loadalltasks' }
     const prs = [
       {
         title: 'Unused return value from loadAllTasks',
@@ -929,7 +949,7 @@ describe('taskHasOpenPR', () => {
 
   it('should not match unrelated PR titles', () => {
     const { sandbox } = setupEnvironment()
-    const task = { title: 'Fix SQL injection' }
+    const task = { title: 'Fix SQL injection', titleLower: 'fix sql injection' }
     const prs = [
       { title: 'Add unit tests', titleLower: 'add unit tests', branch: 'test/unit' },
       { title: 'Update README', titleLower: 'update readme', branch: 'docs/readme' }
@@ -939,19 +959,19 @@ describe('taskHasOpenPR', () => {
 
   it('should return false for empty PR list', () => {
     const { sandbox } = setupEnvironment()
-    assert.strictEqual(sandbox.test_taskHasOpenPR({ title: 'Any task' }, []), false)
+    assert.strictEqual(sandbox.test_taskHasOpenPR({ title: 'Any task', titleLower: 'any task' }, []), false)
   })
 
   it('should return false for untitled tasks', () => {
     const { sandbox } = setupEnvironment()
     const prs = [{ title: 'Some PR', titleLower: 'some pr', branch: 'branch' }]
-    assert.strictEqual(sandbox.test_taskHasOpenPR({ title: '(untitled)' }, prs), false)
-    assert.strictEqual(sandbox.test_taskHasOpenPR({ title: '' }, prs), false)
+    assert.strictEqual(sandbox.test_taskHasOpenPR({ title: '(untitled)', titleLower: '(untitled)' }, prs), false)
+    assert.strictEqual(sandbox.test_taskHasOpenPR({ title: '', titleLower: '' }, prs), false)
   })
 
   it('should be case-insensitive', () => {
     const { sandbox } = setupEnvironment()
-    const task = { title: 'fix REDOS Vulnerability' }
+    const task = { title: 'fix REDOS Vulnerability', titleLower: 'fix redos vulnerability' }
     const prs = [
       {
         title: '[Security] Fix ReDoS vulnerability',

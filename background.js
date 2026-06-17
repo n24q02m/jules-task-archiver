@@ -299,18 +299,44 @@ function isSuggestionEnabled(row) {
   return Array.isArray(block) && Array.isArray(block[2]) && block[2][0] === SUGGESTION_TOGGLE_ON
 }
 
+// ⚡ Bolt Optimization: Replace split('/') with manual string scanning for URL parts.
+// This avoids intermediate array allocations in a hot path called for every task.
+// Additionally, cache the lowercased title to avoid repeated toLowerCase() calls in taskHasOpenPR.
 function parseTask(raw) {
   const source = raw[TASK.SOURCE] || ''
-  const parts = source.split('/')
+  const title = raw[TASK.DISPLAY_TITLE] || raw[TASK.SHORT_TITLE] || '(untitled)'
+
+  let owner = ''
+  let repoName = ''
+  const isGithub = source.startsWith('github/')
+  const repo = isGithub ? source.slice(7) : source
+
+  const firstSlash = source.indexOf('/')
+  if (firstSlash !== -1) {
+    const secondSlash = source.indexOf('/', firstSlash + 1)
+    if (secondSlash !== -1) {
+      owner = source.substring(firstSlash + 1, secondSlash)
+      const thirdSlash = source.indexOf('/', secondSlash + 1)
+      if (thirdSlash !== -1) {
+        repoName = source.substring(secondSlash + 1, thirdSlash)
+      } else {
+        repoName = source.substring(secondSlash + 1)
+      }
+    } else {
+      owner = source.substring(firstSlash + 1)
+    }
+  }
+
   return {
     id: raw[TASK.ID],
-    title: raw[TASK.DISPLAY_TITLE] || raw[TASK.SHORT_TITLE] || '(untitled)',
+    title,
+    titleLower: title.toLowerCase(),
     source,
     state: raw[TASK.STATE],
     statusCode: raw[TASK.STATUS_CODE],
-    repo: source.startsWith('github/') ? source.slice(7) : source,
-    owner: parts[1] || '',
-    repoName: parts[2] || ''
+    repo,
+    owner,
+    repoName
   }
 }
 
@@ -803,7 +829,7 @@ async function getOpenPRs(owner, repo, token) {
 
 function taskHasOpenPR(task, openPRs) {
   if (openPRs.length === 0) return false
-  const taskTitle = (task.title || '').toLowerCase()
+  const taskTitle = task.titleLower // Cached from parseTask
   if (!taskTitle || taskTitle === '(untitled)') return false
   return openPRs.some((pr) => pr.titleLower.includes(taskTitle) || taskTitle.includes(pr.titleLower))
 }
