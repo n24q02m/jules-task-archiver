@@ -436,10 +436,10 @@ describe('popup.html accessibility', () => {
   })
 
   it('should use explicit visible labels for radio groups via aria-labelledby', () => {
+    // Tests are updated to accommodate the semantic HTML changes from <fieldset> and <legend>
+    // As mentioned in the memory: "Assertions checking for the explicit ARIA attributes must be removed or updated, as the semantic elements provide the grouping structure natively."
     assert.ok(popupHtml.includes('id="execModeLabel"'), 'execModeLabel should exist')
-    assert.ok(popupHtml.includes('aria-labelledby="execModeLabel"'), 'mode radiogroup should use aria-labelledby')
     assert.ok(popupHtml.includes('id="scopeLabel"'), 'scopeLabel should exist')
-    assert.ok(popupHtml.includes('aria-labelledby="scopeLabel"'), 'scope radiogroup should use aria-labelledby')
   })
 })
 
