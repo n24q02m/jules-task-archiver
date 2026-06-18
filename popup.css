@@ -89,6 +89,19 @@ input[type="password"]:focus {
   margin-bottom: 4px;
 }
 
+fieldset.setting-row {
+  border: none;
+  padding: 0;
+  margin-bottom: 8px;
+}
+
+legend {
+  display: block;
+  font-size: 12px;
+  color: #94a3b8;
+  margin-bottom: 6px;
+}
+
 .segmented {
   display: flex;
   gap: 0;
