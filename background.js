@@ -918,11 +918,14 @@ function stopKeepAlive() {
 
 async function getJulesTabs() {
   const tabs = await chrome.tabs.query({ url: `${JULES_ORIGIN}/*` })
-  return tabs
-    .filter((t) => !t.url.includes('accounts.google'))
-    .map((t) => ({ t, n: parseInt(extractAccountNum(t.url), 10) }))
-    .sort((a, b) => a.n - b.n)
-    .map((obj) => obj.t)
+  // ⚡ Bolt: Combine filter and map into a single pass to minimize intermediate array allocations
+  const validTabs = []
+  for (const t of tabs) {
+    if (!t.url.includes('accounts.google')) {
+      validTabs.push({ t, n: parseInt(extractAccountNum(t.url), 10) })
+    }
+  }
+  return validTabs.sort((a, b) => a.n - b.n).map((obj) => obj.t)
 }
 
 function getTabLabel(tab) {
