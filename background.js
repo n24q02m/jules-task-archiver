@@ -299,9 +299,26 @@ function isSuggestionEnabled(row) {
   return Array.isArray(block) && Array.isArray(block[2]) && block[2][0] === SUGGESTION_TOGGLE_ON
 }
 
+// ⚡ Bolt Optimization: Avoid intermediate array allocations in high-frequency parsing.
+// By using manual string scanning instead of .split('/'), we prevent array allocations
+// for every task parsed, which reduces GC pressure significantly when processing large payloads.
 function parseTask(raw) {
   const source = raw[TASK.SOURCE] || ''
-  const parts = source.split('/')
+  let owner = ''
+  let repoName = ''
+
+  const s1 = source.indexOf('/')
+  if (s1 !== -1) {
+    const s2 = source.indexOf('/', s1 + 1)
+    if (s2 !== -1) {
+      owner = source.slice(s1 + 1, s2)
+      const s3 = source.indexOf('/', s2 + 1)
+      repoName = s3 !== -1 ? source.slice(s2 + 1, s3) : source.slice(s2 + 1)
+    } else {
+      owner = source.slice(s1 + 1)
+    }
+  }
+
   return {
     id: raw[TASK.ID],
     title: raw[TASK.DISPLAY_TITLE] || raw[TASK.SHORT_TITLE] || '(untitled)',
@@ -309,8 +326,8 @@ function parseTask(raw) {
     state: raw[TASK.STATE],
     statusCode: raw[TASK.STATUS_CODE],
     repo: source.startsWith('github/') ? source.slice(7) : source,
-    owner: parts[1] || '',
-    repoName: parts[2] || ''
+    owner,
+    repoName
   }
 }
 
@@ -916,13 +933,17 @@ function stopKeepAlive() {
 // Tab Management
 // =============================================================================
 
+// ⚡ Bolt Optimization: Combine filter and map in a single pass before sorting.
+// This reduces intermediate array allocations when processing discovered tabs.
 async function getJulesTabs() {
   const tabs = await chrome.tabs.query({ url: `${JULES_ORIGIN}/*` })
-  return tabs
-    .filter((t) => !t.url.includes('accounts.google'))
-    .map((t) => ({ t, n: parseInt(extractAccountNum(t.url), 10) }))
-    .sort((a, b) => a.n - b.n)
-    .map((obj) => obj.t)
+  const validTabs = []
+  for (const t of tabs) {
+    if (!t.url.includes('accounts.google')) {
+      validTabs.push({ t, n: parseInt(extractAccountNum(t.url), 10) })
+    }
+  }
+  return validTabs.sort((a, b) => a.n - b.n).map((obj) => obj.t)
 }
 
 function getTabLabel(tab) {
