@@ -396,4 +396,22 @@ describe('Orchestrator Privilege Escalation Security', () => {
     assert.strictEqual(responseData?.ok, true, 'Should allow CACHE_START_CONFIG from content script')
     assert.deepStrictEqual(sessionData.startConfig, { some: 'data' })
   })
+
+  it('should reject large payloads to prevent storage exhaustion DoS', () => {
+    const { onMessageListeners } = setupEnvironment()
+    const listener = onMessageListeners[0] // background.js listener
+
+    let responseData = null
+    const sendResponse = (data) => {
+      responseData = data
+    }
+
+    // Create a payload larger than 100KB
+    const largeConfig = { data: 'A'.repeat(100001) }
+    const sender = { tab: { id: 1 } }
+
+    listener({ action: 'CACHE_START_CONFIG', config: largeConfig }, sender, sendResponse)
+
+    assert.strictEqual(responseData?.error, 'Security Error: Payload too large', 'Should reject large payloads')
+  })
 })
