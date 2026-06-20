@@ -396,4 +396,28 @@ describe('Orchestrator Privilege Escalation Security', () => {
     assert.strictEqual(responseData?.ok, true, 'Should allow CACHE_START_CONFIG from content script')
     assert.deepStrictEqual(sessionData.startConfig, { some: 'data' })
   })
+
+  it('should reject CACHE_START_CONFIG payloads that exceed the size limit to prevent storage DoS', () => {
+    const { onMessageListeners, chromeMock } = setupEnvironment()
+    const listener = onMessageListeners[0]
+
+    let responseData = null
+    const sendResponse = (data) => {
+      responseData = data
+    }
+
+    let sessionSetCalled = false
+    chromeMock.storage.session.set = async () => {
+      sessionSetCalled = true
+    }
+
+    // Create a payload larger than 100KB
+    const largePayload = { data: 'a'.repeat(102400 + 1) }
+
+    const sender = { tab: { id: 1 } }
+    listener({ action: 'CACHE_START_CONFIG', config: largePayload }, sender, sendResponse)
+
+    assert.strictEqual(responseData?.error, 'Security Error: Payload too large', 'Should reject large payload')
+    assert.strictEqual(sessionSetCalled, false, 'Should not have saved to session storage')
+  })
 })

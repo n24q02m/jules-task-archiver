@@ -1260,6 +1260,10 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       return true
 
     case 'CACHE_START_CONFIG':
+      if (msg.config && JSON.stringify(msg.config).length > 102400) {
+        sendResponse({ error: 'Security Error: Payload too large' })
+        break
+      }
       chrome.storage.session.set({ startConfig: msg.config })
       sendResponse({ ok: true })
       break
