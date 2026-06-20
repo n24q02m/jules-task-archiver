@@ -14,18 +14,18 @@
     <section class="options">
       <h2>Options</h2>
       <div class="setting-row">
-        <label id="opModeLabel">Operation</label>
-        <div class="segmented" id="opMode" role="group" aria-labelledby="opModeLabel">
+        <fieldset class="segmented" id="opMode" style="border: none; padding: 0; margin: 0; display: flex;">
+          <legend id="opModeLabel" style="font-weight: 500; font-size: 13px; color: #333; margin-bottom: 8px;">Operation</legend>
           <button type="button" data-value="archive" class="active" aria-pressed="true">Archive Tasks</button>
           <button type="button" data-value="suggestions" aria-pressed="false">Start Suggestions</button>
-        </div>
+        </fieldset>
       </div>
       <div class="setting-row">
-        <label id="execModeLabel">Execution Mode</label>
-        <div class="radio-group" role="radiogroup" aria-labelledby="execModeLabel">
+        <fieldset class="radio-group" style="border: none; padding: 0; margin: 0; display: flex; gap: 15px;">
+          <legend id="execModeLabel" style="font-weight: 500; font-size: 13px; color: #333; margin-bottom: 8px;">Execution Mode</legend>
           <label><input type="radio" name="mode" value="dry" checked /> Dry Run</label>
           <label><input type="radio" name="mode" value="run" /> Run</label>
-        </div>
+        </fieldset>
       </div>
       <div class="setting-row">
         <label class="checkbox">
@@ -35,11 +35,11 @@
         <span class="hint" id="forceHint" style="display: block; margin-left: 20px; margin-top: 2px;">Archive every task, ignoring state and matching open Pull Requests</span>
       </div>
       <div class="setting-row">
-        <label id="scopeLabel">Scope</label>
-        <div class="radio-group" role="radiogroup" aria-labelledby="scopeLabel">
+        <fieldset class="radio-group" style="border: none; padding: 0; margin: 0; display: flex; gap: 15px;">
+          <legend id="scopeLabel" style="font-weight: 500; font-size: 13px; color: #333; margin-bottom: 8px;">Scope</legend>
           <label><input type="radio" name="scope" value="current" /> Current tab</label>
           <label><input type="radio" name="scope" value="all" checked /> All Jules tabs</label>
-        </div>
+        </fieldset>
       </div>
     </section>
 
