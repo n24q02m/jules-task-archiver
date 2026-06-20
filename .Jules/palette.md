@@ -31,3 +31,7 @@
 ## 2026-06-09 - Empty State Feedback
 **Learning:** When a list or process finishes with zero results, an empty summary container gives no feedback, leaving the user wondering if it actually ran or failed silently.
 **Action:** Always provide a helpful empty state message explaining why no results might have occurred, using styles consistent with other hints to offer guidance without showing as an error.
+
+## 2024-06-20 - Use Native Fieldsets Over ARIA Groups
+**Learning:** Replacing generic containers (<div>) with semantic HTML elements (<fieldset> and <legend>) provides better native accessibility and grouping for screen readers than relying solely on ARIA roles and labels, while preserving existing visual design via CSS resets.
+**Action:** When creating form control groups (radio buttons, segmented controls), use native <fieldset> and <legend> elements instead of <div> wrappers with role='group' and aria-labelledby.
