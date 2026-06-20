@@ -299,9 +299,25 @@ function isSuggestionEnabled(row) {
   return Array.isArray(block) && Array.isArray(block[2]) && block[2][0] === SUGGESTION_TOGGLE_ON
 }
 
+// ⚡ Bolt Optimization: Replace generic `split('/')` with manual string scanning
+// using `indexOf` to avoid intermediate array memory allocations during high-frequency parsing.
 function parseTask(raw) {
   const source = raw[TASK.SOURCE] || ''
-  const parts = source.split('/')
+  let owner = ''
+  let repoName = ''
+
+  const firstSlash = source.indexOf('/')
+  if (firstSlash !== -1) {
+    const secondSlash = source.indexOf('/', firstSlash + 1)
+    if (secondSlash !== -1) {
+      owner = source.slice(firstSlash + 1, secondSlash)
+      const thirdSlash = source.indexOf('/', secondSlash + 1)
+      repoName = thirdSlash !== -1 ? source.slice(secondSlash + 1, thirdSlash) : source.slice(secondSlash + 1)
+    } else {
+      owner = source.slice(firstSlash + 1)
+    }
+  }
+
   return {
     id: raw[TASK.ID],
     title: raw[TASK.DISPLAY_TITLE] || raw[TASK.SHORT_TITLE] || '(untitled)',
@@ -309,8 +325,8 @@ function parseTask(raw) {
     state: raw[TASK.STATE],
     statusCode: raw[TASK.STATUS_CODE],
     repo: source.startsWith('github/') ? source.slice(7) : source,
-    owner: parts[1] || '',
-    repoName: parts[2] || ''
+    owner,
+    repoName
   }
 }
 
