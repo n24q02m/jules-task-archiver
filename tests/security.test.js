@@ -350,7 +350,7 @@ describe('getTabConfig Path Traversal Security', () => {
 
 describe('Orchestrator Privilege Escalation Security', () => {
   it('should reject privileged actions from content scripts', () => {
-    const { onMessageListeners, chromeMock } = setupEnvironment()
+    const { onMessageListeners } = setupEnvironment()
     const listener = onMessageListeners[0] // background.js listener
 
     assert.ok(listener, 'Background message listener should be registered')
@@ -398,7 +398,7 @@ describe('Orchestrator Privilege Escalation Security', () => {
   })
 
   it('should enforce payload size limits on CACHE_START_CONFIG to prevent DoS', () => {
-    const { onMessageListeners, chromeMock } = setupEnvironment()
+    const { onMessageListeners } = setupEnvironment()
     const listener = onMessageListeners[0]
 
     let responseData = null
