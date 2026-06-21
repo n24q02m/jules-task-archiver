@@ -350,7 +350,7 @@ describe('getTabConfig Path Traversal Security', () => {
 
 describe('Orchestrator Privilege Escalation Security', () => {
   it('should reject privileged actions from content scripts', () => {
-    const { onMessageListeners } = setupEnvironment()
+    const { onMessageListeners, chromeMock } = setupEnvironment()
     const listener = onMessageListeners[0] // background.js listener
 
     assert.ok(listener, 'Background message listener should be registered')
@@ -395,5 +395,26 @@ describe('Orchestrator Privilege Escalation Security', () => {
 
     assert.strictEqual(responseData?.ok, true, 'Should allow CACHE_START_CONFIG from content script')
     assert.deepStrictEqual(sessionData.startConfig, { some: 'data' })
+  })
+
+  it('should enforce payload size limits on CACHE_START_CONFIG to prevent DoS', () => {
+    const { onMessageListeners, chromeMock } = setupEnvironment()
+    const listener = onMessageListeners[0]
+
+    let responseData = null
+    const sendResponse = (data) => {
+      responseData = data
+    }
+
+    const sender = { tab: { id: 1 } }
+
+    const hugeConfig = { data: 'A'.repeat(51200) }
+    listener({ action: 'CACHE_START_CONFIG', config: hugeConfig }, sender, sendResponse)
+
+    assert.strictEqual(
+      responseData?.error,
+      'Security Error: Payload too large',
+      'Should reject oversized config payload'
+    )
   })
 })
