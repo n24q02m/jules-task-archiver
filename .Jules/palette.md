@@ -31,3 +31,6 @@
 ## 2026-06-09 - Empty State Feedback
 **Learning:** When a list or process finishes with zero results, an empty summary container gives no feedback, leaving the user wondering if it actually ran or failed silently.
 **Action:** Always provide a helpful empty state message explaining why no results might have occurred, using styles consistent with other hints to offer guidance without showing as an error.
+## 2025-06-25 - Semantic Grouping for Form Controls
+**Learning:** Using generic `<div>` containers with `role="group"` and `aria-labelledby` for groups of form controls (like radio buttons or segmented buttons) can sometimes be verbose and prone to implementation errors compared to native semantic HTML elements. Native elements are preferred where possible.
+**Action:** Replace `<div>` containers using `role="group"` and `aria-labelledby` with native `<fieldset>` and `<legend>` elements to provide grouping structure and semantics natively. Remember to reset their default styles (`border: none; padding: 0; margin: 0;`) and style the `<legend>` to match `<label>` elements so there are no visual regressions.
