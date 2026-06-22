@@ -301,7 +301,29 @@ function isSuggestionEnabled(row) {
 
 function parseTask(raw) {
   const source = raw[TASK.SOURCE] || ''
-  const parts = source.split('/')
+
+  // High-frequency path optimization: manually scan string indices to avoid
+  // intermediate memory allocations from split('/')
+  let owner = ''
+  let repoName = ''
+
+  const firstSlash = source.indexOf('/')
+  if (firstSlash !== -1) {
+    const secondSlash = source.indexOf('/', firstSlash + 1)
+    if (secondSlash !== -1) {
+      owner = source.slice(firstSlash + 1, secondSlash)
+
+      const thirdSlash = source.indexOf('/', secondSlash + 1)
+      if (thirdSlash !== -1) {
+        repoName = source.slice(secondSlash + 1, thirdSlash)
+      } else {
+        repoName = source.slice(secondSlash + 1)
+      }
+    } else {
+      owner = source.slice(firstSlash + 1)
+    }
+  }
+
   return {
     id: raw[TASK.ID],
     title: raw[TASK.DISPLAY_TITLE] || raw[TASK.SHORT_TITLE] || '(untitled)',
@@ -309,8 +331,8 @@ function parseTask(raw) {
     state: raw[TASK.STATE],
     statusCode: raw[TASK.STATUS_CODE],
     repo: source.startsWith('github/') ? source.slice(7) : source,
-    owner: parts[1] || '',
-    repoName: parts[2] || ''
+    owner,
+    repoName
   }
 }
 
