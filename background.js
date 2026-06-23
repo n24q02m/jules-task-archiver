@@ -1031,14 +1031,12 @@ async function filterArchivableTasks(label, tasks, options) {
 
   const byRepo = groupTasksByRepo(candidates)
   addLog(`\n[${label}] Checking open PRs per task...`)
-  const { ghOwner } = await chrome.storage.sync.get(['ghOwner'])
-  const { ghToken } = await chrome.storage.local.get(['ghToken'])
 
   const repoEntries = [...byRepo.entries()]
   const allPRs = await runInPool(repoEntries, API_CONCURRENCY, ([_repo, repoTasks]) => {
-    const owner = repoTasks[0]?.owner || ghOwner || ''
+    const owner = repoTasks[0]?.owner || options.ghOwner || ''
     const repoName = repoTasks[0]?.repoName || ''
-    return owner && repoName ? getOpenPRs(owner, repoName, ghToken) : Promise.resolve([])
+    return owner && repoName ? getOpenPRs(owner, repoName, options.ghToken) : Promise.resolve([])
   })
 
   const toArchive = []
@@ -1224,6 +1222,13 @@ async function startOperation(options) {
   const isSuggestions = initOperationState(options)
 
   try {
+    const [{ ghOwner }, { ghToken }] = await Promise.all([
+      chrome.storage.sync.get(['ghOwner']),
+      chrome.storage.local.get(['ghToken'])
+    ])
+    options.ghOwner = ghOwner
+    options.ghToken = ghToken
+
     const tabs = await discoverTabs(options)
     if (!tabs) return
 
