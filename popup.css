@@ -260,3 +260,22 @@ button.secondary:hover {
 .summary .skipped {
   color: #fbbf24;
 }
+
+/* Fieldset reset for Biome a11y compliance */
+fieldset {
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+legend {
+  display: block;
+  font-size: 12px;
+  color: #94a3b8;
+  margin-bottom: 6px;
+  font-family: inherit;
+}
+
+.segmented-fieldset .segmented {
+  margin-top: 0;
+}
