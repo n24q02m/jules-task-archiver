@@ -9,6 +9,7 @@ importScripts('utils.js')
 // =============================================================================
 // Constants
 // =============================================================================
+const DEFAULT_GITHUB_API_URL = 'https://api.github.com'
 
 const JULES_ORIGIN = 'https://jules.google.com'
 
@@ -47,14 +48,16 @@ function extractAccountNum(url) {
 async function jFetch(url, options = {}) {
   const urlObj = new URL(url)
   const origin = urlObj.origin
-  if (origin !== JULES_ORIGIN && origin !== 'https://api.github.com') {
+
+  const { token, ghApiUrl, headers = {}, ...rest } = options
+  const targetGhOrigin = ghApiUrl ? new URL(ghApiUrl).origin : 'https://api.github.com'
+
+  if (origin !== JULES_ORIGIN && origin !== targetGhOrigin) {
     throw new Error('Security Error: Disallowed fetch origin')
   }
 
-  const { token, headers = {}, ...rest } = options
-
   if (token) {
-    if (origin !== 'https://api.github.com') {
+    if (origin !== targetGhOrigin) {
       throw new Error('Security Error: Refusing to send GitHub token to non-GitHub origin')
     }
     if (typeof token !== 'string') throw new Error('Token must be a string')
@@ -648,6 +651,14 @@ async function startSuggestion(suggestion, repo, config, startConfig) {
   return callBatchExecute('Rja83d', payload, config)
 }
 
+async function getGitHubConfig() {
+  const sync = await chrome.storage.sync.get(['ghApiUrl'])
+  const local = await chrome.storage.local.get(['ghToken'])
+  return {
+    ghToken: local.ghToken || null,
+    ghApiUrl: sync.ghApiUrl || DEFAULT_GITHUB_API_URL
+  }
+}
 async function getStartConfig() {
   const { startConfig } = await chrome.storage.session.get('startConfig')
   return startConfig || null
@@ -769,7 +780,7 @@ async function processSuggestionsForTab(tab, options) {
 
 const prCache = new Map()
 
-async function getOpenPRs(owner, repo, token) {
+async function getOpenPRs(owner, repo, token, ghApiUrl) {
   const key = `${owner}/${repo}`
   if (prCache.has(key)) return prCache.get(key)
 
@@ -778,13 +789,15 @@ async function getOpenPRs(owner, repo, token) {
       throw new Error('Owner and repo must be strings')
     }
 
-    const url = new URL(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls`)
+    const baseUrl = ghApiUrl || DEFAULT_GITHUB_API_URL
+    const url = new URL(`${baseUrl}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls`)
     url.searchParams.set('state', 'open')
     url.searchParams.set('per_page', '100')
 
     const res = await jFetch(url.toString(), {
       headers: { Accept: 'application/vnd.github+json' },
-      token
+      token,
+      ghApiUrl: baseUrl
     })
     const prs = await res.json()
     const mapped = prs.map((pr) => ({
@@ -1032,13 +1045,13 @@ async function filterArchivableTasks(label, tasks, options) {
   const byRepo = groupTasksByRepo(candidates)
   addLog(`\n[${label}] Checking open PRs per task...`)
   const { ghOwner } = await chrome.storage.sync.get(['ghOwner'])
-  const { ghToken } = await chrome.storage.local.get(['ghToken'])
+  const { ghToken, ghApiUrl } = await getGitHubConfig()
 
   const repoEntries = [...byRepo.entries()]
   const allPRs = await runInPool(repoEntries, API_CONCURRENCY, ([_repo, repoTasks]) => {
     const owner = repoTasks[0]?.owner || ghOwner || ''
     const repoName = repoTasks[0]?.repoName || ''
-    return owner && repoName ? getOpenPRs(owner, repoName, ghToken) : Promise.resolve([])
+    return owner && repoName ? getOpenPRs(owner, repoName, ghToken, ghApiUrl) : Promise.resolve([])
   })
 
   const toArchive = []

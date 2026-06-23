@@ -309,6 +309,40 @@ describe('jFetch SSRF Security', () => {
       message: /Security Error: Refusing to send GitHub token to non-GitHub origin/
     })
   })
+
+  it('should allow requests to a custom GitHub API origin', async () => {
+    const { sandbox } = setupEnvironment()
+    const customApi = 'https://github.mycompany.com/api/v3'
+
+    // Should allow if ghApiUrl is passed in options
+    const res = await sandbox.jFetch(`${customApi}/repos/owner/repo`, {
+      ghApiUrl: customApi
+    })
+    assert.strictEqual(res.ok, true)
+  })
+
+  it('should allow sending token to custom GitHub API origin', async () => {
+    const { sandbox } = setupEnvironment()
+    const customApi = 'https://github.mycompany.com/api/v3'
+
+    const res = await sandbox.jFetch(`${customApi}/repos/owner/repo`, {
+      ghApiUrl: customApi,
+      token: 'secret-token'
+    })
+    assert.strictEqual(res.ok, true)
+  })
+
+  it('should block sending token to a different GitHub origin than configured', async () => {
+    const { sandbox } = setupEnvironment()
+    const customApi = 'https://github.mycompany.com/api/v3'
+
+    await assert.rejects(sandbox.jFetch('https://api.github.com/repos/owner/repo', {
+      ghApiUrl: customApi,
+      token: 'secret-token'
+    }), {
+      message: /Security Error: Disallowed fetch origin/
+    })
+  })
 })
 
 describe('getTabConfig Path Traversal Security', () => {

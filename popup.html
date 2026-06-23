@@ -45,6 +45,10 @@
 
     <section class="settings">
       <h2>Settings</h2>
+      <label for="ghApiUrl">
+        GitHub API URL <span class="hint" id="ghApiUrlHint">(optional, for Enterprise/Custom)</span>
+        <input type="text" id="ghApiUrl" placeholder="https://api.github.com" spellcheck="false" aria-describedby="ghApiUrlHint" />
+      </label>
       <label for="ghOwner">
         GitHub Owner <span class="hint" id="ghOwnerHint">(optional, used for PR checks)</span>
         <input type="text" id="ghOwner" placeholder="your-github-username" spellcheck="false" autocomplete="username" aria-describedby="ghOwnerHint" />

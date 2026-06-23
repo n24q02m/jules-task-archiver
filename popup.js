@@ -7,6 +7,7 @@
 const $ = (sel) => document.querySelector(sel)
 
 // --- DOM refs ---
+const ghApiUrlInput = $('#ghApiUrl')
 const ghOwnerInput = $('#ghOwner')
 const ghTokenInput = $('#ghToken')
 const forceCheckbox = $('#force')
@@ -88,7 +89,8 @@ document.querySelectorAll('input[name="mode"]').forEach((radio) => {
 })
 
 // --- Load saved settings & cleanup insecure storage ---
-chrome.storage.sync.get(['ghOwner', 'opMode', 'ghToken'], (syncData) => {
+chrome.storage.sync.get(['ghApiUrl', 'ghOwner', 'opMode', 'ghToken'], (syncData) => {
+  if (syncData.ghApiUrl) ghApiUrlInput.value = syncData.ghApiUrl
   if (syncData.ghOwner) ghOwnerInput.value = syncData.ghOwner
   if (syncData.opMode) {
     setActiveOpMode(syncData.opMode)
@@ -107,6 +109,9 @@ chrome.storage.sync.get(['ghOwner', 'opMode', 'ghToken'], (syncData) => {
   })
 })
 // --- Save settings on change ---
+ghApiUrlInput.addEventListener('change', () => {
+  chrome.storage.sync.set({ ghApiUrl: ghApiUrlInput.value.trim() })
+})
 ghOwnerInput.addEventListener('change', () => {
   chrome.storage.sync.set({ ghOwner: ghOwnerInput.value.trim() })
 })
@@ -118,6 +123,7 @@ ghTokenInput.addEventListener('change', () => {
 startBtn.addEventListener('click', async () => {
   // Save settings first, ensuring token is only in local storage
   chrome.storage.sync.set({
+    ghApiUrl: ghApiUrlInput.value.trim(),
     ghOwner: ghOwnerInput.value.trim()
   })
   chrome.storage.sync.remove('ghToken')
