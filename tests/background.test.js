@@ -752,12 +752,23 @@ describe('extractAccountNum', () => {
     assert.strictEqual(sandbox.test_extractAccountNum('https://jules.google.com/u/3/session'), '3')
     assert.strictEqual(sandbox.test_extractAccountNum('https://jules.google.com/u/0/repo'), '0')
     assert.strictEqual(sandbox.test_extractAccountNum('https://jules.google.com/u/12/session'), '12')
+    assert.strictEqual(sandbox.test_extractAccountNum('https://jules.google.com/u/123/tasks'), '123')
   })
 
-  it('should return 0 for URLs without /u/N', () => {
+  it('should return "0" for URLs without /u/N segment', () => {
     const { sandbox } = setupEnvironment()
     assert.strictEqual(sandbox.test_extractAccountNum('https://jules.google.com/session'), '0')
+    assert.strictEqual(sandbox.test_extractAccountNum('https://jules.google.com/tasks'), '0')
+    assert.strictEqual(sandbox.test_extractAccountNum('https://google.com'), '0')
     assert.strictEqual(sandbox.test_extractAccountNum('https://example.com'), '0')
+  })
+
+  it('should return "-1" for null, undefined, and malformed URLs via catch block', () => {
+    const { sandbox } = setupEnvironment()
+    assert.strictEqual(sandbox.test_extractAccountNum(null), '-1')
+    assert.strictEqual(sandbox.test_extractAccountNum(undefined), '-1')
+    assert.strictEqual(sandbox.test_extractAccountNum(''), '-1')
+    assert.strictEqual(sandbox.test_extractAccountNum('not-a-url'), '-1')
   })
 })
 
@@ -1326,28 +1337,6 @@ describe('state management', () => {
 // =============================================================================
 // Tab Label Parsing & Management Tests
 // =============================================================================
-
-describe('extractAccountNum', () => {
-  it('should extract account number from /u/X/ format', () => {
-    const { sandbox } = setupEnvironment()
-    assert.strictEqual(sandbox.test_extractAccountNum('https://jules.google.com/u/1/session'), '1')
-    assert.strictEqual(sandbox.test_extractAccountNum('https://jules.google.com/u/123/tasks'), '123')
-  })
-
-  it('should return "0" for URLs without /u/X/ segment', () => {
-    const { sandbox } = setupEnvironment()
-    assert.strictEqual(sandbox.test_extractAccountNum('https://jules.google.com/tasks'), '0')
-    assert.strictEqual(sandbox.test_extractAccountNum('https://google.com'), '0')
-    assert.strictEqual(sandbox.test_extractAccountNum(''), '0')
-  })
-
-  it('should handle null, undefined, and malformed URLs gracefully', () => {
-    const { sandbox } = setupEnvironment()
-    assert.strictEqual(sandbox.test_extractAccountNum(null), '0')
-    assert.strictEqual(sandbox.test_extractAccountNum(undefined), '0')
-    assert.strictEqual(sandbox.test_extractAccountNum('not-a-url'), '0')
-  })
-})
 
 describe('getTabLabel', () => {
   it('should return "default" for account 0', () => {

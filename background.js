@@ -33,7 +33,7 @@ function extractAccountNum(url) {
     const match = ACCOUNT_NUM_REGEX.exec(pathname)
     return match ? match[1] : '0'
   } catch (_e) {
-    return '0'
+    return '-1'
   }
 }
 
