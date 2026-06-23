@@ -53,8 +53,8 @@ function setupEnvironment(initialStorage = {}) {
     console,
     crypto: {
       getRandomValues: (arr) => {
-        for (let i = 0; i < arr.length; i++) arr[i] = Math.floor(Math.random() * 1000000);
-        return arr;
+        for (let i = 0; i < arr.length; i++) arr[i] = Math.floor(Math.random() * 1000000)
+        return arr
       }
     },
     importScripts: () => {}
@@ -73,11 +73,15 @@ describe('processSuggestionsForTab Refactor', () => {
     // Mock dependencies
     sandbox.listSuggestions = async (repo) => {
       if (repo === 'repo1') return [{ id: 's1', title: 'S1' }]
-      if (repo === 'repo2') return [{ id: 's2', title: 'S2' }, { id: 's3', title: 'S3' }]
+      if (repo === 'repo2')
+        return [
+          { id: 's2', title: 'S2' },
+          { id: 's3', title: 'S3' }
+        ]
       return []
     }
     sandbox.addLog = () => {}
-    sandbox.runInPool = async (items, concurrency, fn) => {
+    sandbox.runInPool = async (items, _concurrency, fn) => {
       const results = []
       for (const item of items) results.push(await fn(item))
       return results
@@ -116,9 +120,9 @@ describe('processSuggestionsForTab Refactor', () => {
 
   it('executeStartSuggestions should respect dryRun', async () => {
     const sandbox = setupEnvironment()
-    vm.runInContext("var startedCount = 0; startSuggestion = async () => { startedCount++; }", sandbox)
+    vm.runInContext('var startedCount = 0; startSuggestion = async () => { startedCount++; }', sandbox)
     sandbox.addLog = () => {}
-    sandbox.runInPool = async (items, concurrency, fn) => {
+    sandbox.runInPool = async (items, _concurrency, fn) => {
       for (const item of items) await fn(item)
     }
     sandbox.globalLimit = (fn) => fn()
@@ -134,9 +138,9 @@ describe('processSuggestionsForTab Refactor', () => {
 
   it('executeStartSuggestions should start suggestions when not dryRun', async () => {
     const sandbox = setupEnvironment()
-    vm.runInContext("var startedCount = 0; startSuggestion = async () => { startedCount++; }", sandbox)
+    vm.runInContext('var startedCount = 0; startSuggestion = async () => { startedCount++; }', sandbox)
     sandbox.addLog = () => {}
-    sandbox.runInPool = async (items, concurrency, fn) => {
+    sandbox.runInPool = async (items, _concurrency, fn) => {
       for (const item of items) await fn(item)
     }
     sandbox.globalLimit = (fn) => fn()
@@ -146,12 +150,15 @@ describe('processSuggestionsForTab Refactor', () => {
     // In our test environment, 'state' should be initialized after running the script
     vm.runInContext("state.status = 'running'; state.progress = { total: 0, archived: 0 };", sandbox)
 
-    const toStart = [{ repo: 'repo1', s: { title: 'S1' } }, { repo: 'repo2', s: { title: 'S2' } }]
+    const toStart = [
+      { repo: 'repo1', s: { title: 'S1' } },
+      { repo: 'repo2', s: { title: 'S2' } }
+    ]
     const total = await sandbox.test_executeStartSuggestions('label', toStart, {}, {}, { dryRun: false })
 
     assert.strictEqual(total, 2)
     assert.strictEqual(sandbox.startedCount, 2)
-    const finalState = vm.runInContext("state", sandbox)
+    const finalState = vm.runInContext('state', sandbox)
     assert.strictEqual(finalState.progress.total, 2)
     assert.strictEqual(finalState.progress.archived, 2)
   })
