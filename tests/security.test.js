@@ -336,12 +336,15 @@ describe('jFetch SSRF Security', () => {
     const { sandbox } = setupEnvironment()
     const customApi = 'https://github.mycompany.com/api/v3'
 
-    await assert.rejects(sandbox.jFetch('https://api.github.com/repos/owner/repo', {
-      ghApiUrl: customApi,
-      token: 'secret-token'
-    }), {
-      message: /Security Error: Disallowed fetch origin/
-    })
+    await assert.rejects(
+      sandbox.jFetch('https://api.github.com/repos/owner/repo', {
+        ghApiUrl: customApi,
+        token: 'secret-token'
+      }),
+      {
+        message: /Security Error: Disallowed fetch origin/
+      }
+    )
   })
 })
 
