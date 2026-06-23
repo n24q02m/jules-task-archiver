@@ -22,7 +22,21 @@ injectMainWorldScript()
 // The MAIN world script and isolated world share the same window and origin,
 // so anything failing these checks is a cross-origin/cross-frame spoof attempt.
 function isTrustedMessage(event) {
-  return event.source === window && event.origin === window.location.origin
+  // Must come from the same window (not an iframe or popup)
+  if (event.source !== window) return false
+
+  // Must come from the same origin
+  if (event.origin !== window.location.origin) return false
+
+  // Must have our signature
+  if (!event.data?.type?.startsWith('JULES_')) return false
+
+  // Config messages from MAIN world must have a payload
+  if (event.data.type.endsWith('_CONFIG') && event.data.type !== 'JULES_REQUEST_CONFIG' && !event.data.config) {
+    return false
+  }
+
+  return true
 }
 
 // Listen for messages from MAIN world script
@@ -119,4 +133,5 @@ if (typeof globalThis !== 'undefined' && globalThis.TEST_MODE) {
   globalThis.test_getAccountNum = getAccountNum
   globalThis.test_getAccountLabel = getAccountLabel
   globalThis.test_injectMainWorldScript = injectMainWorldScript
+  globalThis.test_isTrustedMessage = isTrustedMessage
 }
