@@ -1266,7 +1266,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
             sendResponse({ error: 'Security Error: Config payload exceeds maximum size limit (50KB)' })
             break
           }
-        } catch (e) {
+        } catch (_e) {
           sendResponse({ error: 'Security Error: Invalid config format' })
           break
         }
