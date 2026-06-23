@@ -1017,19 +1017,29 @@ async function filterArchivableTasks(label, tasks, options) {
     return { toArchive: [...tasks], toSkip: [] }
   }
 
-  const candidates = tasks.filter(isArchivable)
-  const activeCount = tasks.length - candidates.length
+  const candidates = []
+  const seenStates = new Set()
+  const byRepo = new Map()
 
+  for (const t of tasks) {
+    seenStates.add(t.state)
+    if (isArchivable(t)) {
+      candidates.push(t)
+      const key = t.repo || '(no repo)'
+      if (!byRepo.has(key)) byRepo.set(key, [])
+      byRepo.get(key).push(t)
+    }
+  }
+
+  const activeCount = tasks.length - candidates.length
   addLog(`[${label}] ${tasks.length} total: ${candidates.length} archivable, ${activeCount} active`)
 
   if (candidates.length === 0) {
-    const states = [...new Set(tasks.map((t) => t.state))].join(', ')
+    const states = [...seenStates].join(', ')
     addLog(`[${label}] No archivable tasks among ${tasks.length} (states seen: ${states}).`)
     addLog(`[${label}] Enable Force to archive regardless of state.`)
     return { toArchive: [], toSkip: [] }
   }
-
-  const byRepo = groupTasksByRepo(candidates)
   addLog(`\n[${label}] Checking open PRs per task...`)
   const { ghOwner } = await chrome.storage.sync.get(['ghOwner'])
   const { ghToken } = await chrome.storage.local.get(['ghToken'])

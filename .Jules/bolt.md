@@ -1,0 +1,3 @@
+## 2025-05-14 - Consolidation of Task Filtering and Grouping
+**Learning:** Consolidating multiple array traversals (filter, map, grouping) into a single loop significantly reduces redundant O(N) operations. In `filterArchivableTasks`, we were previously filtering the array, then mapping it to extract states, and finally calling a separate grouping function. By merging these into a single pass, we reduce memory allocations for intermediate arrays and improve execution time for large task sets.
+**Action:** Always look for opportunities to combine filter/map/reduce operations into a single `for...of` loop when multiple passes over the same data are detected, particularly in performance-sensitive background logic.
