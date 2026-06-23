@@ -8,32 +8,32 @@
  * Communicates with content.js (isolated world) via window.postMessage.
  */
 
-// Extract config and post to isolated world
-function broadcastConfig() {
-  const w = window.WIZ_global_data
-  const modelMatch = w?.TSDtV ? String(w.TSDtV).match(/beyond:models\/[\w-]+/) : null
-
-  window.postMessage(
-    {
-      type: 'JULES_ARCHIVER_CONFIG',
-      config: w
-        ? {
-            at: w.SNlM0e || null,
-            bl: w.cfb2h || null,
-            fsid: w.FdrFJe || null,
-            modelId: modelMatch ? modelMatch[0] : null,
-            timestamp: Date.now()
-          }
-        : null
-    },
-    window.location.origin
-  )
-}
-
-// Install fetch observer for StartSuggestion config capture (once)
 if (!window.__julesArchiver) {
   window.__julesArchiver = true
 
+  // Extract config and post to isolated world
+  const broadcastConfig = () => {
+    const w = window.WIZ_global_data
+    const modelMatch = w?.TSDtV ? String(w.TSDtV).match(/beyond:models\/[\w.-]+/) : null
+
+    window.postMessage(
+      {
+        type: 'JULES_ARCHIVER_CONFIG',
+        config: w
+          ? {
+              at: w.SNlM0e || null,
+              bl: w.cfb2h || null,
+              fsid: w.FdrFJe || null,
+              modelId: modelMatch ? modelMatch[0] : null,
+              timestamp: Date.now()
+            }
+          : null
+      },
+      window.location.origin
+    )
+  }
+
+  // Install fetch observer for StartSuggestion config capture (once)
   const _origFetch = window.fetch
   window.fetch = async function (...args) {
     const [url, opts] = args
@@ -62,18 +62,18 @@ if (!window.__julesArchiver) {
     }
     return resp
   }
+
+  // Broadcast config immediately (WIZ_global_data should be ready by document_idle)
+  broadcastConfig()
+
+  // Also listen for explicit re-extract requests from content.js.
+  // Only honour requests from this page's own window/origin — a cross-origin
+  // frame must not be able to trigger config broadcasts.
+  window.addEventListener('message', (event) => {
+    if (event.source !== window) return
+    if (event.origin !== window.location.origin) return
+    if (event.data?.type === 'JULES_REQUEST_CONFIG') {
+      broadcastConfig()
+    }
+  })
 }
-
-// Broadcast config immediately (WIZ_global_data should be ready by document_idle)
-broadcastConfig()
-
-// Also listen for explicit re-extract requests from content.js.
-// Only honour requests from this page's own window/origin — a cross-origin
-// frame must not be able to trigger config broadcasts.
-window.addEventListener('message', (event) => {
-  if (event.source !== window) return
-  if (event.origin !== window.location.origin) return
-  if (event.data?.type === 'JULES_REQUEST_CONFIG') {
-    broadcastConfig()
-  }
-})

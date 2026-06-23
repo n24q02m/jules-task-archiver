@@ -108,6 +108,16 @@ describe('main-world.js', () => {
     assert.strictEqual(messages[0].data.config.modelId, null)
   })
 
+  it('should handle modelId with dots (e.g. gemini-1.5-pro)', () => {
+    const { sandbox, messages } = setupSandbox({
+      TSDtV: 'beyond:models/gemini-1.5-pro'
+    })
+
+    vm.runInContext(mainWorldJs, sandbox)
+
+    assert.strictEqual(messages[0].data.config.modelId, 'beyond:models/gemini-1.5-pro')
+  })
+
   it('should handle empty WIZ_global_data object', () => {
     const { sandbox, messages } = setupSandbox({})
 
@@ -214,9 +224,9 @@ describe('main-world.js', () => {
     const startMsg = messages.find((m) => m.data.type === 'JULES_START_CONFIG')
     assert.ok(startMsg, 'JULES_START_CONFIG message should be sent')
     assert.strictEqual(startMsg.targetOrigin, 'https://jules.google.com')
-    assert.deepStrictEqual(startMsg.data.config.modelConfig, payload[2])
-    assert.deepStrictEqual(startMsg.data.config.experimentIds, ['exp1', 'exp2'])
-    assert.deepStrictEqual(startMsg.data.config.featureFlags, ['flag1'])
+    assert.strictEqual(JSON.stringify(startMsg.data.config.modelConfig), JSON.stringify(payload[2]))
+    assert.strictEqual(JSON.stringify(startMsg.data.config.experimentIds), JSON.stringify(['exp1', 'exp2']))
+    assert.strictEqual(JSON.stringify(startMsg.data.config.featureFlags), JSON.stringify(['flag1']))
     assert.strictEqual(startMsg.data.config.capturedAt, 1234567890)
   })
 
@@ -268,5 +278,64 @@ describe('main-world.js', () => {
     // Run script again
     vm.runInContext(mainWorldJs, sandbox)
     assert.strictEqual(windowMock.fetch, firstFetch, 'Fetch should not be wrapped again')
+  })
+
+  it('should avoid redundant listeners and broadcasts on double injection', () => {
+    const { sandbox, messages, listeners } = setupSandbox({
+      SNlM0e: 'at-token'
+    })
+
+    // First run
+    vm.runInContext(mainWorldJs, sandbox)
+    assert.strictEqual(messages.length, 1)
+    assert.strictEqual(listeners.message.length, 1)
+
+    // Second run
+    vm.runInContext(mainWorldJs, sandbox)
+
+    assert.strictEqual(messages.length, 1, 'Should not broadcast twice on double injection')
+    assert.strictEqual(listeners.message.length, 1, 'Should not add multiple message listeners')
+  })
+
+  it('should handle fetch with partial payload structure', async () => {
+    const { sandbox, messages, windowMock } = setupSandbox({})
+
+    vm.runInContext(mainWorldJs, sandbox)
+
+    // Payload missing index 9 (experiments)
+    const payload = [null, null, ['model-config', null, null, null, null, null, null, null, null, null, ['flag1']]]
+    const freq = [[['id', JSON.stringify(payload)]]]
+    const body = `f.req=${encodeURIComponent(JSON.stringify(freq))}`
+
+    await windowMock.fetch('https://jules.google.com/_/Swebot/data/batchexecute?rpcids=Rja83d', {
+      method: 'POST',
+      body
+    })
+
+    const startMsg = messages.find((m) => m.data.type === 'JULES_START_CONFIG')
+    assert.ok(startMsg)
+    assert.strictEqual(JSON.stringify(startMsg.data.config.experimentIds), '[]')
+    assert.strictEqual(JSON.stringify(startMsg.data.config.featureFlags), JSON.stringify(['flag1']))
+  })
+
+  it('should handle fetch with extremely minimal payload', async () => {
+    const { sandbox, messages, windowMock } = setupSandbox({})
+
+    vm.runInContext(mainWorldJs, sandbox)
+
+    const payload = []
+    const freq = [[['id', JSON.stringify(payload)]]]
+    const body = `f.req=${encodeURIComponent(JSON.stringify(freq))}`
+
+    await windowMock.fetch('https://jules.google.com/_/Swebot/data/batchexecute?rpcids=Rja83d', {
+      method: 'POST',
+      body
+    })
+
+    const startMsg = messages.find((m) => m.data.type === 'JULES_START_CONFIG')
+    assert.ok(startMsg)
+    assert.strictEqual(startMsg.data.config.modelConfig, undefined)
+    assert.strictEqual(JSON.stringify(startMsg.data.config.experimentIds), '[]')
+    assert.strictEqual(JSON.stringify(startMsg.data.config.featureFlags), '[]')
   })
 })
