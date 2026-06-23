@@ -104,7 +104,7 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_callBatchExecute = callBatchExecute;
     globalThis.test_runInPool = runInPool;
     globalThis.test_createLimiter = createLimiter;
-    globalThis.test_archiveTaskWithRetry = archiveTaskWithRetry;
+    globalThis.test_archiveTasksWithRetry = archiveTasksWithRetry;
     globalThis.test_withRetry = withRetry;
     globalThis.test_isRetryable = isRetryable;
     globalThis.test_fixJsonControlChars = fixJsonControlChars;
@@ -430,7 +430,7 @@ describe('createLimiter', () => {
   })
 })
 
-describe('archiveTaskWithRetry', () => {
+describe('archiveTasksWithRetry', () => {
   it('isRetryable matches rate-limit and transient errors only', () => {
     const { sandbox } = setupEnvironment()
     assert.strictEqual(sandbox.test_isRetryable('batchexecute Tjmm5c failed: HTTP 429'), true)
@@ -443,22 +443,22 @@ describe('archiveTaskWithRetry', () => {
   it('retries on a 429 then succeeds', async () => {
     const { sandbox } = setupEnvironment()
     let calls = 0
-    sandbox.archiveTask = async () => {
+    sandbox.archiveTasks = async () => {
       calls++
       if (calls === 1) throw new Error('batchexecute Tjmm5c failed: HTTP 429')
     }
-    await sandbox.test_archiveTaskWithRetry('t1', {})
+    await sandbox.test_archiveTasksWithRetry(['t1'], {})
     assert.strictEqual(calls, 2)
   })
 
   it('does not retry a non-retryable error', async () => {
     const { sandbox } = setupEnvironment()
     let calls = 0
-    sandbox.archiveTask = async () => {
+    sandbox.archiveTasks = async () => {
       calls++
       throw new Error('HTTP 404')
     }
-    await assert.rejects(sandbox.test_archiveTaskWithRetry('t1', {}), { message: 'HTTP 404' })
+    await assert.rejects(sandbox.test_archiveTasksWithRetry(['t1'], {}), { message: 'HTTP 404' })
     assert.strictEqual(calls, 1)
   })
 
@@ -673,8 +673,8 @@ describe('processTab force vs default archiving', () => {
     sandbox.listTasks = async () => tasks
     sandbox.getOpenPRs = async () => []
     const archived = []
-    sandbox.archiveTask = async (id) => {
-      archived.push(id)
+    sandbox.archiveTasks = async (taskIds) => {
+      archived.push(...taskIds)
     }
     return { sandbox, archived }
   }

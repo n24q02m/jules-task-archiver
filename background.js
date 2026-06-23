@@ -22,6 +22,7 @@ const API_CONCURRENCY = 5
 // (which rate-limits with HTTP 429). Retries with backoff absorb the rest.
 const PER_ACCOUNT_CONCURRENCY = 6
 const GLOBAL_CONCURRENCY = 12
+const ARCHIVE_BATCH_SIZE = 50
 
 // ⚡ Bolt Optimization: After parsing the URL, use a fast regex test to extract
 // the account ID instead of allocating string arrays via `.split('/')`. This avoids
@@ -349,9 +350,9 @@ async function safeListTasks(label, config) {
   }
 }
 
-async function archiveTask(taskId, config) {
+async function archiveTasks(taskIds, config) {
   const payload = new Array(2).fill(null)
-  payload[TJMM5C.TASK_IDS] = [taskId]
+  payload[TJMM5C.TASK_IDS] = taskIds
   payload[TJMM5C.ACTION] = 1
   await callBatchExecute('Tjmm5c', payload, config)
 }
@@ -378,8 +379,8 @@ async function withRetry(fn) {
   }
 }
 
-function archiveTaskWithRetry(taskId, config) {
-  return withRetry(() => archiveTask(taskId, config))
+function archiveTasksWithRetry(taskIds, config) {
+  return withRetry(() => archiveTasks(taskIds, config))
 }
 
 // =============================================================================
@@ -1081,23 +1082,31 @@ async function executeArchive(label, toArchive, config) {
   let grandTotal = 0
   let lastUpdate = 0
 
-  await runInPool(toArchive, PER_ACCOUNT_CONCURRENCY, async (task) => {
+  const batches = []
+  for (let i = 0; i < toArchive.length; i += ARCHIVE_BATCH_SIZE) {
+    batches.push(toArchive.slice(i, i + ARCHIVE_BATCH_SIZE))
+  }
+
+  await runInPool(batches, PER_ACCOUNT_CONCURRENCY, async (batch) => {
+    const taskIds = batch.map((t) => t.id)
     const now = Date.now()
     if (now - lastUpdate > 500) {
-      updateState({ currentRepo: task.repo || '(no repo)' })
+      updateState({ currentRepo: batch[0].repo || '(no repo)' })
       lastUpdate = now
     }
     try {
-      await globalLimit(() => archiveTaskWithRetry(task.id, config))
-      grandTotal++
-      state.progress.archived += 1
+      await globalLimit(() => archiveTasksWithRetry(taskIds, config))
+      grandTotal += batch.length
+      state.progress.archived += batch.length
       if (Date.now() - lastUpdate > 500) {
         updateState({})
         lastUpdate = Date.now()
       }
-      addLog(`  Archived [${label}] [${task.id}] ${task.title}`)
+      for (const task of batch) {
+        addLog(`  Archived [${label}] [${task.id}] ${task.title}`)
+      }
     } catch (e) {
-      addLog(`  ERROR [${label}] archiving ${task.id}: ${e.message}`)
+      addLog(`  ERROR [${label}] archiving batch: ${e.message}`)
     }
   })
   return grandTotal

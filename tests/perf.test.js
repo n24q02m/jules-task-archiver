@@ -137,9 +137,9 @@ describe('Orchestrator Performance Optimization', () => {
     ]
     sandbox.getOpenPRs = async () => [] // No PRs, so they should be archived
 
-    let archiveTaskCount = 0
-    sandbox.archiveTask = async () => {
-      archiveTaskCount++
+    let archivedTaskCount = 0
+    sandbox.archiveTasks = async (taskIds) => {
+      archivedTaskCount += taskIds.length
     }
 
     const tab = { id: 123, url: 'https://jules.google.com/u/0/' }
@@ -147,7 +147,7 @@ describe('Orchestrator Performance Optimization', () => {
 
     await sandbox.processTab(tab, options)
 
-    assert.strictEqual(archiveTaskCount, 2, 'archiveTask should be called for each task')
+    assert.strictEqual(archivedTaskCount, 2, 'archiveTasks should be called with all tasks')
   })
 })
 
@@ -171,7 +171,7 @@ describe('Throttling Optimization', () => {
     sandbox.listTasks = async () => tasks
     sandbox.getOpenPRs = async () => []
 
-    sandbox.archiveTaskWithRetry = async () => {
+    sandbox.archiveTasksWithRetry = async () => {
       // Fast execution to trigger throttling
       return Promise.resolve()
     }
