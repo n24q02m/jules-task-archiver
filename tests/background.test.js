@@ -129,6 +129,11 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_buildStartPayload = buildStartPayload;
     globalThis.test_SUGGESTION = SUGGESTION;
     globalThis.test_SDETAIL = SDETAIL;
+    globalThis.test_createRoleConfig = createRoleConfig;
+    globalThis.test_SECURITY_CONFIG = SECURITY_CONFIG;
+    globalThis.test_PERFORMANCE_CONFIG = PERFORMANCE_CONFIG;
+    globalThis.test_CLEANUP_CONFIG = CLEANUP_CONFIG;
+    globalThis.test_TESTING_CONFIG = TESTING_CONFIG;
     globalThis.test_CATEGORY_CONFIG = CATEGORY_CONFIG;
     globalThis.test_DEFAULT_CATEGORY = DEFAULT_CATEGORY;
     globalThis.test_initOperationState = initOperationState;
@@ -2011,5 +2016,42 @@ describe('trimLog Internal', () => {
     // Should have removed the first 10 entries
     assert.strictEqual(state.log[0], 'line 10')
     assert.strictEqual(state.log[max - 1], `line ${max + 9}`)
+  })
+})
+
+describe('Prompt Builder', () => {
+  it('createRoleConfig should return a valid config object', () => {
+    const { sandbox } = setupEnvironment()
+    const icon = '[ICON]'
+    const name = 'Name'
+    const role = 'role'
+    const codeLabel = 'label'
+
+    const config = sandbox.test_createRoleConfig(icon, name, role, codeLabel)
+
+    assert.strictEqual(config.icon, icon)
+    assert.strictEqual(config.name, name)
+    assert.strictEqual(config.role, role)
+    assert.strictEqual(config.codeLabel, codeLabel)
+  })
+
+  it('predefined configs should be correctly initialized', () => {
+    const { sandbox } = setupEnvironment()
+
+    assert.strictEqual(sandbox.test_SECURITY_CONFIG.icon, '[SECURITY]')
+    assert.strictEqual(sandbox.test_PERFORMANCE_CONFIG.icon, '[PERF]')
+    assert.strictEqual(sandbox.test_CLEANUP_CONFIG.icon, '[CLEANUP]')
+    assert.strictEqual(sandbox.test_TESTING_CONFIG.icon, '[TEST]')
+    assert.strictEqual(sandbox.test_DEFAULT_CATEGORY.icon, '[FIX]')
+  })
+
+  it('CATEGORY_CONFIG should map categories to correct configs', () => {
+    const { sandbox } = setupEnvironment()
+    const categoryConfig = sandbox.test_CATEGORY_CONFIG
+
+    assert.strictEqual(categoryConfig['input-validation'], sandbox.test_SECURITY_CONFIG)
+    assert.strictEqual(categoryConfig['async-io'], sandbox.test_PERFORMANCE_CONFIG)
+    assert.strictEqual(categoryConfig['dead-code'], sandbox.test_CLEANUP_CONFIG)
+    assert.strictEqual(categoryConfig['untested-function'], sandbox.test_TESTING_CONFIG)
   })
 })
