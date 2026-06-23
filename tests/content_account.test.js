@@ -29,7 +29,8 @@ function setupContentSandbox(initialUrl = 'https://jules.google.com/u/0/') {
         if (el.onload) el.onload()
       }
     },
-    documentElement: {}
+    documentElement: {},
+    querySelector: () => null
   }
 
   const window = {
@@ -52,9 +53,11 @@ function setupContentSandbox(initialUrl = 'https://jules.google.com/u/0/') {
     setTimeout,
     clearTimeout,
     Promise,
-    Date
+    Date,
+    TEST_MODE: true
   }
 
+  sandbox.globalThis = sandbox
   vm.createContext(sandbox)
   vm.runInContext(contentJsContent, sandbox)
 
@@ -86,5 +89,50 @@ describe('content.js getAccountLabel', () => {
     const sandbox = setupContentSandbox('not-a-url')
     // getAccountNum has a try-catch that returns '0' on error
     assert.strictEqual(sandbox.getAccountLabel(), 'default')
+  })
+
+  it('should extract account from DOM if present', () => {
+    const sandbox = setupContentSandbox('https://jules.google.com/tasks')
+    sandbox.document.querySelector = (selector) => {
+      if (selector === 'c-wiz[data-is-main-wiz]') {
+        return {
+          getAttribute: (name) => {
+            if (name === 'data-auth-user') return '2'
+            return null
+          }
+        }
+      }
+      return null
+    }
+    assert.strictEqual(sandbox.test_getAccountNum(), '2')
+    assert.strictEqual(sandbox.getAccountLabel(), 'u/2')
+  })
+
+  it('should fall back to URL if DOM extraction fails (element missing)', () => {
+    const sandbox = setupContentSandbox('https://jules.google.com/u/3/tasks')
+    sandbox.document.querySelector = () => null
+    assert.strictEqual(sandbox.test_getAccountNum(), '3')
+  })
+
+  it('should fall back to URL if DOM extraction fails (attribute missing)', () => {
+    const sandbox = setupContentSandbox('https://jules.google.com/u/4/tasks')
+    sandbox.document.querySelector = (selector) => {
+      if (selector === 'c-wiz[data-is-main-wiz]') {
+        return {
+          getAttribute: () => null
+        }
+      }
+      return null
+    }
+    assert.strictEqual(sandbox.test_getAccountNum(), '4')
+  })
+
+  it('should fall back to URL if querySelector throws', () => {
+    const sandbox = setupContentSandbox('https://jules.google.com/u/5/tasks')
+    sandbox.document.querySelector = () => {
+      throw new Error('DOM Error')
+    }
+    // Should catch the error and fall back to URL
+    assert.strictEqual(sandbox.test_getAccountNum(), '5')
   })
 })
