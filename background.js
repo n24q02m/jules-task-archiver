@@ -32,7 +32,10 @@ function extractAccountNum(url) {
     const pathname = new URL(url).pathname
     const match = ACCOUNT_NUM_REGEX.exec(pathname)
     return match ? match[1] : '0'
-  } catch (_e) {
+  } catch (e) {
+    // Safety: '0' is the default account index for Jules. Falling back to '0'
+    // is safe for malformed URLs or non-Jules origins.
+    console.error('[extractAccountNum] Failed to parse URL:', url, e)
     return '0'
   }
 }
