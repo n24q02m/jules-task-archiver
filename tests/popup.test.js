@@ -435,11 +435,11 @@ describe('popup.html accessibility', () => {
     )
   })
 
-  it('should use explicit visible labels for radio groups via aria-labelledby', () => {
-    assert.ok(popupHtml.includes('id="execModeLabel"'), 'execModeLabel should exist')
-    assert.ok(popupHtml.includes('aria-labelledby="execModeLabel"'), 'mode radiogroup should use aria-labelledby')
-    assert.ok(popupHtml.includes('id="scopeLabel"'), 'scopeLabel should exist')
-    assert.ok(popupHtml.includes('aria-labelledby="scopeLabel"'), 'scope radiogroup should use aria-labelledby')
+  it('should use semantic fieldset and legend for grouping', () => {
+    assert.ok(popupHtml.includes('<fieldset'), 'should use fieldset elements')
+    assert.ok(popupHtml.includes('<legend'), 'should use legend elements')
+    assert.ok(popupHtml.includes('Execution Mode'), 'should have Execution Mode legend')
+    assert.ok(popupHtml.includes('Scope'), 'should have Scope legend')
   })
 })
 
