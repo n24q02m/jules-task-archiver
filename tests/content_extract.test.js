@@ -98,7 +98,21 @@ function setupEnvironment() {
 
   sandbox.globalThis = sandbox
   vm.createContext(sandbox)
-  vm.runInContext(contentJsCode, sandbox)
+  if (sandbox.TEST_MODE) {
+    const testExposures = `
+      globalThis.test_cachedConfig = {
+        get: () => cachedConfig,
+        set: (v) => { cachedConfig = v }
+      };
+      globalThis.test_extractConfig = extractConfig;
+      globalThis.test_getAccountNum = getAccountNum;
+      globalThis.test_getAccountLabel = getAccountLabel;
+      globalThis.test_injectMainWorldScript = injectMainWorldScript;
+    `
+    vm.runInContext(contentJsCode + testExposures, sandbox)
+  } else {
+    vm.runInContext(contentJsCode, sandbox)
+  }
 
   return sandbox
 }

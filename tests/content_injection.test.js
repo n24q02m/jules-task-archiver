@@ -169,7 +169,11 @@ describe('content.js script injection', () => {
     sandbox.location = sandbox.window.location
 
     vm.createContext(sandbox)
-    vm.runInContext(contentJsCode, sandbox)
+    if (sandbox.TEST_MODE) {
+      vm.runInContext(`${contentJsCode}\n globalThis.test_injectMainWorldScript = injectMainWorldScript`, sandbox)
+    } else {
+      vm.runInContext(contentJsCode, sandbox)
+    }
 
     const initialCount = scriptCreatedCount
     assert.ok(initialCount >= 1, 'Should have injected at least once on load')

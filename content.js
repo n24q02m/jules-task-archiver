@@ -106,17 +106,3 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       sendResponse({ error: 'Unknown action' })
   }
 })
-
-// Exposure for testing
-if (typeof globalThis !== 'undefined' && globalThis.TEST_MODE) {
-  globalThis.test_cachedConfig = {
-    get: () => cachedConfig,
-    set: (v) => {
-      cachedConfig = v
-    }
-  }
-  globalThis.test_extractConfig = extractConfig
-  globalThis.test_getAccountNum = getAccountNum
-  globalThis.test_getAccountLabel = getAccountLabel
-  globalThis.test_injectMainWorldScript = injectMainWorldScript
-}
