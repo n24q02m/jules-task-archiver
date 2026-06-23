@@ -15,8 +15,10 @@ function setupEnvironment(initialStorage = {}) {
   const chromeMock = {
     storage: {
       session: {
-        get: async (key) => key ? { [key]: currentStorage[key] } : currentStorage,
-        set: async (data) => { currentStorage = { ...currentStorage, ...data } }
+        get: async (key) => (key ? { [key]: currentStorage[key] } : currentStorage),
+        set: async (data) => {
+          currentStorage = { ...currentStorage, ...data }
+        }
       },
       sync: {
         get: async (keys) => {
@@ -43,12 +45,22 @@ function setupEnvironment(initialStorage = {}) {
     setTimeout: (fn) => fn(),
     setInterval: () => 1,
     clearInterval: () => {},
-    Math, Date, JSON, String, Array, Map, Object, Error, URL, Promise, console,
+    Math,
+    Date,
+    JSON,
+    String,
+    Array,
+    Map,
+    Object,
+    Error,
+    URL,
+    Promise,
+    console,
     importScripts: () => {}
   }
 
   vm.createContext(sandbox)
-  const scriptContent = utilsScriptContent + bgScriptContent + `
+  const scriptContent = `${utilsScriptContent}${bgScriptContent}
     globalThis.test_filterArchivableCandidates = filterArchivableCandidates;
     globalThis.test_filterTasksByOpenPRs = filterTasksByOpenPRs;
     globalThis.test_state = () => state;
@@ -72,7 +84,7 @@ describe('Refactored Filtering Helpers', () => {
     assert.strictEqual(candidates[0].id, '1')
     assert.strictEqual(candidates[1].id, '3')
     const state = sandbox.test_state()
-    assert.ok(state.log.some(l => l.includes('2 archivable, 1 active')))
+    assert.ok(state.log.some((l) => l.includes('2 archivable, 1 active')))
   })
 
   it('filterTasksByOpenPRs should skip tasks with open PRs', async () => {
