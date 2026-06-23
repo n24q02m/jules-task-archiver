@@ -99,6 +99,7 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_updateState = updateState;
     globalThis.test_addLog = addLog;
     globalThis.test_trimLog = trimLog;
+    globalThis.test_buildModelConfig = buildModelConfig;
     globalThis.test_MAX_LOG_LINES = MAX_LOG_LINES;
     globalThis.test_buildBatchRequest = buildBatchRequest;
     globalThis.test_callBatchExecute = callBatchExecute;
@@ -1150,7 +1151,7 @@ describe('buildStartPayload', () => {
     assert.ok(payload[0].includes('[CLEANUP] Code Cleanup Task'))
 
     // payload[2] is model config
-    assert.strictEqual(payload[2][1], 'beyond:models/test-model')
+    assert.strictEqual(payload[2][2][1], 'beyond:models/test-model')
 
     // payload[4] is repo
     assert.strictEqual(payload[4], 'github/owner/repo')
@@ -1179,7 +1180,7 @@ describe('buildStartPayload', () => {
     const startConfig = { modelConfig: [null, 'beyond:models/fallback-model'] }
 
     const payload = sandbox.test_buildStartPayload(suggestion, 'repo', config, startConfig)
-    assert.strictEqual(payload[2][1], 'beyond:models/direct-model')
+    assert.strictEqual(payload[2][2][1], 'beyond:models/direct-model')
   })
 
   it('should use default feature flags when startConfig is null', () => {
@@ -1197,7 +1198,7 @@ describe('buildStartPayload', () => {
 
     const payload = sandbox.test_buildStartPayload(suggestion, 'repo', {}, null)
     // Should have default feature flags
-    const flags = payload[2][10]
+    const flags = payload[2][2][2]
     assert.ok(flags.length > 0)
     // Compare via JSON to avoid cross-VM reference issues
     assert.strictEqual(JSON.stringify(flags[0]), JSON.stringify(['enable_bash_session_tool', 1]))
@@ -2011,5 +2012,39 @@ describe('trimLog Internal', () => {
     // Should have removed the first 10 entries
     assert.strictEqual(state.log[0], 'line 10')
     assert.strictEqual(state.log[max - 1], `line ${max + 9}`)
+  })
+})
+
+describe('buildModelConfig Internal', () => {
+  it('should return the correct object structure', () => {
+    const { sandbox } = setupEnvironment()
+    const modelId = 'test-model'
+    const featureFlags = [['flag1', 1]]
+    const config = sandbox.test_buildModelConfig(modelId, featureFlags)
+
+    assert.strictEqual(
+      JSON.stringify(config),
+      JSON.stringify({
+        2: {
+          1: modelId,
+          2: featureFlags
+        }
+      })
+    )
+  })
+
+  it('should handle null values', () => {
+    const { sandbox } = setupEnvironment()
+    const config = sandbox.test_buildModelConfig(null, null)
+
+    assert.strictEqual(
+      JSON.stringify(config),
+      JSON.stringify({
+        2: {
+          1: null,
+          2: null
+        }
+      })
+    )
   })
 })

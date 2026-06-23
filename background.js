@@ -418,11 +418,6 @@ const RJA83D = {
 }
 
 // Model Config array layout (used in Rja83d payload [2])
-const MCONFIG = {
-  MODEL_ID: 1,
-  FEATURE_FLAGS: 10
-}
-
 // Suggestion Metadata array layout (used in Rja83d payload [9])
 const SMETA = {
   EXPERIMENT_IDS: 4,
@@ -609,14 +604,12 @@ const DEFAULT_FEATURE_FLAGS = [
 ]
 
 function buildModelConfig(modelId, featureFlags) {
-  const config = new Array(11).fill(null)
-  config[MCONFIG.MODEL_ID] = modelId
-  config[MCONFIG.FEATURE_FLAGS] = featureFlags
-  // Schema defaults
-  config[3] = []
-  config[4] = 1
-  config[9] = [360]
-  return config
+  return {
+    2: {
+      1: modelId,
+      2: featureFlags
+    }
+  }
 }
 
 function buildSuggestionMetadata(suggestionId, experimentIds) {
