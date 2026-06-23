@@ -57,7 +57,7 @@ if (!window.__julesArchiver) {
           window.location.origin
         )
       } catch (_e) {
-        /* ignore parse errors */
+        console.warn('[Jules Archiver] Failed to parse Rja83d config:', _e)
       }
     }
     return resp

@@ -9,6 +9,7 @@ const mainWorldJs = fs.readFileSync(path.join(__dirname, '../main-world.js'), 'u
 function setupSandbox(initialWizData = {}) {
   const messages = []
   const listeners = {}
+  const warnings = []
 
   const windowMock = {
     WIZ_global_data: initialWizData,
@@ -43,7 +44,13 @@ function setupSandbox(initialWizData = {}) {
 
   const sandbox = {
     window: windowMock,
-    console,
+    console: {
+      warn: (...args) => {
+        warnings.push(args)
+      },
+      log: console.log,
+      error: console.error
+    },
     URLSearchParams: windowMock.URLSearchParams,
     JSON,
     Date: windowMock.Date,
@@ -52,7 +59,7 @@ function setupSandbox(initialWizData = {}) {
   }
 
   vm.createContext(sandbox)
-  return { sandbox, windowMock, messages, listeners }
+  return { sandbox, windowMock, messages, listeners, warnings }
 }
 
 describe('main-world.js', () => {
@@ -221,7 +228,7 @@ describe('main-world.js', () => {
   })
 
   it('should gracefully handle malformed fetch payloads', async () => {
-    const { sandbox, messages, windowMock } = setupSandbox({})
+    const { sandbox, messages, windowMock, warnings } = setupSandbox({})
 
     vm.runInContext(mainWorldJs, sandbox)
     const initialCount = messages.length
@@ -233,6 +240,8 @@ describe('main-world.js', () => {
     })
 
     assert.strictEqual(messages.length, initialCount, 'Should not broadcast config on malformed fetch')
+    assert.strictEqual(warnings.length, 1)
+    assert.ok(warnings[0][0].includes('Failed to parse Rja83d config'))
   })
 
   it('should handle fetch with missing body', async () => {
