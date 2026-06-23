@@ -648,9 +648,12 @@ async function startSuggestion(suggestion, repo, config, startConfig) {
   return callBatchExecute('Rja83d', payload, config)
 }
 
+let cachedStartConfig = null
 async function getStartConfig() {
+  if (cachedStartConfig) return cachedStartConfig
   const { startConfig } = await chrome.storage.session.get('startConfig')
-  return startConfig || null
+  cachedStartConfig = startConfig || null
+  return cachedStartConfig
 }
 
 // =============================================================================
@@ -1144,6 +1147,7 @@ async function processTab(tab, options) {
 
 function initOperationState(options) {
   prCache.clear()
+  cachedStartConfig = null
   const randomArray = new Uint32Array(1)
   crypto.getRandomValues(randomArray)
   reqCounter = (randomArray[0] % 900000) + 100000
@@ -1261,6 +1265,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 
     case 'CACHE_START_CONFIG':
       chrome.storage.session.set({ startConfig: msg.config })
+      cachedStartConfig = msg.config
       sendResponse({ ok: true })
       break
 
@@ -1270,6 +1275,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         break
       }
       prCache.clear()
+      cachedStartConfig = null
       stopKeepAlive()
       state = { ...DEFAULT_STATE }
       chrome.storage.session.set({ archiveState: state })
