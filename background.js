@@ -244,13 +244,16 @@ function parseResponse(text, rpcId) {
   const jsonStr = text.substring(dataStart, jsonEnd)
   const fixed = fixJsonControlChars(jsonStr)
   const outer = JSON.parse(fixed)
+  if (!Array.isArray(outer)) throw new Error('Invalid batchexecute response: expected array')
 
   // Find the entry matching our rpcId
   for (const entry of outer) {
     if (!Array.isArray(entry) || entry[1] !== rpcId) continue
     if (!entry[2]) return null
     const innerFixed = fixJsonControlChars(entry[2])
-    return JSON.parse(innerFixed)
+    const result = JSON.parse(innerFixed)
+    if (!Array.isArray(result)) throw new Error('Invalid batchexecute response: expected inner array')
+    return result
   }
 
   return null
