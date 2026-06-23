@@ -396,4 +396,34 @@ describe('Orchestrator Privilege Escalation Security', () => {
     assert.strictEqual(responseData?.ok, true, 'Should allow CACHE_START_CONFIG from content script')
     assert.deepStrictEqual(sessionData.startConfig, { some: 'data' })
   })
+
+  it('should reject CACHE_START_CONFIG payloads that exceed the 50KB size limit', () => {
+    const { onMessageListeners, chromeMock } = setupEnvironment()
+    const listener = onMessageListeners[0] // background.js listener
+
+    let responseData = null
+    const sendResponse = (data) => {
+      responseData = data
+    }
+
+    let sessionData = {}
+    chromeMock.storage.session.set = async (data) => {
+      sessionData = data
+    }
+
+    const sender = { tab: { id: 1 } }
+
+    // Create a payload string that is slightly larger than 51200 chars when JSON stringified
+    const largeString = 'a'.repeat(51200)
+    const largeConfig = { data: largeString }
+
+    listener({ action: 'CACHE_START_CONFIG', config: largeConfig }, sender, sendResponse)
+
+    assert.strictEqual(
+      responseData?.error,
+      'Security Error: Config payload exceeds maximum size limit (50KB)',
+      'Should reject payloads exceeding 50KB'
+    )
+    assert.deepStrictEqual(sessionData, {}, 'Should not persist large payloads to storage')
+  })
 })
