@@ -137,6 +137,7 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_finalizeOperation = finalizeOperation;
     globalThis.test_handleOperationError = handleOperationError;
     globalThis.test_listTasks = listTasks;
+    globalThis.test_safeCallList = safeCallList;
     globalThis.test_safeListTasks = safeListTasks;
     globalThis.test_safeListSources = safeListSources;
     globalThis.test_startOperation = startOperation;

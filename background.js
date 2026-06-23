@@ -335,18 +335,22 @@ async function listTasks(filter, config) {
   return result[0].map(parseTask)
 }
 
-async function safeListTasks(label, config) {
+async function safeCallList(label, fetcher, emptyMsg, errorType) {
   try {
-    const tasks = await listTasks('', config)
-    if (tasks.length === 0) {
-      addLog(`[${label}] No tasks found.`)
+    const items = await fetcher()
+    if (items.length === 0) {
+      addLog(`[${label}] ${emptyMsg}`)
       return null
     }
-    return tasks
+    return items
   } catch (e) {
-    addLog(`[${label}] ERROR listing tasks: ${e.message}`)
+    addLog(`[${label}] ERROR listing ${errorType}: ${e.message}`)
     return null
   }
+}
+
+async function safeListTasks(label, config) {
+  return safeCallList(label, () => listTasks('', config), 'No tasks found.', 'tasks')
 }
 
 async function archiveTask(taskId, config) {
@@ -484,17 +488,12 @@ async function listSuggestionEnabledSources(config) {
 }
 
 async function safeListSources(label, config) {
-  try {
-    const repos = await listSuggestionEnabledSources(config)
-    if (repos.length === 0) {
-      addLog(`[${label}] No repos have Suggestions enabled. Nothing to do.`)
-      return null
-    }
-    return repos
-  } catch (e) {
-    addLog(`[${label}] ERROR listing sources: ${e.message}`)
-    return null
-  }
+  return safeCallList(
+    label,
+    () => listSuggestionEnabledSources(config),
+    'No repos have Suggestions enabled. Nothing to do.',
+    'sources'
+  )
 }
 
 // Jules caps suggestion sessions per account per day. KQOO7 returns
