@@ -31,3 +31,6 @@
 ## 2026-06-09 - Empty State Feedback
 **Learning:** When a list or process finishes with zero results, an empty summary container gives no feedback, leaving the user wondering if it actually ran or failed silently.
 **Action:** Always provide a helpful empty state message explaining why no results might have occurred, using styles consistent with other hints to offer guidance without showing as an error.
+## 2026-10-25 - Native Semantic Option Groups
+**Learning:** Using `role="group"` and `role="radiogroup"` with pseudo-label `<div>` elements mapped via `aria-labelledby` triggers accessibility linting errors. Sighted and screen reader users alike benefit from native semantic groupings.
+**Action:** Always replace generic grouping wrappers and pseudo-labels for grouped controls (like segmented buttons or radio groups) with native `<fieldset>` and `<legend>` elements to ensure correct semantics without extra ARIA markup.
