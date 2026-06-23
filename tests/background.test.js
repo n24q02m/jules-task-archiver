@@ -150,6 +150,9 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_getDailySessionQuota = getDailySessionQuota;
     globalThis.test_ensureContentScript = ensureContentScript;
     globalThis.test_getTabConfig = getTabConfig;
+    globalThis.test_persistSoon = persistSoon;
+    globalThis.test_persistNow = persistNow;
+    globalThis.test_pendingFlush = () => pendingFlush;
   `
 
   const script = new vm.Script(scriptContent)
@@ -2011,5 +2014,75 @@ describe('trimLog Internal', () => {
     // Should have removed the first 10 entries
     assert.strictEqual(state.log[0], 'line 10')
     assert.strictEqual(state.log[max - 1], `line ${max + 9}`)
+  })
+})
+
+// =============================================================================
+// Persistence Tests
+// =============================================================================
+
+describe('Persistence', () => {
+  it('persistNow should flush immediately and clear pendingFlush', async () => {
+    const { sandbox, sessionSetData } = setupEnvironment()
+
+    // 1. Set a pendingFlush via persistSoon
+    sandbox.test_persistSoon()
+    const initialFlush = sandbox.test_pendingFlush()
+    assert.ok(initialFlush, 'persistSoon should have set a pendingFlush')
+
+    // 2. Call persistNow
+    sandbox.test_persistNow()
+
+    // 3. Verify
+    assert.strictEqual(sandbox.test_pendingFlush(), null, 'persistNow should have cleared pendingFlush')
+    assert.ok(sessionSetData.length > 0, 'persistNow should have called session.set')
+    assert.strictEqual(
+      JSON.stringify(sessionSetData[sessionSetData.length - 1]),
+      JSON.stringify({ archiveState: sandbox.test_state() }),
+      'Persisted state should match current state'
+    )
+  })
+
+  it('persistSoon should debounce multiple calls', async () => {
+    const { sandbox, sessionSetData } = setupEnvironment()
+
+    // 1. Call persistSoon multiple times
+    sandbox.test_persistSoon()
+    const firstFlush = sandbox.test_pendingFlush()
+    assert.ok(firstFlush, 'First call should set pendingFlush')
+
+    sandbox.test_persistSoon()
+    const secondFlush = sandbox.test_pendingFlush()
+    assert.strictEqual(firstFlush, secondFlush, 'Second call should reuse existing pendingFlush')
+
+    // 2. Wait for the debounce timeout (150ms + buffer)
+    await new Promise((resolve) => setTimeout(resolve, 200))
+
+    // 3. Verify
+    assert.strictEqual(sandbox.test_pendingFlush(), null, 'After timeout, pendingFlush should be null')
+    assert.ok(sessionSetData.length > 0, 'session.set should have been called')
+    assert.strictEqual(
+      JSON.stringify(sessionSetData[sessionSetData.length - 1]),
+      JSON.stringify({ archiveState: sandbox.test_state() }),
+      'Persisted state should match current state'
+    )
+  })
+
+  it('updateState should choose between persistNow and persistSoon', async () => {
+    const { sandbox } = setupEnvironment()
+
+    // 1. updateState with status should trigger persistNow
+    sandbox.test_updateState({ status: 'running' })
+    assert.strictEqual(sandbox.test_pendingFlush(), null, 'Status update should flush immediately')
+
+    // 2. updateState without status should trigger persistSoon
+    sandbox.test_updateState({ progress: { archived: 1, skipped: 0, total: 10 } })
+    assert.ok(sandbox.test_pendingFlush(), 'Progress update should defer flush')
+  })
+
+  it('addLog should trigger persistSoon', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.test_addLog('test message')
+    assert.ok(sandbox.test_pendingFlush(), 'addLog should set a pendingFlush')
   })
 })
