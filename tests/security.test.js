@@ -396,4 +396,50 @@ describe('Orchestrator Privilege Escalation Security', () => {
     assert.strictEqual(responseData?.ok, true, 'Should allow CACHE_START_CONFIG from content script')
     assert.deepStrictEqual(sessionData.startConfig, { some: 'data' })
   })
+
+  it('should reject CACHE_START_CONFIG payloads larger than 50KB to prevent DoS', () => {
+    const { onMessageListeners } = setupEnvironment()
+    const listener = onMessageListeners[0] // background.js listener
+
+    let responseData = null
+    const sendResponse = (data) => {
+      responseData = data
+    }
+
+    // Create a payload larger than 51200 chars
+    const largeString = 'a'.repeat(51201)
+    const largeConfig = { data: largeString }
+
+    const sender = { tab: { id: 1 } }
+    listener({ action: 'CACHE_START_CONFIG', config: largeConfig }, sender, sendResponse)
+
+    assert.strictEqual(
+      responseData?.error,
+      'Security Error: Payload exceeds maximum allowed size',
+      'Should reject oversized payloads'
+    )
+  })
+
+  it('should safely reject unserializable CACHE_START_CONFIG payloads (circular references)', () => {
+    const { onMessageListeners } = setupEnvironment()
+    const listener = onMessageListeners[0] // background.js listener
+
+    let responseData = null
+    const sendResponse = (data) => {
+      responseData = data
+    }
+
+    // Create circular reference
+    const circularConfig = { name: 'config' }
+    circularConfig.self = circularConfig
+
+    const sender = { tab: { id: 1 } }
+    listener({ action: 'CACHE_START_CONFIG', config: circularConfig }, sender, sendResponse)
+
+    assert.strictEqual(
+      responseData?.error,
+      'Security Error: Invalid payload format',
+      'Should safely handle and reject unserializable payloads'
+    )
+  })
 })

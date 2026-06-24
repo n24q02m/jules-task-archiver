@@ -1260,6 +1260,16 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       return true
 
     case 'CACHE_START_CONFIG':
+      try {
+        const payloadLength = JSON.stringify(msg.config).length
+        if (payloadLength > 51200) {
+          sendResponse({ error: 'Security Error: Payload exceeds maximum allowed size' })
+          break
+        }
+      } catch (_e) {
+        sendResponse({ error: 'Security Error: Invalid payload format' })
+        break
+      }
       chrome.storage.session.set({ startConfig: msg.config })
       sendResponse({ ok: true })
       break
