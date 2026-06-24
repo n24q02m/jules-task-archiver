@@ -31,3 +31,7 @@
 ## 2026-06-09 - Empty State Feedback
 **Learning:** When a list or process finishes with zero results, an empty summary container gives no feedback, leaving the user wondering if it actually ran or failed silently.
 **Action:** Always provide a helpful empty state message explaining why no results might have occurred, using styles consistent with other hints to offer guidance without showing as an error.
+
+## 2024-05-24 - Form Control Accessibility
+**Learning:** Generic `div role="group"` or `role="radiogroup"` combined with `aria-labelledby` using pseudo-labels provides inferior screen reader experience compared to semantic HTML elements. Native elements communicate grouping and context natively.
+**Action:** When grouping related controls (like segmented buttons or radio inputs) to improve accessibility, wrap the existing layout inside a reset `<fieldset>` (`border: none; padding: 0; margin: 0;`) and use a `<legend>` to act as the group's label. This provides a robust, native grouping experience without adding custom CSS.
