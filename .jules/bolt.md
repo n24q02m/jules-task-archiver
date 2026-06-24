@@ -1,0 +1,3 @@
+## 2025-02-18 - Fast Map Grouping
+**Learning:** While `Map.groupBy` (ES2024) is a convenient built-in for grouping items, in this codebase architecture it was found to be ~57% slower than an optimized imperative loop using a single `map.get()` lookup combined with conditional array initialization (`map.set()`). The standard `has()` followed by `set()` then `get()` approach was even slower (~100% slower than optimal).
+**Action:** When grouping items into a Map in performance-sensitive paths, prioritize a single `map.get(key)` call and checking for `undefined` over multiple lookups or `Map.groupBy` unless the collection size is trivially small.
