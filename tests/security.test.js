@@ -396,4 +396,39 @@ describe('Orchestrator Privilege Escalation Security', () => {
     assert.strictEqual(responseData?.ok, true, 'Should allow CACHE_START_CONFIG from content script')
     assert.deepStrictEqual(sessionData.startConfig, { some: 'data' })
   })
+
+  it('should reject CACHE_START_CONFIG payload exceeding 50KB limit', () => {
+    const { onMessageListeners } = setupEnvironment()
+    const listener = onMessageListeners[0]
+
+    let responseData = null
+    const sendResponse = (data) => {
+      responseData = data
+    }
+
+    const largeConfig = { data: 'a'.repeat(51201) }
+    const sender = { tab: { id: 1 } }
+
+    listener({ action: 'CACHE_START_CONFIG', config: largeConfig }, sender, sendResponse)
+
+    assert.strictEqual(responseData?.error, 'Security Error: Payload exceeds 50KB limit')
+  })
+
+  it('should reject un-serializable CACHE_START_CONFIG payload', () => {
+    const { onMessageListeners } = setupEnvironment()
+    const listener = onMessageListeners[0]
+
+    let responseData = null
+    const sendResponse = (data) => {
+      responseData = data
+    }
+
+    const circularObj = {}
+    circularObj.self = circularObj
+    const sender = { tab: { id: 1 } }
+
+    listener({ action: 'CACHE_START_CONFIG', config: circularObj }, sender, sendResponse)
+
+    assert.strictEqual(responseData?.error, 'Security Error: Invalid payload structure')
+  })
 })

@@ -1259,10 +1259,21 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       stateReadyPromise.then(() => sendResponse(state))
       return true
 
-    case 'CACHE_START_CONFIG':
+    case 'CACHE_START_CONFIG': {
+      try {
+        const payloadStr = JSON.stringify(msg.config)
+        if (payloadStr.length > 51200) {
+          sendResponse({ error: 'Security Error: Payload exceeds 50KB limit' })
+          break
+        }
+      } catch (_e) {
+        sendResponse({ error: 'Security Error: Invalid payload structure' })
+        break
+      }
       chrome.storage.session.set({ startConfig: msg.config })
       sendResponse({ ok: true })
       break
+    }
 
     case 'RESET':
       if (_sender.tab) {
