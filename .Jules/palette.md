@@ -31,3 +31,7 @@
 ## 2026-06-09 - Empty State Feedback
 **Learning:** When a list or process finishes with zero results, an empty summary container gives no feedback, leaving the user wondering if it actually ran or failed silently.
 **Action:** Always provide a helpful empty state message explaining why no results might have occurred, using styles consistent with other hints to offer guidance without showing as an error.
+
+## 2024-06-25 - Use semantic fieldsets for form controls
+**Learning:** I found that generic form controls using `role="group"` paired with `aria-labelledby` IDs on label elements (pseudo-labels) trigger accessibility linters because they are not semantic. These generic elements should be transformed into native `<fieldset>` and `<legend>` elements to pass accessibility linters and improve semantic UX, and they can be styled with inline styles to match existing constraints without altering visual styling.
+**Action:** I will wrap existing UI layout `div`s inside semantic `fieldset`s with `border: none; margin: 0; padding: 0`, and replace pseudo-labels with `<legend>` tags carrying existing styling (`display: block; font-size: 12px; color: #94a3b8; margin-bottom: 6px; padding: 0;`).
