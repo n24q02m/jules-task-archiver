@@ -318,12 +318,19 @@ function isArchivable(task) {
   // A null/undefined state is emitted for one class of completed tasks.
   return task.state == null || ARCHIVABLE_STATES.has(task.state)
 }
+// ⚡ Bolt Optimization: Group items using a single map.get(key) call and checking
+// for undefined before setting. This reduces Map key hashing and lookups from
+// 2-3 per iteration to 1-2, improving grouping performance for large task lists.
 function groupTasksByRepo(tasks) {
   const map = new Map()
   for (const t of tasks) {
     const key = t.repo || '(no repo)'
-    if (!map.has(key)) map.set(key, [])
-    map.get(key).push(t)
+    let list = map.get(key)
+    if (list === undefined) {
+      list = []
+      map.set(key, list)
+    }
+    list.push(t)
   }
   return map
 }
