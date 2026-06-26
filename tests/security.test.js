@@ -398,7 +398,7 @@ describe('Orchestrator Privilege Escalation Security', () => {
   })
 
   it('should enforce 50KB payload limit on CACHE_START_CONFIG to prevent DoS', () => {
-    const { onMessageListeners, chromeMock } = setupEnvironment()
+    const { onMessageListeners } = setupEnvironment()
     const listener = onMessageListeners[0] // background.js listener
 
     let responseData = null
