@@ -1260,8 +1260,17 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       return true
 
     case 'CACHE_START_CONFIG':
-      chrome.storage.session.set({ startConfig: msg.config })
-      sendResponse({ ok: true })
+      try {
+        const payloadStr = JSON.stringify(msg.config)
+        if (payloadStr.length > 51200) {
+          sendResponse({ error: 'Security Error: Payload size exceeds 50KB limit' })
+          break
+        }
+        chrome.storage.session.set({ startConfig: msg.config })
+        sendResponse({ ok: true })
+      } catch (_e) {
+        sendResponse({ error: 'Security Error: Invalid payload' })
+      }
       break
 
     case 'RESET':

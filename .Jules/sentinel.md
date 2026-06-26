@@ -1,0 +1,4 @@
+## 2026-06-26 - DoS Vulnerability via Storage Quota Exhaustion
+**Vulnerability:** The `CACHE_START_CONFIG` message payload originating from content scripts was written directly to `chrome.storage.session` without any size validation.
+**Learning:** A malicious actor could exploit this by sending arbitrarily large payloads to the extension, exhausting the storage quota and causing a Denial of Service (DoS) for the background script or extension operations relying on `chrome.storage.session`. Furthermore, un-serializable objects (like circular references) could crash the execution context if not handled properly during size calculations.
+**Prevention:** Implement strict payload size limits (e.g., 50KB / 51,200 characters) on any data received from content scripts before persistence. Additionally, always wrap dynamic object serialization (e.g., `JSON.stringify()`) in a `try/catch` block to handle un-serializable objects safely and prevent execution crashes.

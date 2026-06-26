@@ -396,4 +396,47 @@ describe('Orchestrator Privilege Escalation Security', () => {
     assert.strictEqual(responseData?.ok, true, 'Should allow CACHE_START_CONFIG from content script')
     assert.deepStrictEqual(sessionData.startConfig, { some: 'data' })
   })
+
+  it('should enforce 50KB payload limit on CACHE_START_CONFIG to prevent DoS', () => {
+    const { onMessageListeners, chromeMock } = setupEnvironment()
+    const listener = onMessageListeners[0] // background.js listener
+
+    let responseData = null
+    const sendResponse = (data) => {
+      responseData = data
+    }
+
+    const sender = { tab: { id: 1 } }
+
+    // 50KB = 51200 chars. We create a payload that, when stringified, exceeds this.
+    // 'a' repeated 51200 times + overhead of {"data":""} makes it > 51200
+    const largePayload = { data: 'a'.repeat(51200) }
+
+    listener({ action: 'CACHE_START_CONFIG', config: largePayload }, sender, sendResponse)
+
+    assert.strictEqual(
+      responseData?.error,
+      'Security Error: Payload size exceeds 50KB limit',
+      'Should reject oversized payload'
+    )
+  })
+
+  it('should reject un-serializable payloads in CACHE_START_CONFIG', () => {
+    const { onMessageListeners } = setupEnvironment()
+    const listener = onMessageListeners[0]
+
+    let responseData = null
+    const sendResponse = (data) => {
+      responseData = data
+    }
+
+    const sender = { tab: { id: 1 } }
+
+    const circularObj = {}
+    circularObj.self = circularObj
+
+    listener({ action: 'CACHE_START_CONFIG', config: circularObj }, sender, sendResponse)
+
+    assert.strictEqual(responseData?.error, 'Security Error: Invalid payload', 'Should reject circular objects')
+  })
 })
