@@ -31,3 +31,6 @@
 ## 2026-06-09 - Empty State Feedback
 **Learning:** When a list or process finishes with zero results, an empty summary container gives no feedback, leaving the user wondering if it actually ran or failed silently.
 **Action:** Always provide a helpful empty state message explaining why no results might have occurred, using styles consistent with other hints to offer guidance without showing as an error.
+## 2025-06-25 - Semantic Grouping for Form Controls
+**Learning:** Using a generic `div role="group"` with a pseudo-label (e.g. `<label id="...">` and `aria-labelledby`) for logical form groups (like operation selection or execution mode) triggers accessibility warnings (`noLabelWithoutControl`) because `<label>` elements are intended exclusively for interactive form controls like inputs, not container elements. Furthermore, structural wrappers are less semantically robust than native grouping elements.
+**Action:** Always replace logical form groupings with native `<fieldset>` and `<legend>` elements to provide semantically correct and universally supported accessibility. When migrating existing visual designs, wrap the layout in a reset `<fieldset>` (`border: none; padding: 0; margin: 0;`) and style the `<legend>` to match the previous pseudo-label, avoiding the need for complex custom CSS classes or new design tokens.
