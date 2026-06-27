@@ -1,0 +1,4 @@
+## 2025-02-27 - Storage Quota Exhaustion via Oversized Payloads
+**Vulnerability:** The `CACHE_START_CONFIG` message handler accepted unsanitized configuration payloads without any length validation, allowing a potentially unprivileged content script or web page to exhaust Chrome extension's storage limits (DoS attack) by sending an oversized object.
+**Learning:** Payloads that directly map to storage structures like `chrome.storage.session` must enforce a bounded length constraint. Dynamic object sizes can be computed via `JSON.stringify(obj).length`, but the check must be wrapped in `try/catch` to handle circular references or non-serializable objects that would otherwise crash the execution context.
+**Prevention:** Always bound dynamically sized inputs before storage persistence using explicit limits, and wrap JSON serialization in a `try/catch` to gracefully reject malformed payloads.
