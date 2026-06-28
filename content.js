@@ -22,7 +22,11 @@ injectMainWorldScript()
 // The MAIN world script and isolated world share the same window and origin,
 // so anything failing these checks is a cross-origin/cross-frame spoof attempt.
 function isTrustedMessage(event) {
-  return event.source === window && event.origin === window.location.origin
+  if (event.source !== window || event.origin !== window.location.origin) return false
+  const type = event.data?.type
+  if (typeof type !== 'string' || !type.startsWith('JULES_')) return false
+  if (type.endsWith('_CONFIG') && type !== 'JULES_REQUEST_CONFIG' && !event.data?.config) return false
+  return true
 }
 
 // Listen for messages from MAIN world script
