@@ -50,7 +50,8 @@ section {
   border-radius: 6px;
 }
 
-label {
+label,
+legend {
   display: block;
   font-size: 12px;
   color: #94a3b8;
@@ -85,7 +86,8 @@ input[type="password"]:focus {
   margin-bottom: 8px;
 }
 
-.setting-row label {
+.setting-row label,
+.setting-row legend {
   margin-bottom: 4px;
 }
 

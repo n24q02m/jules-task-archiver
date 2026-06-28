@@ -31,3 +31,6 @@
 ## 2026-06-09 - Empty State Feedback
 **Learning:** When a list or process finishes with zero results, an empty summary container gives no feedback, leaving the user wondering if it actually ran or failed silently.
 **Action:** Always provide a helpful empty state message explaining why no results might have occurred, using styles consistent with other hints to offer guidance without showing as an error.
+## 2025-07-10 - Native Semantics for Grouped Inputs
+**Learning:** Using generic `div role="group"` or `div role="radiogroup"` with `aria-labelledby` creates brittle accessibility for grouped controls and often leads to linter warnings (like `noLabelWithoutControl`) because they lack native element association.
+**Action:** Always wrap related grouped inputs (like radio buttons or segmented controls) in a semantic `<fieldset>` and use a `<legend>` instead of a `<label>`. To maintain visual consistency without adding custom CSS, ensure the `<legend>` inherits the same styling as standard `<label>` elements.
