@@ -436,11 +436,8 @@ describe('popup.html accessibility', () => {
   })
 
   it('should use explicit visible labels for radio groups via aria-labelledby', () => {
-    return; // Tests updated because fieldset/legend natively handles this
     assert.ok(popupHtml.includes('id="execModeLabel"'), 'execModeLabel should exist')
-    // assert.ok(popupHtml.includes('aria-labelledby="execModeLabel"'), 'mode radiogroup should use aria-labelledby')
     assert.ok(popupHtml.includes('id="scopeLabel"'), 'scopeLabel should exist')
-    // assert.ok(popupHtml.includes('aria-labelledby="scopeLabel"'), 'scope radiogroup should use aria-labelledby')
   })
 })
 
