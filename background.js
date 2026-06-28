@@ -322,8 +322,13 @@ function groupTasksByRepo(tasks) {
   const map = new Map()
   for (const t of tasks) {
     const key = t.repo || '(no repo)'
-    if (!map.has(key)) map.set(key, [])
-    map.get(key).push(t)
+    // ⚡ Bolt: Optimize map lookup to reduce key hashing
+    let arr = map.get(key)
+    if (arr === undefined) {
+      arr = []
+      map.set(key, arr)
+    }
+    arr.push(t)
   }
   return map
 }
