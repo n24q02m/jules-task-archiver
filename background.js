@@ -346,10 +346,15 @@ function isArchivable(task) {
 }
 function groupTasksByRepo(tasks) {
   const map = new Map()
-  for (const t of tasks) {
+  for (let i = 0; i < tasks.length; i++) {
+    const t = tasks[i]
     const key = t.repo || '(no repo)'
-    if (!map.has(key)) map.set(key, [])
-    map.get(key).push(t)
+    let list = map.get(key)
+    if (list === undefined) {
+      list = []
+      map.set(key, list)
+    }
+    list.push(t)
   }
   return map
 }
@@ -1069,19 +1074,33 @@ async function filterArchivableTasks(label, tasks, options) {
     return { toArchive: [...tasks], toSkip: [] }
   }
 
-  const candidates = tasks.filter(isArchivable)
+  const byRepo = new Map()
+  const candidates = []
+  const statesSet = new Set()
+  for (let i = 0; i < tasks.length; i++) {
+    const t = tasks[i]
+    statesSet.add(t.state)
+    if (isArchivable(t)) {
+      candidates.push(t)
+      const key = t.repo || '(no repo)'
+      let list = byRepo.get(key)
+      if (list === undefined) {
+        list = []
+        byRepo.set(key, list)
+      }
+      list.push(t)
+    }
+  }
   const activeCount = tasks.length - candidates.length
 
   addLog(`[${label}] ${tasks.length} total: ${candidates.length} archivable, ${activeCount} active`)
 
   if (candidates.length === 0) {
-    const states = [...new Set(tasks.map((t) => t.state))].join(', ')
+    const states = [...statesSet].join(', ')
     addLog(`[${label}] No archivable tasks among ${tasks.length} (states seen: ${states}).`)
     addLog(`[${label}] Enable Force to archive regardless of state.`)
     return { toArchive: [], toSkip: [] }
   }
-
-  const byRepo = groupTasksByRepo(candidates)
   addLog(`\n[${label}] Checking open PRs per task...`)
   const { ghOwner } = await chrome.storage.sync.get(['ghOwner'])
   const { ghToken } = await chrome.storage.local.get(['ghToken'])
