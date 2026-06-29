@@ -550,7 +550,7 @@ async function getDailySessionQuota(config) {
 // Prompt Builder
 // =============================================================================
 
-function createRoleConfig(icon, name, role, codeLabel) {
+function createRoleConfig(icon = '', name = '', role = '', codeLabel = '') {
   return { icon, name, role, codeLabel }
 }
 

@@ -2062,7 +2062,7 @@ describe('trimLog Internal', () => {
 })
 
 describe('Prompt Builder', () => {
-  it('createRoleConfig should return a valid config object', () => {
+  it('createRoleConfig should return a valid config object with all arguments', () => {
     const { sandbox } = setupEnvironment()
     const icon = '[ICON]'
     const name = 'Name'
@@ -2077,8 +2077,49 @@ describe('Prompt Builder', () => {
     assert.strictEqual(config.codeLabel, codeLabel)
   })
 
-  it('predefined configs should be correctly initialized', () => {
+  it('createRoleConfig should handle missing arguments using defaults', () => {
     const { sandbox } = setupEnvironment()
+
+    const empty = sandbox.test_createRoleConfig()
+    assert.strictEqual(empty.icon, '')
+    assert.strictEqual(empty.name, '')
+    assert.strictEqual(empty.role, '')
+    assert.strictEqual(empty.codeLabel, '')
+
+    const partial = sandbox.test_createRoleConfig('[ICON]', 'Name')
+    assert.strictEqual(partial.icon, '[ICON]')
+    assert.strictEqual(partial.name, 'Name')
+    assert.strictEqual(partial.role, '')
+    assert.strictEqual(partial.codeLabel, '')
+  })
+
+  it('createRoleConfig should return a new object on every call (referential integrity)', () => {
+    const { sandbox } = setupEnvironment()
+    const c1 = sandbox.test_createRoleConfig('a', 'b', 'c', 'd')
+    const c2 = sandbox.test_createRoleConfig('a', 'b', 'c', 'd')
+
+    assert.notStrictEqual(c1, c2)
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(c1)), JSON.parse(JSON.stringify(c2)))
+  })
+
+  it('predefined configs should be correctly initialized with all properties', () => {
+    const { sandbox } = setupEnvironment()
+    const configs = [
+      sandbox.test_SECURITY_CONFIG,
+      sandbox.test_PERFORMANCE_CONFIG,
+      sandbox.test_CLEANUP_CONFIG,
+      sandbox.test_TESTING_CONFIG,
+      sandbox.test_DEFAULT_CATEGORY
+    ]
+
+    for (const config of configs) {
+      assert.strictEqual(typeof config.icon, 'string')
+      assert.strictEqual(typeof config.name, 'string')
+      assert.strictEqual(typeof config.role, 'string')
+      assert.strictEqual(typeof config.codeLabel, 'string')
+      assert.ok(config.icon.length > 0)
+      assert.ok(config.name.length > 0)
+    }
 
     assert.strictEqual(sandbox.test_SECURITY_CONFIG.icon, '[SECURITY]')
     assert.strictEqual(sandbox.test_PERFORMANCE_CONFIG.icon, '[PERF]')
@@ -2091,9 +2132,24 @@ describe('Prompt Builder', () => {
     const { sandbox } = setupEnvironment()
     const categoryConfig = sandbox.test_CATEGORY_CONFIG
 
+    // Security
     assert.strictEqual(categoryConfig['input-validation'], sandbox.test_SECURITY_CONFIG)
+    assert.strictEqual(categoryConfig['insecure-config'], sandbox.test_SECURITY_CONFIG)
+    assert.strictEqual(categoryConfig.injection, sandbox.test_SECURITY_CONFIG)
+
+    // Performance
     assert.strictEqual(categoryConfig['async-io'], sandbox.test_PERFORMANCE_CONFIG)
+    assert.strictEqual(categoryConfig['loop-optimization'], sandbox.test_PERFORMANCE_CONFIG)
+    assert.strictEqual(categoryConfig['data-structure'], sandbox.test_PERFORMANCE_CONFIG)
+
+    // Cleanup
     assert.strictEqual(categoryConfig['dead-code'], sandbox.test_CLEANUP_CONFIG)
+    assert.strictEqual(categoryConfig.other, sandbox.test_CLEANUP_CONFIG)
+
+    // Testing
     assert.strictEqual(categoryConfig['untested-function'], sandbox.test_TESTING_CONFIG)
+    assert.strictEqual(categoryConfig['missing-error-test'], sandbox.test_TESTING_CONFIG)
+    assert.strictEqual(categoryConfig['missing-edge-case'], sandbox.test_TESTING_CONFIG)
+    assert.strictEqual(categoryConfig['missing-test-file'], sandbox.test_TESTING_CONFIG)
   })
 })
