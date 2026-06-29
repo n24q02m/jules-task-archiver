@@ -355,7 +355,7 @@ function groupTasksByRepo(tasks) {
 }
 
 async function listTasks(filter, config) {
-  const payload = [filter, 4]
+  const payload = [filter, null]
   const result = await callBatchExecute('p1Takd', payload, config)
   if (!result?.[0]) return []
   return result[0].map(parseTask)
