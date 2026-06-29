@@ -687,8 +687,10 @@ async function startSuggestion(suggestion, repo, config, startConfig) {
 }
 
 async function getStartConfig() {
+  if (cachedStartConfig) return cachedStartConfig
   const { startConfig } = await chrome.storage.session.get('startConfig')
-  return startConfig || null
+  cachedStartConfig = startConfig || null
+  return cachedStartConfig
 }
 
 // =============================================================================
@@ -867,6 +869,7 @@ const DEFAULT_STATE = {
 const MAX_LOG_LINES = 2000
 
 let state = { ...DEFAULT_STATE }
+let cachedStartConfig = null
 let pendingFlush = null
 
 function trimLog() {
@@ -1203,6 +1206,7 @@ async function processTab(tab, options) {
 }
 
 function initOperationState(options) {
+  cachedStartConfig = null
   prCache.clear()
   const randomArray = new Uint32Array(1)
   crypto.getRandomValues(randomArray)
@@ -1330,11 +1334,13 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         sendResponse({ error: 'Security Error: Invalid payload' })
         break
       }
+      cachedStartConfig = msg.config
       chrome.storage.session.set({ startConfig: msg.config })
       sendResponse({ ok: true })
       break
 
     case 'RESET':
+      cachedStartConfig = null
       if (_sender.tab) {
         sendResponse({ error: 'Security Error: Unauthorized action from content script' })
         break
