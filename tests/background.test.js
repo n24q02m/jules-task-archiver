@@ -157,6 +157,9 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_getDailySessionQuota = getDailySessionQuota;
     globalThis.test_ensureContentScript = ensureContentScript;
     globalThis.test_getTabConfig = getTabConfig;
+    globalThis.test_persistNow = persistNow;
+    globalThis.test_persistSoon = persistSoon;
+    globalThis.test_pendingFlush = () => pendingFlush;
   `
 
   const script = new vm.Script(scriptContent)
@@ -2095,5 +2098,81 @@ describe('Prompt Builder', () => {
     assert.strictEqual(categoryConfig['async-io'], sandbox.test_PERFORMANCE_CONFIG)
     assert.strictEqual(categoryConfig['dead-code'], sandbox.test_CLEANUP_CONFIG)
     assert.strictEqual(categoryConfig['untested-function'], sandbox.test_TESTING_CONFIG)
+  })
+})
+
+// =============================================================================
+// State Persistence Tests
+// =============================================================================
+
+describe('State Persistence', () => {
+  it('persistNow should clear pendingFlush and set storage immediately', async () => {
+    const { sandbox } = setupEnvironment()
+    let clearedId = null
+    sandbox.clearTimeout = (id) => {
+      clearedId = id
+    }
+
+    // Manually set a mock pendingFlush
+    sandbox.test_persistSoon() // This will use real setTimeout, let's mock it
+    const initialTimerId = sandbox.test_pendingFlush()
+    assert.ok(initialTimerId)
+
+    await sandbox.test_persistNow()
+
+    assert.strictEqual(clearedId, initialTimerId)
+    assert.strictEqual(sandbox.test_pendingFlush(), null)
+
+    const storage = await sandbox.chrome.storage.session.get('archiveState')
+    assert.deepStrictEqual(storage.archiveState, sandbox.test_state())
+  })
+
+  it('persistSoon should set a timeout if none exists', () => {
+    const { sandbox } = setupEnvironment()
+    let timerId = 0
+    let timeoutMs = 0
+    sandbox.setTimeout = (_fn, ms) => {
+      timeoutMs = ms
+      return ++timerId
+    }
+
+    sandbox.test_persistSoon()
+    assert.strictEqual(sandbox.test_pendingFlush(), 1)
+    assert.strictEqual(timeoutMs, 150)
+  })
+
+  it('multiple persistSoon calls should not reset the timeout', () => {
+    const { sandbox } = setupEnvironment()
+    let calls = 0
+    sandbox.setTimeout = () => {
+      calls++
+      return 123
+    }
+
+    sandbox.test_persistSoon()
+    sandbox.test_persistSoon()
+    sandbox.test_persistSoon()
+
+    assert.strictEqual(calls, 1)
+    assert.strictEqual(sandbox.test_pendingFlush(), 123)
+  })
+
+  it('persistSoon timeout should set storage and clear pendingFlush', async () => {
+    const { sandbox } = setupEnvironment()
+    let timeoutFn = null
+    sandbox.setTimeout = (fn) => {
+      timeoutFn = fn
+      return 123
+    }
+
+    sandbox.test_persistSoon()
+    assert.strictEqual(sandbox.test_pendingFlush(), 123)
+
+    // Execute the timeout function
+    await timeoutFn()
+
+    assert.strictEqual(sandbox.test_pendingFlush(), null)
+    const storage = await sandbox.chrome.storage.session.get('archiveState')
+    assert.deepStrictEqual(storage.archiveState, sandbox.test_state())
   })
 })
