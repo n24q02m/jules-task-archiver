@@ -45,6 +45,7 @@ function setupSandbox(initialWizData = {}) {
     window: windowMock,
     console,
     URLSearchParams: windowMock.URLSearchParams,
+    TEST_MODE: true,
     JSON,
     Date: windowMock.Date,
     String,
@@ -269,4 +270,58 @@ describe('main-world.js', () => {
     vm.runInContext(mainWorldJs, sandbox)
     assert.strictEqual(windowMock.fetch, firstFetch, 'Fetch should not be wrapped again')
   })
+})
+
+describe('broadcastConfig direct testing', () => {
+  it('should pick up updates to window.WIZ_global_data', () => {
+    const { sandbox, messages, windowMock } = setupSandbox({
+      SNlM0e: 'initial-token'
+    })
+
+    vm.runInContext(mainWorldJs, sandbox)
+    assert.strictEqual(messages.length, 1)
+    assert.strictEqual(messages[0].data.config.at, 'initial-token')
+
+    // Update global data
+    windowMock.WIZ_global_data = {
+      SNlM0e: 'updated-token'
+    }
+
+    // Call exposed broadcastConfig
+    sandbox.test_broadcastConfig()
+
+    assert.strictEqual(messages.length, 2)
+    assert.strictEqual(messages[1].data.config.at, 'updated-token')
+  })
+})
+
+it('should correctly populate the timestamp field', () => {
+  const { sandbox, messages } = setupSandbox({
+    SNlM0e: 'token'
+  })
+
+  vm.runInContext(mainWorldJs, sandbox)
+
+  // Initial broadcast
+  assert.strictEqual(messages[0].data.config.timestamp, 1234567890)
+
+  // Manual call
+  sandbox.test_broadcastConfig()
+  assert.strictEqual(messages[1].data.config.timestamp, 1234567890)
+})
+
+it('should use window.location.origin as the targetOrigin in postMessage', () => {
+  const { sandbox, messages, windowMock } = setupSandbox({
+    SNlM0e: 'token'
+  })
+
+  const customOrigin = 'https://custom.google.com'
+  windowMock.location.origin = customOrigin
+
+  vm.runInContext(mainWorldJs, sandbox)
+
+  assert.strictEqual(messages[0].targetOrigin, customOrigin)
+
+  sandbox.test_broadcastConfig()
+  assert.strictEqual(messages[1].targetOrigin, customOrigin)
 })

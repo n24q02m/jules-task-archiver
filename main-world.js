@@ -77,3 +77,8 @@ window.addEventListener('message', (event) => {
     broadcastConfig()
   }
 })
+
+// Exposure for testing
+if (typeof globalThis !== 'undefined' && globalThis.TEST_MODE) {
+  globalThis.test_broadcastConfig = broadcastConfig
+}
