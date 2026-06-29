@@ -58,6 +58,15 @@ function setupContentSandbox(initialUrl = 'https://jules.google.com/u/0/') {
   vm.createContext(sandbox)
   vm.runInContext(contentJsContent, sandbox)
 
+  // Inject test helpers
+  vm.runInContext(
+    `
+    globalThis.getAccountLabel = getAccountLabel;
+    globalThis.getAccountNum = getAccountNum;
+  `,
+    sandbox
+  )
+
   return sandbox
 }
 

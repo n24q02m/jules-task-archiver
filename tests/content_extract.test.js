@@ -100,6 +100,20 @@ function setupEnvironment() {
   vm.createContext(sandbox)
   vm.runInContext(contentJsCode, sandbox)
 
+  // Inject test helpers
+  vm.runInContext(
+    `
+    globalThis.test_cachedConfig = {
+      get: () => cachedConfig,
+      set: (v) => { cachedConfig = v }
+    };
+    globalThis.test_extractConfig = extractConfig;
+    globalThis.test_getAccountNum = getAccountNum;
+    globalThis.test_getAccountLabel = getAccountLabel;
+  `,
+    sandbox
+  )
+
   return sandbox
 }
 
