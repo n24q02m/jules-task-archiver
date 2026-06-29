@@ -107,6 +107,8 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_archiveTaskWithRetry = archiveTaskWithRetry;
     globalThis.test_withRetry = withRetry;
     globalThis.test_isRetryable = isRetryable;
+    globalThis.test_RETRY_ATTEMPTS = RETRY_ATTEMPTS;
+    globalThis.test_RETRY_BASE_MS = RETRY_BASE_MS;
     globalThis.test_fixJsonControlChars = fixJsonControlChars;
     globalThis.test_findJsonEnd = findJsonEnd;
     globalThis.test_parseResponse = parseResponse;
@@ -430,36 +432,40 @@ describe('createLimiter', () => {
   })
 })
 
-describe('archiveTaskWithRetry', () => {
-  it('isRetryable matches rate-limit and transient errors only', () => {
-    const { sandbox } = setupEnvironment()
-    assert.strictEqual(sandbox.test_isRetryable('batchexecute Tjmm5c failed: HTTP 429'), true)
-    assert.strictEqual(sandbox.test_isRetryable('HTTP 503'), true)
-    assert.strictEqual(sandbox.test_isRetryable('Failed to fetch'), true)
-    assert.strictEqual(sandbox.test_isRetryable('HTTP 404'), false)
-    assert.strictEqual(sandbox.test_isRetryable('Security Error'), false)
-  })
+describe('Retry Utilities', () => {
+  describe('isRetryable', () => {
+    it('matches rate-limit and transient errors', () => {
+      const { sandbox } = setupEnvironment()
+      assert.strictEqual(sandbox.test_isRetryable('batchexecute Tjmm5c failed: HTTP 429'), true)
+      assert.strictEqual(sandbox.test_isRetryable('HTTP 500'), true)
+      assert.strictEqual(sandbox.test_isRetryable('HTTP 502'), true)
+      assert.strictEqual(sandbox.test_isRetryable('HTTP 503'), true)
+      assert.strictEqual(sandbox.test_isRetryable('HTTP 504'), true)
+      assert.strictEqual(sandbox.test_isRetryable('Failed to fetch'), true)
+      assert.strictEqual(sandbox.test_isRetryable('NetworkError'), true)
+    })
 
-  it('retries on a 429 then succeeds', async () => {
-    const { sandbox } = setupEnvironment()
-    let calls = 0
-    sandbox.archiveTask = async () => {
-      calls++
-      if (calls === 1) throw new Error('batchexecute Tjmm5c failed: HTTP 429')
-    }
-    await sandbox.test_archiveTaskWithRetry('t1', {})
-    assert.strictEqual(calls, 2)
-  })
+    it('is case-insensitive', () => {
+      const { sandbox } = setupEnvironment()
+      assert.strictEqual(sandbox.test_isRetryable('http 429'), true)
+      assert.strictEqual(sandbox.test_isRetryable('networkerror'), true)
+      assert.strictEqual(sandbox.test_isRetryable('FAILED TO FETCH'), true)
+    })
 
-  it('does not retry a non-retryable error', async () => {
-    const { sandbox } = setupEnvironment()
-    let calls = 0
-    sandbox.archiveTask = async () => {
-      calls++
-      throw new Error('HTTP 404')
-    }
-    await assert.rejects(sandbox.test_archiveTaskWithRetry('t1', {}), { message: 'HTTP 404' })
-    assert.strictEqual(calls, 1)
+    it('does not match non-retryable errors', () => {
+      const { sandbox } = setupEnvironment()
+      assert.strictEqual(sandbox.test_isRetryable('HTTP 404'), false)
+      assert.strictEqual(sandbox.test_isRetryable('HTTP 400'), false)
+      assert.strictEqual(sandbox.test_isRetryable('Security Error'), false)
+      assert.strictEqual(sandbox.test_isRetryable('JSON.parse error'), false)
+    })
+
+    it('handles edge case inputs', () => {
+      const { sandbox } = setupEnvironment()
+      assert.strictEqual(sandbox.test_isRetryable(null), false)
+      assert.strictEqual(sandbox.test_isRetryable(undefined), false)
+      assert.strictEqual(sandbox.test_isRetryable(''), false)
+    })
   })
 
   describe('withRetry', () => {
@@ -487,18 +493,19 @@ describe('archiveTaskWithRetry', () => {
       assert.strictEqual(result, 'retry-success')
     })
 
-    it('stops retrying after RETRY_ATTEMPTS', async () => {
+    it('exhausts all attempts and throws the last error', async () => {
       const { sandbox } = setupEnvironment()
       let calls = 0
       sandbox.setTimeout = (fn) => fn()
+      const attempts = sandbox.test_RETRY_ATTEMPTS
       await assert.rejects(
         sandbox.test_withRetry(async () => {
           calls++
-          throw new Error('HTTP 500')
+          throw new Error(`HTTP 500 attempt ${calls}`)
         }),
-        { message: 'HTTP 500' }
+        { message: `HTTP 500 attempt ${attempts}` }
       )
-      assert.strictEqual(calls, 4) // RETRY_ATTEMPTS is 4
+      assert.strictEqual(calls, attempts)
     })
 
     it('throws immediately on non-retryable error', async () => {
@@ -515,7 +522,7 @@ describe('archiveTaskWithRetry', () => {
       assert.strictEqual(calls, 1)
     })
 
-    it('verifies exponential backoff delay', async () => {
+    it('verifies exponential backoff delay calculation', async () => {
       const { sandbox } = setupEnvironment()
       const delays = []
       sandbox.setTimeout = (fn, ms) => {
@@ -523,24 +530,51 @@ describe('archiveTaskWithRetry', () => {
         fn()
       }
       sandbox.Math.random = () => 0.5 // Constant jitter for testing
+      const base = sandbox.test_RETRY_BASE_MS
 
       let calls = 0
       await sandbox.test_withRetry(async () => {
         calls++
-        if (calls < 3) throw new Error('HTTP 429')
+        if (calls < 4) throw new Error('HTTP 429')
         return 'ok'
       })
 
-      // RETRY_BASE_MS = 400
-      // attempt 0: 400 * 2^0 + 0.5 * 200 = 400 + 100 = 500
-      // attempt 1: 400 * 2^1 + 0.5 * 200 = 800 + 100 = 900
-      assert.strictEqual(delays.length, 2)
-      assert.strictEqual(delays[0], 500)
-      assert.strictEqual(delays[1], 900)
+      assert.strictEqual(delays.length, 3)
+      // delay = base * 2^attempt + random * 200
+      // attempt 0: base * 1 + 100
+      // attempt 1: base * 2 + 100
+      // attempt 2: base * 4 + 100
+      assert.strictEqual(delays[0], base * 1 + 100)
+      assert.strictEqual(delays[1], base * 2 + 100)
+      assert.strictEqual(delays[2], base * 4 + 100)
     })
   })
 })
 
+describe('archiveTaskWithRetry Integration', () => {
+  it('retries on a 429 then succeeds', async () => {
+    const { sandbox } = setupEnvironment()
+    let calls = 0
+    sandbox.archiveTask = async () => {
+      calls++
+      if (calls === 1) throw new Error('batchexecute Tjmm5c failed: HTTP 429')
+    }
+    sandbox.setTimeout = (fn) => fn()
+    await sandbox.test_archiveTaskWithRetry('t1', {})
+    assert.strictEqual(calls, 2)
+  })
+
+  it('does not retry a non-retryable error', async () => {
+    const { sandbox } = setupEnvironment()
+    let calls = 0
+    sandbox.archiveTask = async () => {
+      calls++
+      throw new Error('HTTP 404')
+    }
+    await assert.rejects(sandbox.test_archiveTaskWithRetry('t1', {}), { message: 'HTTP 404' })
+    assert.strictEqual(calls, 1)
+  })
+})
 describe('parseResponse', () => {
   it('should extract payload from batchexecute response', () => {
     const { sandbox } = setupEnvironment()
