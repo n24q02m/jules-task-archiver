@@ -35,7 +35,9 @@ function extractAccountNum(url) {
     const pathname = new URL(url).pathname
     const match = ACCOUNT_NUM_REGEX.exec(pathname)
     return match ? match[1] : '0'
-  } catch (_e) {
+  } catch (e) {
+    // 🛡️ Sentinel: Safe fallback for malformed URLs or non-Jules origins
+    console.warn('[Jules Archiver] Error extracting account number:', e)
     return '0'
   }
 }
