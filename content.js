@@ -75,6 +75,17 @@ function extractConfig() {
 // Detect account from URL
 function getAccountNum() {
   try {
+    // First try the robust DOM approach
+    const el = document.querySelector('c-wiz[data-is-main-wiz]')
+    if (el) {
+      const authUser = el.getAttribute('data-auth-user')
+      if (authUser) return authUser
+    }
+  } catch (_e) {
+    // Ignore DOM errors
+  }
+
+  try {
     const parts = new URL(location.href).pathname.split('/')
     const uIdx = parts.indexOf('u')
     const val = uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'

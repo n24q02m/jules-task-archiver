@@ -7,7 +7,7 @@ const vm = require('node:vm')
 const contentJsPath = path.join(__dirname, '../content.js')
 const contentJsContent = fs.readFileSync(contentJsPath, 'utf8')
 
-function setupContentSandbox(initialUrl = 'https://jules.google.com/u/0/') {
+function setupContentSandbox(initialUrl = 'https://jules.google.com/u/0/', domMock = null) {
   const chrome = {
     runtime: {
       getURL: (path) => `chrome-extension://id/${path}`,
@@ -29,7 +29,8 @@ function setupContentSandbox(initialUrl = 'https://jules.google.com/u/0/') {
         if (el.onload) el.onload()
       }
     },
-    documentElement: {}
+    documentElement: {},
+    querySelector: domMock || (() => null)
   }
 
   const window = {
@@ -84,7 +85,41 @@ describe('content.js getAccountLabel', () => {
 
   it('should handle malformed URLs gracefully via getAccountNum try-catch', () => {
     const sandbox = setupContentSandbox('not-a-url')
-    // getAccountNum has a try-catch that returns '0' on error
     assert.strictEqual(sandbox.getAccountLabel(), 'default')
+  })
+
+  it('should return account from DOM if available', () => {
+    const domMock = (query) => {
+      if (query === 'c-wiz[data-is-main-wiz]') {
+        return {
+          getAttribute: (attr) => (attr === 'data-auth-user' ? '42' : null)
+        }
+      }
+      return null
+    }
+    const sandbox = setupContentSandbox('https://jules.google.com/tasks', domMock)
+    assert.strictEqual(sandbox.getAccountNum(), '42')
+    assert.strictEqual(sandbox.getAccountLabel(), 'u/42')
+  })
+
+  it('should fallback to URL if DOM attribute is missing', () => {
+    const domMock = (query) => {
+      if (query === 'c-wiz[data-is-main-wiz]') {
+        return {
+          getAttribute: () => null
+        }
+      }
+      return null
+    }
+    const sandbox = setupContentSandbox('https://jules.google.com/u/7/tasks', domMock)
+    assert.strictEqual(sandbox.getAccountNum(), '7')
+  })
+
+  it('should fallback to URL if DOM query fails/throws', () => {
+    const domMock = () => {
+      throw new Error('DOM Error')
+    }
+    const sandbox = setupContentSandbox('https://jules.google.com/u/8/tasks', domMock)
+    assert.strictEqual(sandbox.getAccountNum(), '8')
   })
 })
