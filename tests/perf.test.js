@@ -137,9 +137,11 @@ describe('Orchestrator Performance Optimization', () => {
     ]
     sandbox.getOpenPRs = async () => [] // No PRs, so they should be archived
 
-    let archiveTaskCount = 0
-    sandbox.archiveTask = async () => {
-      archiveTaskCount++
+    let archiveTasksCallCount = 0
+    let totalArchived = 0
+    sandbox.archiveTasks = async (ids) => {
+      archiveTasksCallCount++
+      totalArchived += ids.length
     }
 
     const tab = { id: 123, url: 'https://jules.google.com/u/0/' }
@@ -147,7 +149,9 @@ describe('Orchestrator Performance Optimization', () => {
 
     await sandbox.processTab(tab, options)
 
-    assert.strictEqual(archiveTaskCount, 2, 'archiveTask should be called for each task')
+    // Batching (ARCHIVE_BATCH_SIZE=50): 2 tasks fit in one batch -> one API call.
+    assert.strictEqual(archiveTasksCallCount, 1, 'archiveTasks should be called once per batch, not per task')
+    assert.strictEqual(totalArchived, 2, 'both tasks should be archived in the single batch call')
   })
 })
 
