@@ -1063,10 +1063,10 @@ async function getTabConfig(tabId) {
 // Orchestrator
 // =============================================================================
 
-async function filterArchivableTasks(label, tasks, options) {
+function filterArchivableCandidates(label, tasks, options) {
   if (options.force) {
     addLog(`[${label}] FORCE: archiving all ${tasks.length} tasks (skip state filter + PR check)`)
-    return { toArchive: [...tasks], toSkip: [] }
+    return { toArchive: [...tasks], toSkip: [], candidates: [...tasks] }
   }
 
   const candidates = tasks.filter(isArchivable)
@@ -1078,9 +1078,13 @@ async function filterArchivableTasks(label, tasks, options) {
     const states = [...new Set(tasks.map((t) => t.state))].join(', ')
     addLog(`[${label}] No archivable tasks among ${tasks.length} (states seen: ${states}).`)
     addLog(`[${label}] Enable Force to archive regardless of state.`)
-    return { toArchive: [], toSkip: [] }
+    return { toArchive: [], toSkip: [], candidates: [] }
   }
 
+  return { toArchive: null, toSkip: [], candidates }
+}
+
+async function filterTasksByOpenPRs(label, candidates) {
   const byRepo = groupTasksByRepo(candidates)
   addLog(`\n[${label}] Checking open PRs per task...`)
   const { ghOwner } = await chrome.storage.sync.get(['ghOwner'])
@@ -1113,6 +1117,15 @@ async function filterArchivableTasks(label, tasks, options) {
   if (prLogs.length > 0) addLog(prLogs.join('\n'))
 
   return { toArchive, toSkip }
+}
+
+async function filterArchivableTasks(label, tasks, options) {
+  const { toArchive, toSkip, candidates } = filterArchivableCandidates(label, tasks, options)
+  if (options.force || candidates.length === 0) {
+    return { toArchive: toArchive || [], toSkip }
+  }
+
+  return filterTasksByOpenPRs(label, candidates)
 }
 
 function logDryRun(label, toArchive) {
