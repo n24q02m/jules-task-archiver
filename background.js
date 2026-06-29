@@ -695,28 +695,7 @@ async function getStartConfig() {
 // Suggestions Orchestrator
 // =============================================================================
 
-async function processSuggestionsForTab(tab, options) {
-  const prepared = await prepareTab(tab)
-  if (!prepared) return 0
-  const { label, config } = prepared
-
-  const startConfig = await getStartConfig()
-  if (!startConfig) {
-    addLog(`[${label}] No StartSuggestion config cached. Using defaults.`)
-    addLog(`[${label}] Tip: Click Start on any suggestion in Jules UI to capture config.`)
-  }
-
-  // Only repos whose Jules Suggestions toggle is ON. Enumerating every connected
-  // source instead caused the extension to start suggestions on repos the user
-  // never enabled (and blow past the daily session limit).
-  addLog(`[${label}] Fetching Suggestions-enabled repos...`)
-  const repos = await safeListSources(label, config)
-  if (!repos) return 0
-
-  addLog(
-    `[${label}] ${repos.length} repo(s) with Suggestions enabled: ${repos.map((r) => r.replace(/^github\//, '')).join(', ')}`
-  )
-
+async function fetchSuggestionsForRepos(label, repos, config) {
   addLog(`\n[${label}] Fetching suggestions for ${repos.length} repos concurrently...`)
   const allSuggestions = await runInPool(repos, PER_ACCOUNT_CONCURRENCY, (repo) =>
     globalLimit(() => listSuggestions(repo, config))
@@ -742,27 +721,30 @@ async function processSuggestionsForTab(tab, options) {
   }
   if (discoveryLogs.length > 0) addLog(discoveryLogs.join(''))
 
-  if (work.length === 0) {
-    addLog(`\n[${label}] TOTAL: 0 suggestions started`)
-    return 0
-  }
+  return work
+}
 
+async function applySuggestionsQuota(label, work, config) {
   // Respect Jules' daily session limit: never start more suggestions than the
   // account's remaining quota. Each started suggestion consumes one session.
-  let toStart = work
   const quota = await getDailySessionQuota(config)
-  if (quota) {
-    addLog(`\n[${label}] Daily sessions: ${quota.used}/${quota.limit} used, ${quota.remaining} remaining`)
-    if (quota.remaining === 0) {
-      addLog(`[${label}] Daily limit reached. Starting 0 suggestions.`)
-      return 0
-    }
-    if (work.length > quota.remaining) {
-      addLog(`[${label}] Capping ${work.length} suggestions to ${quota.remaining} (daily limit)`)
-      toStart = work.slice(0, quota.remaining)
-    }
+  if (!quota) return work
+
+  addLog(`\n[${label}] Daily sessions: ${quota.used}/${quota.limit} used, ${quota.remaining} remaining`)
+  if (quota.remaining === 0) {
+    addLog(`[${label}] Daily limit reached. Starting 0 suggestions.`)
+    return []
   }
 
+  if (work.length > quota.remaining) {
+    addLog(`[${label}] Capping ${work.length} suggestions to ${quota.remaining} (daily limit)`)
+    return work.slice(0, quota.remaining)
+  }
+
+  return work
+}
+
+async function executeStartSuggestions(label, toStart, config, startConfig, options) {
   if (!options.dryRun) {
     state.progress.total += toStart.length
     updateState({})
@@ -799,6 +781,38 @@ async function processSuggestionsForTab(tab, options) {
 
   addLog(`\n[${label}] TOTAL: ${totalStarted} suggestions started`)
   return totalStarted
+}
+
+async function processSuggestionsForTab(tab, options) {
+  const prepared = await prepareTab(tab)
+  if (!prepared) return 0
+  const { label, config } = prepared
+
+  const startConfig = await getStartConfig()
+  if (!startConfig) {
+    addLog(`[${label}] No StartSuggestion config cached. Using defaults.`)
+    addLog(`[${label}] Tip: Click Start on any suggestion in Jules UI to capture config.`)
+  }
+
+  // Only repos whose Jules Suggestions toggle is ON.
+  addLog(`[${label}] Fetching Suggestions-enabled repos...`)
+  const repos = await safeListSources(label, config)
+  if (!repos) return 0
+
+  addLog(
+    `[${label}] ${repos.length} repo(s) with Suggestions enabled: ${repos.map((r) => r.replace(/^github\//, '')).join(', ')}`
+  )
+
+  const work = await fetchSuggestionsForRepos(label, repos, config)
+  if (work.length === 0) {
+    addLog(`\n[${label}] TOTAL: 0 suggestions started`)
+    return 0
+  }
+
+  const toStart = await applySuggestionsQuota(label, work, config)
+  if (toStart.length === 0) return 0
+
+  return await executeStartSuggestions(label, toStart, config, startConfig, options)
 }
 
 // =============================================================================
