@@ -1385,14 +1385,14 @@ describe('extractAccountNum', () => {
     const { sandbox } = setupEnvironment()
     assert.strictEqual(sandbox.test_extractAccountNum('https://jules.google.com/tasks'), '0')
     assert.strictEqual(sandbox.test_extractAccountNum('https://google.com'), '0')
-    assert.strictEqual(sandbox.test_extractAccountNum(''), '0')
+    assert.strictEqual(sandbox.test_extractAccountNum(''), '-1')
   })
 
   it('should handle null, undefined, and malformed URLs gracefully', () => {
     const { sandbox } = setupEnvironment()
-    assert.strictEqual(sandbox.test_extractAccountNum(null), '0')
-    assert.strictEqual(sandbox.test_extractAccountNum(undefined), '0')
-    assert.strictEqual(sandbox.test_extractAccountNum('not-a-url'), '0')
+    assert.strictEqual(sandbox.test_extractAccountNum(null), '-1')
+    assert.strictEqual(sandbox.test_extractAccountNum(undefined), '-1')
+    assert.strictEqual(sandbox.test_extractAccountNum('not-a-url'), '-1')
   })
 })
 
