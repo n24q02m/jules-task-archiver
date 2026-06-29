@@ -123,4 +123,5 @@ if (typeof globalThis !== 'undefined' && globalThis.TEST_MODE) {
   globalThis.test_getAccountNum = getAccountNum
   globalThis.test_getAccountLabel = getAccountLabel
   globalThis.test_injectMainWorldScript = injectMainWorldScript
+  globalThis.test_isTrustedMessage = isTrustedMessage
 }
