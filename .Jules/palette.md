@@ -31,3 +31,6 @@
 ## 2026-06-09 - Empty State Feedback
 **Learning:** When a list or process finishes with zero results, an empty summary container gives no feedback, leaving the user wondering if it actually ran or failed silently.
 **Action:** Always provide a helpful empty state message explaining why no results might have occurred, using styles consistent with other hints to offer guidance without showing as an error.
+## 2025-07-28 - Semantic Grouping with Native Fieldsets
+**Learning:** Using generic `<div>` wrappers with `role="group"` or `role="radiogroup"` combined with `aria-labelledby` creates accessibility warnings and relies on ARIA bridging rather than semantic HTML. Sighted users see a group, but assistive technologies prefer native structural elements.
+**Action:** Always prefer native HTML `<fieldset>` and `<legend>` for grouping related form controls. To avoid breaking existing CSS flex/grid layouts when retrofitting generic `<div>` containers, wrap the container in a `<fieldset style="border: none; padding: 0; margin: 0; display: contents;">` and convert the pseudo-label into a `<legend>`. Update CSS selectors (like `label, legend`) to ensure visual consistency without introducing custom class bloat.
