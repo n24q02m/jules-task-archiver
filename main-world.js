@@ -56,8 +56,8 @@ if (!window.__julesArchiver) {
           },
           window.location.origin
         )
-      } catch (_e) {
-        /* ignore parse errors */
+      } catch (e) {
+        console.warn('[Jules Archiver] Failed to parse StartSuggestion (Rja83d) payload:', e)
       }
     }
     return resp
