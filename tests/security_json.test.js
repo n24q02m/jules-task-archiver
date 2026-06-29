@@ -46,7 +46,7 @@ describe('parseResponse Type Validation Security', () => {
   it('should throw if outer is not an array', () => {
     const sandbox = setup()
     // Valid XSS prefix + newline + byte count + non-array JSON object
-    const text = ")]}'\n\n10\n{\"not\": \"an array\"}"
+    const text = ')]}\'\n\n10\n{"not": "an array"}'
     assert.throws(() => sandbox.parseResponse(text, 'rpcId'), {
       message: 'Invalid batchexecute response: expected array'
     })
@@ -57,7 +57,7 @@ describe('parseResponse Type Validation Security', () => {
     // outer is [[null, "rpcId", "{\"not\": \"an array\"}"]]
     const innerPayload = JSON.stringify({ not: 'an array' })
     const outer = [[null, 'rpcId', innerPayload]]
-    const text = ")]}'\n\n100\n" + JSON.stringify(outer)
+    const text = `)]}'\n\n100\n${JSON.stringify(outer)}`
 
     assert.throws(() => sandbox.parseResponse(text, 'rpcId'), {
       message: 'Invalid batchexecute response: expected inner array'
@@ -68,7 +68,7 @@ describe('parseResponse Type Validation Security', () => {
     const sandbox = setup()
     // entry[2] is a number instead of a string
     const outer = [[null, 'rpcId', 12345]]
-    const text = ")]}'\n\n100\n" + JSON.stringify(outer)
+    const text = `)]}'\n\n100\n${JSON.stringify(outer)}`
 
     const result = sandbox.parseResponse(text, 'rpcId')
     assert.strictEqual(result, null)
@@ -77,7 +77,7 @@ describe('parseResponse Type Validation Security', () => {
   it('should return null if rpcId is not found', () => {
     const sandbox = setup()
     const outer = [[null, 'otherRpc', '[]']]
-    const text = ")]}'\n\n100\n" + JSON.stringify(outer)
+    const text = `)]}'\n\n100\n${JSON.stringify(outer)}`
 
     const result = sandbox.parseResponse(text, 'rpcId')
     assert.strictEqual(result, null)
@@ -87,7 +87,7 @@ describe('parseResponse Type Validation Security', () => {
     const sandbox = setup()
     const innerData = ['task1', 'Title']
     const outer = [[null, 'rpcId', JSON.stringify(innerData)]]
-    const text = ")]}'\n\n100\n" + JSON.stringify(outer)
+    const text = `)]}'\n\n100\n${JSON.stringify(outer)}`
 
     const result = sandbox.parseResponse(text, 'rpcId')
     assert.deepStrictEqual(result, innerData)
