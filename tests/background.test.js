@@ -143,6 +143,7 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_processAllTabs = processAllTabs;
     globalThis.test_finalizeOperation = finalizeOperation;
     globalThis.test_handleOperationError = handleOperationError;
+    globalThis.test_safeList = safeList;
     globalThis.test_listTasks = listTasks;
     globalThis.test_safeListTasks = safeListTasks;
     globalThis.test_safeListSources = safeListSources;
@@ -1953,6 +1954,39 @@ describe('groupTasksByRepo Internal', () => {
     assert.strictEqual(result.size, 2)
     assert.strictEqual(result.get('repo-1').length, 2)
     assert.strictEqual(result.get('repo-2').length, 1)
+  })
+})
+
+describe('safeList', () => {
+  it('should return items when fetcher succeeds with non-empty list', async () => {
+    const { sandbox } = setupEnvironment()
+    const mockItems = [1, 2, 3]
+    const fetcher = async () => mockItems
+
+    const result = await sandbox.test_safeList('test-label', fetcher, 'empty', 'error')
+    assert.deepStrictEqual(result, mockItems)
+  })
+
+  it('should return null and log message when fetcher returns an empty array', async () => {
+    const { sandbox } = setupEnvironment()
+    const fetcher = async () => []
+
+    const result = await sandbox.test_safeList('test-label', fetcher, 'empty message', 'error')
+    assert.strictEqual(result, null)
+    const state = sandbox.test_state()
+    assert.ok(state.log.some((l) => l.includes('[test-label] empty message')))
+  })
+
+  it('should return null and log error when fetcher throws', async () => {
+    const { sandbox } = setupEnvironment()
+    const fetcher = async () => {
+      throw new Error('API failure')
+    }
+
+    const result = await sandbox.test_safeList('test-label', fetcher, 'empty', 'Error listing')
+    assert.strictEqual(result, null)
+    const state = sandbox.test_state()
+    assert.ok(state.log.some((l) => l.includes('[test-label] Error listing: API failure')))
   })
 })
 
