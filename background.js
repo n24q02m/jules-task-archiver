@@ -346,12 +346,20 @@ function isArchivable(task) {
   // A null/undefined state is emitted for one class of completed tasks.
   return task.state == null || ARCHIVABLE_STATES.has(task.state)
 }
+// ⚡ Bolt Optimization: Use a standard for loop instead of for...of, and replace
+// double Map lookup (.has() + .get()) with a single .get() + undefined check.
+// This reduces hashing and lookups in the hot path.
 function groupTasksByRepo(tasks) {
   const map = new Map()
-  for (const t of tasks) {
+  for (let i = 0; i < tasks.length; i++) {
+    const t = tasks[i]
     const key = t.repo || '(no repo)'
-    if (!map.has(key)) map.set(key, [])
-    map.get(key).push(t)
+    let arr = map.get(key)
+    if (arr === undefined) {
+      arr = []
+      map.set(key, arr)
+    }
+    arr.push(t)
   }
   return map
 }
@@ -841,11 +849,20 @@ async function getOpenPRs(owner, repo, token) {
   }
 }
 
+// ⚡ Bolt Optimization: Replace `.some()` with a standard for loop to avoid
+// closure allocation overhead in this hot path called for every task.
 function taskHasOpenPR(task, openPRs) {
   if (openPRs.length === 0) return false
   const taskTitle = (task.title || '').toLowerCase()
   if (!taskTitle || taskTitle === '(untitled)') return false
-  return openPRs.some((pr) => pr.titleLower.includes(taskTitle) || taskTitle.includes(pr.titleLower))
+
+  for (let i = 0; i < openPRs.length; i++) {
+    const pr = openPRs[i]
+    if (pr.titleLower.includes(taskTitle) || taskTitle.includes(pr.titleLower)) {
+      return true
+    }
+  }
+  return false
 }
 
 // =============================================================================
