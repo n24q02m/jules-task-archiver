@@ -252,9 +252,11 @@ function parseResponse(text, rpcId) {
   // Find the entry matching our rpcId
   for (const entry of outer) {
     if (!Array.isArray(entry) || entry[1] !== rpcId) continue
-    if (!entry[2]) return null
+    if (typeof entry[2] !== 'string') return null
     const innerFixed = fixJsonControlChars(entry[2])
-    return JSON.parse(innerFixed)
+    const inner = JSON.parse(innerFixed)
+    if (!Array.isArray(inner)) return null
+    return inner
   }
 
   return null
