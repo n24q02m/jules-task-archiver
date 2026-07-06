@@ -1088,19 +1088,36 @@ async function filterArchivableTasks(label, tasks, options) {
     return { toArchive: [...tasks], toSkip: [] }
   }
 
-  const candidates = tasks.filter(isArchivable)
-  const activeCount = tasks.length - candidates.length
+  // ⚡ Bolt Optimization: Combine filtering and grouping into a single loop
+  // to avoid allocating an intermediate `candidates` array.
+  let candidatesCount = 0
+  const byRepo = new Map()
 
-  addLog(`[${label}] ${tasks.length} total: ${candidates.length} archivable, ${activeCount} active`)
+  for (let i = 0; i < tasks.length; i++) {
+    const t = tasks[i]
+    if (isArchivable(t)) {
+      candidatesCount++
+      const key = t.repo || '(no repo)'
+      let arr = byRepo.get(key)
+      if (arr === undefined) {
+        arr = []
+        byRepo.set(key, arr)
+      }
+      arr.push(t)
+    }
+  }
 
-  if (candidates.length === 0) {
+  const activeCount = tasks.length - candidatesCount
+
+  addLog(`[${label}] ${tasks.length} total: ${candidatesCount} archivable, ${activeCount} active`)
+
+  if (candidatesCount === 0) {
     const states = [...new Set(tasks.map((t) => t.state))].join(', ')
     addLog(`[${label}] No archivable tasks among ${tasks.length} (states seen: ${states}).`)
     addLog(`[${label}] Enable Force to archive regardless of state.`)
     return { toArchive: [], toSkip: [] }
   }
 
-  const byRepo = groupTasksByRepo(candidates)
   addLog(`\n[${label}] Checking open PRs per task...`)
   const { ghOwner } = await chrome.storage.sync.get(['ghOwner'])
   const { ghToken } = await chrome.storage.local.get(['ghToken'])
