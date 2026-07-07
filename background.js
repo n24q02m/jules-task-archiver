@@ -26,12 +26,51 @@ const GLOBAL_CONCURRENCY = 12
 // the request count (was 1 request per task). One batch = one batchexecute call.
 const ARCHIVE_BATCH_SIZE = 50
 
-// ⚡ Bolt Optimization: After parsing the URL, use a fast regex test to extract
-// the account ID instead of allocating string arrays via `.split('/')`. This avoids
-// object allocation overhead while preserving the original strict URL validation.
+// ⚡ Bolt Optimization: Use a fast string search path to extract the account ID
+// instead of instantiating a URL object and running regex, which creates heavy
+// overhead in hot paths. Fallbacks to strict URL validation for edge cases.
 const ACCOUNT_NUM_REGEX = /\/u\/(\d+)(?:\/|$)/
 function extractAccountNum(url) {
   try {
+    if (typeof url !== 'string') return '0'
+
+    // Fast path: find /u/ only within the pathname part of the URL (before ? or #)
+    // Find where query params or hash starts from the beginning (after scheme)
+    const queryStart = url.indexOf('?', 8)
+    const hashStart = url.indexOf('#', 8)
+
+    let pathEnd = url.length
+    if (queryStart !== -1 && hashStart !== -1) pathEnd = Math.min(queryStart, hashStart)
+    else if (queryStart !== -1) pathEnd = queryStart
+    else if (hashStart !== -1) pathEnd = hashStart
+
+    // Find the end of origin: https://domain.com/
+    // Ensure we only look for the origin slash BEFORE the query string starts
+    let originEnd = url.indexOf('/', 8)
+    if (originEnd !== -1 && originEnd < pathEnd) {
+      const uIdx = url.indexOf('/u/', originEnd)
+      // Ensure the match is actually within the path, not query params
+      if (uIdx !== -1 && uIdx < pathEnd) {
+        const numStart = uIdx + 3
+        const slashIdx = url.indexOf('/', numStart)
+
+        // The number ends at either the next slash or the end of the path
+        const endIdx = slashIdx !== -1 && slashIdx < pathEnd ? slashIdx : pathEnd
+
+        let isDigits = true
+        for (let j = numStart; j < endIdx; j++) {
+          const code = url.charCodeAt(j)
+          if (code < 48 || code > 57) {
+            isDigits = false
+            break
+          }
+        }
+        if (isDigits && endIdx > numStart) {
+          return url.substring(numStart, endIdx)
+        }
+      }
+    }
+
     const pathname = new URL(url).pathname
     const match = ACCOUNT_NUM_REGEX.exec(pathname)
     return match ? match[1] : '0'
