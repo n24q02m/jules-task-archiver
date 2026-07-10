@@ -819,7 +819,10 @@ const prCache = new Map()
 
 async function getOpenPRs(owner, repo, token) {
   const key = `${owner}/${repo}`
-  if (prCache.has(key)) return prCache.get(key)
+  // ⚡ Bolt Optimization: Use a single map.get(key) lookup instead of
+  // map.has(key) followed by map.get(key) to reduce hashing operations.
+  const cached = prCache.get(key)
+  if (cached !== undefined) return cached
 
   try {
     if (typeof owner !== 'string' || typeof repo !== 'string') {
