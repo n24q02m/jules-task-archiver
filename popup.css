@@ -147,6 +147,15 @@ input:focus-visible {
   outline-offset: 2px;
 }
 
+.segmented button:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px #4ade80;
+}
+
+.segmented button.active:focus-visible {
+  box-shadow: inset 0 0 0 2px #0f172a;
+}
+
 button.primary {
   display: block;
   width: 100%;
