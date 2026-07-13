@@ -12,6 +12,11 @@ function fixJsonControlChars(str) {
   // Matches JSON string literals, accounting for escaped quotes.
   // Inside these strings, we replace raw control characters.
   return str.replace(/"(?:[^"\\]|\\.)*"/g, (match) => {
+    // ⚡ Bolt Optimization: Fast path inside strings. Only run the character-by-character
+    // replace if the individual string literal actually contains a control character.
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: Intentionally matching control characters
+    if (!/[\x00-\x1F]/.test(match)) return match
+
     // biome-ignore lint/suspicious/noControlCharactersInRegex: Intentionally matching control characters
     return match.replace(/[\x00-\x1F]/g, (c) => {
       if (c === '\n') return '\\n'
