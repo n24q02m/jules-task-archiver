@@ -262,3 +262,13 @@ button.secondary:hover {
 .summary .skipped {
   color: #fbbf24;
 }
+
+.segmented button:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px #4ade80;
+}
+
+.segmented button.active:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px #0f172a;
+}
