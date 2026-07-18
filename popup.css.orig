@@ -148,7 +148,7 @@ input:focus-visible {
 }
 
 .segmented button:focus-visible {
-  outline: 2px solid transparent; /* Keeps focus visible in Windows High Contrast Mode */
+  outline: none;
   box-shadow: inset 0 0 0 2px #4ade80;
 }
 

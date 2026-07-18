@@ -34,3 +34,6 @@
 ## 2025-06-30 - Native Semantic Elements for Groups
 **Learning:** Using `role="group"` and `role="radiogroup"` with `aria-labelledby` on `div` elements triggers `noLabelWithoutControl` a11y linter warnings, as these labels are not semantically linked to an input control via a `for` attribute in the same way native HTML works.
 **Action:** Always prefer native semantic elements like `<fieldset>` and `<legend>` for grouping related form controls. To prevent `<fieldset>` from breaking existing CSS layouts (like flexbox/grid) and injecting browser defaults, use `<fieldset style="border: none; padding: 0; margin: 0; display: contents;">`. Ensure the `<legend>` tag inherits the same styling as the generic `label` tag.
+## 2025-07-15 - Clipped Focus Rings in Overflow Containers
+**Learning:** When using standard `outline` for focus indicators on interactive elements inside a container with `overflow: hidden` (like a segmented control or rounded group), the focus ring is often visually clipped, making it invisible or hard to see.
+**Action:** Replace `outline` with an `inset` `box-shadow` on the interactive element to render the focus indicator completely inside its boundaries. Ensure the shadow color provides sufficient contrast against both the active and inactive backgrounds of the element.
