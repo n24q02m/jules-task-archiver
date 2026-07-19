@@ -9,15 +9,43 @@ function fixJsonControlChars(str) {
   // biome-ignore lint/suspicious/noControlCharactersInRegex: Intentionally matching control characters
   if (!/[\x00-\x1F]/.test(str)) return str
 
-  // Matches JSON string literals, accounting for escaped quotes.
-  // Inside these strings, we replace raw control characters.
-  return str.replace(/"(?:[^"\\]|\\.)*"/g, (match) => {
-    // biome-ignore lint/suspicious/noControlCharactersInRegex: Intentionally matching control characters
-    return match.replace(/[\x00-\x1F]/g, (c) => {
-      if (c === '\n') return '\\n'
-      if (c === '\r') return '\\r'
-      if (c === '\t') return '\\t'
-      return `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`
-    })
-  })
+  let result = ''
+  let inString = false
+  let isEscaped = false
+  let lastIndex = 0
+
+  for (let i = 0; i < str.length; i++) {
+    const charCode = str.charCodeAt(i)
+
+    if (inString) {
+      if (isEscaped) {
+        isEscaped = false
+      } else if (charCode === 92) {
+        // '\\'
+        isEscaped = true
+      } else if (charCode === 34) {
+        // '"'
+        inString = false
+      } else if (charCode <= 0x1f) {
+        // Control character
+        result += str.slice(lastIndex, i)
+        if (charCode === 10) result += '\\n'
+        else if (charCode === 13) result += '\\r'
+        else if (charCode === 9) result += '\\t'
+        else result += `\\u${charCode.toString(16).padStart(4, '0')}`
+        lastIndex = i + 1
+      }
+    } else {
+      if (charCode === 34) {
+        // '"'
+        inString = true
+      }
+    }
+  }
+
+  if (lastIndex < str.length) {
+    result += str.slice(lastIndex)
+  }
+
+  return result
 }
