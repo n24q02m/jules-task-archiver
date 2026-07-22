@@ -1,3 +1,6 @@
 ## 2025-02-24 - Map Lookup and Loop Overhead in Hot Paths
 **Learning:** In performance-critical hot paths (like parsing and grouping thousands of tasks), using `for...of` loops and array iteration methods like `.some()` introduces measurable closure allocation and iteration overhead. Similarly, a double Map lookup using `map.has(key)` followed by `map.set(key, [])` or `map.get(key)` requires two hashing operations.
 **Action:** Replace array methods (`.some()`, `.forEach()`) and `for...of` loops with standard `for` loops in high-frequency functions. For map insertion/grouping, use a single `map.get(key)` lookup, check for `undefined`, and then assign to reduce hashing overhead.
+## 2024-07-22 - Optimize nested regex replacement in JSON parser
+**Learning:** Using nested regex replacements (`String.prototype.replace` inside another `replace` callback) on large string payloads causes massive memory churn due to intermediate substring allocations, especially when the outer regex matches frequently (like all string literals in a JSON document).
+**Action:** Replace nested regex replacements that parse structure with a single-pass `for` loop state machine using `.charCodeAt()` and `.slice()`. This completely eliminates regex execution and object instantiations, significantly improving parsing speed.
