@@ -6,6 +6,12 @@
 
 const $ = (sel) => document.querySelector(sel)
 
+// Match the HTML `maxlength` bounds on #ghOwner / #ghToken (popup.html) so
+// storage writes stay bounded even if `.value` is set programmatically
+// (devtools, extension context) and bypasses the input's typing limit.
+const MAX_OWNER_LEN = 39
+const MAX_TOKEN_LEN = 255
+
 // --- DOM refs ---
 const ghOwnerInput = $('#ghOwner')
 const ghTokenInput = $('#ghToken')
@@ -96,10 +102,11 @@ chrome.storage.sync.get(['ghOwner', 'opMode', 'ghToken'], (syncData) => {
 
   // Cleanup legacy insecure storage of token in sync
   if (syncData.ghToken) {
-    chrome.storage.local.set({ ghToken: syncData.ghToken }, () => {
+    const ghToken = syncData.ghToken.slice(0, MAX_TOKEN_LEN)
+    chrome.storage.local.set({ ghToken }, () => {
       chrome.storage.sync.remove('ghToken')
     })
-    ghTokenInput.value = syncData.ghToken
+    ghTokenInput.value = ghToken
   }
 
   chrome.storage.local.get(['ghToken'], (localData) => {
@@ -108,21 +115,21 @@ chrome.storage.sync.get(['ghOwner', 'opMode', 'ghToken'], (syncData) => {
 })
 // --- Save settings on change ---
 ghOwnerInput.addEventListener('change', () => {
-  chrome.storage.sync.set({ ghOwner: ghOwnerInput.value.trim() })
+  chrome.storage.sync.set({ ghOwner: ghOwnerInput.value.trim().slice(0, MAX_OWNER_LEN) })
 })
 ghTokenInput.addEventListener('change', () => {
-  chrome.storage.local.set({ ghToken: ghTokenInput.value.trim() })
+  chrome.storage.local.set({ ghToken: ghTokenInput.value.trim().slice(0, MAX_TOKEN_LEN) })
 })
 
 // --- Start operation ---
 startBtn.addEventListener('click', async () => {
   // Save settings first, ensuring token is only in local storage
   chrome.storage.sync.set({
-    ghOwner: ghOwnerInput.value.trim()
+    ghOwner: ghOwnerInput.value.trim().slice(0, MAX_OWNER_LEN)
   })
   chrome.storage.sync.remove('ghToken')
   chrome.storage.local.set({
-    ghToken: ghTokenInput.value.trim()
+    ghToken: ghTokenInput.value.trim().slice(0, MAX_TOKEN_LEN)
   })
 
   const mode = document.querySelector('input[name="mode"]:checked').value
