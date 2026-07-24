@@ -1,4 +1,4 @@
-## 2026-07-06 - Client-Side DoS via Unbounded Extension Inputs
-**Vulnerability:** The browser extension popup contained unbound `<input>` fields for GitHub Owner and GitHub Token. An attacker or malicious script could paste an extremely large payload (e.g., several megabytes of text) into these fields, which would then be synced to `chrome.storage`, potentially exceeding extension storage quotas and causing a persistent Denial of Service (DoS) for the extension.
-**Learning:** Browser extension popup inputs must be strictly bounded just like traditional web applications. Even though they seem 'local', their contents are often written to constrained storage mechanisms like `chrome.storage.sync` (which has strict quota limits, often ~8KB per item). Unbounded inputs can trivially exhaust these quotas and break the extension permanently until manually cleared.
-**Prevention:** Always set `maxlength` and appropriate `pattern` constraints on all user-facing inputs in browser extensions, especially those tied directly to storage APIs.
+## 2024-07-18 - Restrict Content Security Policy
+**Vulnerability:** The extension's Content Security Policy (CSP) in `manifest.json` lacked explicit `default-src 'none'` and broad network constraints, relying solely on script and object restrictions.
+**Learning:** A permissive CSP allows unexpected resource loading and potential data exfiltration if an XSS vulnerability occurs. A strict whitelist (`default-src 'none'`) provides a robust defense-in-depth layer.
+**Prevention:** Always define a strict CSP for extensions, setting `default-src 'none'` and explicitly allowing only required origins (e.g., `connect-src`).
