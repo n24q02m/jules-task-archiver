@@ -1,3 +1,7 @@
 ## 2025-02-24 - Map Lookup and Loop Overhead in Hot Paths
 **Learning:** In performance-critical hot paths (like parsing and grouping thousands of tasks), using `for...of` loops and array iteration methods like `.some()` introduces measurable closure allocation and iteration overhead. Similarly, a double Map lookup using `map.has(key)` followed by `map.set(key, [])` or `map.get(key)` requires two hashing operations.
 **Action:** Replace array methods (`.some()`, `.forEach()`) and `for...of` loops with standard `for` loops in high-frequency functions. For map insertion/grouping, use a single `map.get(key)` lookup, check for `undefined`, and then assign to reduce hashing overhead.
+
+## 2025-02-25 - Rejected Micro-Optimization (Loop Fusion)
+**Learning:** A PR replacing `array.filter()` and a grouping function with a single manual `for` loop (loop fusion) to save intermediate array allocations was rejected as churn. Although it improves execution speed in micro-benchmarks, the absolute time saved is negligible compared to network latency, while the cost to code readability and maintainability is high.
+**Action:** Do not perform loop fusion or similar micro-optimizations on array operations unless the code is in a proven hot path where absolute execution time is a known bottleneck. Always include a benchmark demonstrating a meaningful real-world win, and prioritize readability over negligible performance gains.
