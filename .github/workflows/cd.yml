@@ -54,7 +54,7 @@ jobs:
           token: ${{ steps.app-token.outputs.token }}
           fetch-depth: 0
 
-      - uses: n24q02m/better-semantic-release@b385406f1f40d317f0ac94ac12c827643cfd4bf1 # main: validating setup-uv v8 bump before it becomes v1
+      - uses: n24q02m/better-semantic-release@95d056deb7b7edcf6b4be69536aec70624355333 # v1.2.1
         id: release
         with:
           github_token: ${{ steps.app-token.outputs.token }}
