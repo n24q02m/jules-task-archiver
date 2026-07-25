@@ -916,7 +916,7 @@ describe('getOpenPRs', () => {
     await sandbox.test_getOpenPRs('own', 'rep', null)
 
     assert.strictEqual(sandbox.test_prCache.has(key), true)
-    const cached = sandbox.test_prCache.get(key)
+    const cached = await sandbox.test_prCache.get(key)
     assert.strictEqual(cached.length, 1)
     assert.strictEqual(cached[0].title, 'PR')
   })

@@ -817,36 +817,42 @@ async function processSuggestionsForTab(tab, options) {
 
 const prCache = new Map()
 
-async function getOpenPRs(owner, repo, token) {
+function getOpenPRs(owner, repo, token) {
   const key = `${owner}/${repo}`
   if (prCache.has(key)) return prCache.get(key)
 
-  try {
-    if (typeof owner !== 'string' || typeof repo !== 'string') {
-      throw new Error('Owner and repo must be strings')
+  // ⚡ Bolt Optimization: Cache the Promise of the fetch operation instead of the resolved data
+  // (Request Coalescing). This prevents the "thundering herd" problem where multiple parallel
+  // background tabs processing the same repo all trigger simultaneous GitHub API requests.
+  // Subsequent concurrent calls will now await this same in-flight Promise.
+  const fetchPromise = (async () => {
+    try {
+      if (typeof owner !== 'string' || typeof repo !== 'string') {
+        throw new Error('Owner and repo must be strings')
+      }
+
+      const url = new URL(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls`)
+      url.searchParams.set('state', 'open')
+      url.searchParams.set('per_page', '100')
+
+      const res = await jFetch(url.toString(), {
+        headers: { Accept: 'application/vnd.github+json' },
+        token
+      })
+      const prs = await res.json()
+      return prs.map((pr) => ({
+        title: pr.title || '',
+        titleLower: (pr.title || '').toLowerCase(),
+        branch: pr.head?.ref || ''
+      }))
+    } catch (e) {
+      addLog(`  WARNING: Could not check PRs for ${key}: ${e.message}`)
+      return []
     }
+  })()
 
-    const url = new URL(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls`)
-    url.searchParams.set('state', 'open')
-    url.searchParams.set('per_page', '100')
-
-    const res = await jFetch(url.toString(), {
-      headers: { Accept: 'application/vnd.github+json' },
-      token
-    })
-    const prs = await res.json()
-    const mapped = prs.map((pr) => ({
-      title: pr.title || '',
-      titleLower: (pr.title || '').toLowerCase(),
-      branch: pr.head?.ref || ''
-    }))
-    prCache.set(key, mapped)
-    return mapped
-  } catch (e) {
-    addLog(`  WARNING: Could not check PRs for ${key}: ${e.message}`)
-    prCache.set(key, [])
-    return []
-  }
+  prCache.set(key, fetchPromise)
+  return fetchPromise
 }
 
 // ⚡ Bolt Optimization: Replace `.some()` with a standard for loop to avoid

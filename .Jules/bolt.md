@@ -4,3 +4,6 @@
 ## 2025-02-24 - Nested Regex vs State Machine
 **Learning:** In modern JavaScript engines, adding a redundant `regex.test()` before a `replace(regex, callback)` is a flawed optimization because V8 inherently bypasses the callback if there is no match. Furthermore, replacing complex nested regular expressions with a single-pass `for` loop state machine using `charCodeAt()` avoids large intermediate string allocations and iteration overhead, providing massive speedups for large text payloads.
 **Action:** Do not use `regex.test()` to guard a `replace()`. Instead, for critical hot paths parsing large payloads with complex constraints (like finding control characters only inside JSON strings), use a single-pass character loop state machine and `str.slice()` for unmodified chunks.
+## 2025-02-25 - Request Coalescing
+**Learning:** When fetching external data (like PRs) in parallel across multiple tabs, caching only the *resolved* result leads to thundering herd problems where multiple identical network requests are fired concurrently.
+**Action:** Cache the *Promise* of the fetch operation synchronously (request coalescing) so concurrent calls to the same resource wait on the same in-flight network request, saving API quota and time.
