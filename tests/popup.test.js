@@ -41,11 +41,11 @@ function createMockElement(tag = 'div', attrs = {}) {
       if (!element.listeners[type]) element.listeners[type] = []
       element.listeners[type].push(cb)
     },
-    dispatchEvent: (type) => {
+    dispatchEvent: async (type, eventArg = {}) => {
       if (element.listeners?.[type]) {
-        element.listeners[type].forEach((cb) => {
-          cb({ target: element })
-        })
+        for (const cb of element.listeners[type]) {
+          await cb({ target: element, preventDefault: () => {}, ...eventArg })
+        }
       }
     },
     style: { display: '' },
@@ -197,6 +197,8 @@ function setupPopupSandbox() {
     '#force': createMockElement('input', { type: 'checkbox' }),
     '#startBtn': createMockElement('button'),
     'input[name="mode"]:checked': createMockElement('input', { value: 'dry' }),
+    '#mainForm': createMockElement('form'),
+    '#formControls': createMockElement('fieldset'),
     '#resetBtn': createMockElement('button'),
     '#progressSection': createMockElement('section'),
     '#summarySection': createMockElement('section'),
@@ -299,6 +301,7 @@ describe('renderState', () => {
 
     assert.strictEqual(elements['#progressFill'].style.width, '100%')
     assert.strictEqual(elements['#startBtn'].disabled, false)
+    assert.strictEqual(elements['#formControls'].disabled, false)
     assert.strictEqual(elements['#resetBtn'].style.display, 'block')
     assert.strictEqual(elements['#summarySection'].style.display, 'block')
     assert.strictEqual(elements['#progressFill'].parentElement.getAttribute('aria-valuenow'), '100')
@@ -375,7 +378,7 @@ describe('Initialization and Storage', () => {
 })
 
 describe('Button Event Handlers', () => {
-  it('should send START message when startBtn is clicked', async () => {
+  it('should send START message when mainForm is submitted', async () => {
     const { sandbox, elements } = setupPopupSandbox()
     let sentMessage = null
     sandbox.chrome.runtime.sendMessage = (msg) => {
@@ -387,10 +390,13 @@ describe('Button Event Handlers', () => {
     elements['#ghOwner'].value = 'test-owner'
     elements['#ghToken'].value = 'test-token'
 
-    await elements['#startBtn'].dispatchEvent('click')
+    await elements['#mainForm'].dispatchEvent('submit', {
+      preventDefault: () => {}
+    })
 
     assert.strictEqual(sentMessage.action, 'START')
     assert.strictEqual(sentMessage.options.opMode, 'archive')
+    assert.strictEqual(elements['#formControls'].disabled, true)
     assert.strictEqual(elements['#startBtn'].disabled, true)
     assert.strictEqual(elements['#startBtn'].textContent, '⏳ Dry Running Archive...')
   })
@@ -408,6 +414,7 @@ describe('Button Event Handlers', () => {
 
     assert.strictEqual(sentMessage.action, 'RESET')
     assert.strictEqual(elements['#startBtn'].disabled, false)
+    assert.strictEqual(elements['#formControls'].disabled, false)
     assert.strictEqual(elements['#startBtn'].textContent, 'Dry Run Archive')
     assert.strictEqual(elements['#resetBtn'].style.display, 'none')
   })

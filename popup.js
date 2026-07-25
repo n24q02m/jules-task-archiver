@@ -18,6 +18,8 @@ const ghTokenInput = $('#ghToken')
 const forceCheckbox = $('#force')
 const startBtn = $('#startBtn')
 const resetBtn = $('#resetBtn')
+const mainForm = $('#mainForm')
+const formControls = $('#formControls')
 const progressSection = $('#progressSection')
 const summarySection = $('#summarySection')
 const currentInfo = $('#currentInfo')
@@ -122,7 +124,9 @@ ghTokenInput.addEventListener('change', () => {
 })
 
 // --- Start operation ---
-startBtn.addEventListener('click', async () => {
+mainForm.addEventListener('submit', async (e) => {
+  e.preventDefault()
+
   // Save settings first, ensuring token is only in local storage
   chrome.storage.sync.set({
     ghOwner: ghOwnerInput.value.trim().slice(0, MAX_OWNER_LEN)
@@ -156,6 +160,7 @@ startBtn.addEventListener('click', async () => {
   // Reset UI
   startBtn.disabled = true
   startBtn.setAttribute('aria-busy', 'true')
+  formControls.disabled = true
   startBtn.textContent = getRunningText()
   resetBtn.style.display = 'none'
   progressSection.style.display = 'block'
@@ -172,6 +177,7 @@ startBtn.addEventListener('click', async () => {
 resetBtn.addEventListener('click', () => {
   chrome.runtime.sendMessage({ action: 'RESET' })
   startBtn.disabled = false
+  formControls.disabled = false
   startBtn.removeAttribute('aria-busy')
   updateOpModeUI(opMode)
   resetBtn.style.display = 'none'
@@ -217,6 +223,7 @@ function renderState(state) {
   // Done or error
   if (state.status === 'done' || state.status === 'error') {
     startBtn.disabled = false
+    formControls.disabled = false
     startBtn.removeAttribute('aria-busy')
     updateOpModeUI(opMode)
     resetBtn.style.display = 'block'
@@ -283,6 +290,7 @@ chrome.runtime.sendMessage({ action: 'GET_STATE' }, (state) => {
     renderState(state)
     if (state.status === 'running') {
       startBtn.disabled = true
+      formControls.disabled = true
       startBtn.setAttribute('aria-busy', 'true')
       startBtn.textContent = getRunningText()
     } else {
