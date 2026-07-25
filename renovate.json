@@ -54,5 +54,11 @@
       "matchPackageNames": ["node"],
       "allowedVersions": ">=24.0.0 <25.0.0"
     }
-  ]
+  ],
+  "semanticCommits": "enabled",
+  "commitMessagePrefix": "fix(deps):",
+  "commitMessageAction": "update",
+  "commitMessageTopic": "{{depName}}",
+  "semanticCommitType": "fix",
+  "semanticCommitScope": "deps"
 }
