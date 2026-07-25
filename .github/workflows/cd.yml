@@ -54,7 +54,7 @@ jobs:
           token: ${{ steps.app-token.outputs.token }}
           fetch-depth: 0
 
-      - uses: n24q02m/better-semantic-release@95d056deb7b7edcf6b4be69536aec70624355333 # v1.2.1
+      - uses: n24q02m/better-semantic-release@2e4d8122661f080fec53632f2b93d8d80a45b331 # main: live-verifying the action.sh argv rewrite + setup-uv v8 before they reach v1
         id: release
         with:
           github_token: ${{ steps.app-token.outputs.token }}
