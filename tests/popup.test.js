@@ -78,6 +78,7 @@ function createMockElement(tag = 'div', attrs = {}) {
     checked: false,
     disabled: false,
     focused: false,
+    reportValidity: () => true,
     scrollHeight: 0,
     scrollTop: 0
   }

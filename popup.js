@@ -121,8 +121,23 @@ ghTokenInput.addEventListener('change', () => {
   chrome.storage.local.set({ ghToken: ghTokenInput.value.trim().slice(0, MAX_TOKEN_LEN) })
 })
 
+// --- Handle Enter key to submit ---
+function handleEnterKey(e) {
+  if (e.key === 'Enter' && !startBtn.disabled) {
+    e.preventDefault()
+    startBtn.click()
+  }
+}
+ghOwnerInput.addEventListener('keydown', handleEnterKey)
+ghTokenInput.addEventListener('keydown', handleEnterKey)
+
 // --- Start operation ---
 startBtn.addEventListener('click', async () => {
+  // Check HTML5 validity (e.g. pattern on ghOwner)
+  if (!ghOwnerInput.reportValidity() || !ghTokenInput.reportValidity()) {
+    return
+  }
+
   // Save settings first, ensuring token is only in local storage
   chrome.storage.sync.set({
     ghOwner: ghOwnerInput.value.trim().slice(0, MAX_OWNER_LEN)
