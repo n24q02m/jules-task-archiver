@@ -862,10 +862,14 @@ function taskHasOpenPR(task, openPRs) {
   const taskTitle = (task.title || '').toLowerCase()
   if (!taskTitle || taskTitle === '(untitled)') return false
 
+  const taskTitleLen = taskTitle.length
   for (let i = 0; i < openPRs.length; i++) {
-    const pr = openPRs[i]
-    if (pr.titleLower.includes(taskTitle) || taskTitle.includes(pr.titleLower)) {
-      return true
+    const prTitle = openPRs[i].titleLower
+    const prTitleLen = prTitle.length
+    if (prTitleLen >= taskTitleLen) {
+      if (prTitle.includes(taskTitle)) return true
+    } else {
+      if (taskTitle.includes(prTitle)) return true
     }
   }
   return false
