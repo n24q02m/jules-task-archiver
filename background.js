@@ -862,9 +862,20 @@ function taskHasOpenPR(task, openPRs) {
   const taskTitle = (task.title || '').toLowerCase()
   if (!taskTitle || taskTitle === '(untitled)') return false
 
+  const taskTitleLen = taskTitle.length
+
   for (let i = 0; i < openPRs.length; i++) {
     const pr = openPRs[i]
-    if (pr.titleLower.includes(taskTitle) || taskTitle.includes(pr.titleLower)) {
+    const prTitle = pr.titleLower
+    const prTitleLen = prTitle.length
+
+    // ⚡ Bolt Optimization: Compare string lengths before executing .includes().
+    // A longer string cannot be contained within a shorter one, so this prevents
+    // redundant O(N*M) string matching evaluations.
+    if (
+      (prTitleLen >= taskTitleLen && prTitle.includes(taskTitle)) ||
+      (taskTitleLen >= prTitleLen && taskTitle.includes(prTitle))
+    ) {
       return true
     }
   }
