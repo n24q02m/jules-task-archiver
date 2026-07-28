@@ -864,7 +864,14 @@ function taskHasOpenPR(task, openPRs) {
 
   for (let i = 0; i < openPRs.length; i++) {
     const pr = openPRs[i]
-    if (pr.titleLower.includes(taskTitle) || taskTitle.includes(pr.titleLower)) {
+    const prTitle = pr.titleLower
+    // ⚡ Bolt Optimization: Bidirectional substring matching.
+    // A longer string cannot be contained within a shorter one. Comparing lengths
+    // prevents redundant `.includes()` evaluations.
+    if (
+      (prTitle.length >= taskTitle.length && prTitle.includes(taskTitle)) ||
+      (taskTitle.length > prTitle.length && taskTitle.includes(prTitle))
+    ) {
       return true
     }
   }
