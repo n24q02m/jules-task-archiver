@@ -7,3 +7,7 @@
 ## 2025-02-25 - Request Coalescing
 **Learning:** When fetching external data (like PRs) in parallel across multiple tabs, caching only the *resolved* result leads to thundering herd problems where multiple identical network requests are fired concurrently.
 **Action:** Cache the *Promise* of the fetch operation synchronously (request coalescing) so concurrent calls to the same resource wait on the same in-flight network request, saving API quota and time.
+
+## 2025-02-25 - Bidirectional Substring Matching
+**Learning:** In bidirectional substring matching (e.g., `A.includes(B) || B.includes(A)`), evaluating `.includes()` in both directions is redundant because a longer string cannot be contained within a shorter one.
+**Action:** Compare string lengths (`A.length >= B.length`) before executing the `.includes()` check to prevent redundant evaluations and string searching overhead.
