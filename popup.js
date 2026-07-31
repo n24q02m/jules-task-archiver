@@ -122,7 +122,8 @@ ghTokenInput.addEventListener('change', () => {
 })
 
 // --- Start operation ---
-startBtn.addEventListener('click', async () => {
+$('#mainForm').addEventListener('submit', async (e) => {
+  e.preventDefault()
   // Save settings first, ensuring token is only in local storage
   chrome.storage.sync.set({
     ghOwner: ghOwnerInput.value.trim().slice(0, MAX_OWNER_LEN)
