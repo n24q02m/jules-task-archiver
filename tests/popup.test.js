@@ -73,6 +73,7 @@ function createMockElement(tag = 'div', attrs = {}) {
     focus: () => {
       element.focused = true
     },
+    reportValidity: () => true,
     textContent: '',
     value: '',
     checked: false,
@@ -177,7 +178,8 @@ function createMockDocument(elements, opModeButtons, radioStates) {
       const frag = createMockElement('documentfragment')
       frag.nodeType = 11
       return frag
-    }
+    },
+    addEventListener: () => {}
   }
 }
 

@@ -123,6 +123,8 @@ ghTokenInput.addEventListener('change', () => {
 
 // --- Start operation ---
 startBtn.addEventListener('click', async () => {
+  if (!ghOwnerInput.reportValidity() || !ghTokenInput.reportValidity()) return
+
   // Save settings first, ensuring token is only in local storage
   chrome.storage.sync.set({
     ghOwner: ghOwnerInput.value.trim().slice(0, MAX_OWNER_LEN)
@@ -287,6 +289,16 @@ chrome.runtime.sendMessage({ action: 'GET_STATE' }, (state) => {
       startBtn.textContent = getRunningText()
     } else {
       resetBtn.style.display = 'block'
+    }
+  }
+})
+
+// --- Keyboard support ---
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    if (!startBtn.disabled && startBtn.style.display !== 'none' && !startBtn.hasAttribute('aria-busy')) {
+      e.preventDefault()
+      startBtn.click()
     }
   }
 })

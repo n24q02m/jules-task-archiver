@@ -80,7 +80,8 @@ describe('Security: ghToken Storage Cleanup', () => {
       }),
       createElement: () => ({
         appendChild: () => {}
-      })
+      }),
+      addEventListener: () => {}
     }
 
     const sandbox = { chrome, document, console, setTimeout, setInterval, clearInterval }
