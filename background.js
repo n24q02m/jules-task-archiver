@@ -857,14 +857,19 @@ function getOpenPRs(owner, repo, token) {
 
 // ⚡ Bolt Optimization: Replace `.some()` with a standard for loop to avoid
 // closure allocation overhead in this hot path called for every task.
+// Additionally, prevent redundant string evaluations by comparing lengths
+// before bidirectional `.includes()`, as a longer string cannot be contained
+// within a shorter one.
 function taskHasOpenPR(task, openPRs) {
   if (openPRs.length === 0) return false
   const taskTitle = (task.title || '').toLowerCase()
   if (!taskTitle || taskTitle === '(untitled)') return false
+  const tLen = taskTitle.length
 
   for (let i = 0; i < openPRs.length; i++) {
     const pr = openPRs[i]
-    if (pr.titleLower.includes(taskTitle) || taskTitle.includes(pr.titleLower)) {
+    const pLen = pr.titleLower.length
+    if ((pLen >= tLen && pr.titleLower.includes(taskTitle)) || (tLen >= pLen && taskTitle.includes(pr.titleLower))) {
       return true
     }
   }
