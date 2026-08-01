@@ -37,3 +37,6 @@
 ## 2024-05-15 - Fix clipped focus rings with inset box-shadow
 **Learning:** When using inset box-shadow for focus rings to avoid clipping from overflow:hidden containers, ensure the shadow color contrasts with both active and inactive states. An inset shadow matching the background color becomes invisible.
 **Action:** Use outline: 2px solid transparent to retain Windows High Contrast Mode support, and select a contrasting inset shadow color (like #0f172a) for active states.
+## 2027-10-25 - Form Submission and Native Validation
+**Learning:** Inputs (like the GitHub username) inside `popup.html` have native HTML5 validation constraints (e.g. `pattern="^[a-zA-Z0-9-]+$"`, `maxlength`). However, if the primary submit button is not wrapped inside a semantic `<form>` element, these native validation tools are completely bypassed when the button is clicked, reducing accessibility and causing silent validation failures on the frontend. Additionally, without a `<form>`, users cannot hit the "Enter" key implicitly to submit the action.
+**Action:** Always wrap form inputs in a `<form>` element. Attach a submit event listener to the form element, explicitly invoking `e.preventDefault()` inside the event handler instead of using a `click` listener directly on the primary button. Update tests to use the `submit` event to dispatch properly.
