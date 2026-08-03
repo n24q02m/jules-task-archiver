@@ -44,7 +44,7 @@ function createMockElement(tag = 'div', attrs = {}) {
     dispatchEvent: (type) => {
       if (element.listeners?.[type]) {
         element.listeners[type].forEach((cb) => {
-          cb({ target: element })
+          cb({ target: element, preventDefault: () => {} })
         })
       }
     },
@@ -205,7 +205,8 @@ function setupPopupSandbox() {
     '#log': createMockElement('pre'),
     '#summary': createMockElement('div'),
     '.settings': createMockElement('section'),
-    '.setting-row': createMockElement('div')
+    '.setting-row': createMockElement('div'),
+    '#mainForm': createMockElement('form')
   }
 
   // Parent element for elements that use .parentElement in popup.js
@@ -375,7 +376,7 @@ describe('Initialization and Storage', () => {
 })
 
 describe('Button Event Handlers', () => {
-  it('should send START message when startBtn is clicked', async () => {
+  it('should send START message when mainForm is submitted', async () => {
     const { sandbox, elements } = setupPopupSandbox()
     let sentMessage = null
     sandbox.chrome.runtime.sendMessage = (msg) => {
@@ -387,7 +388,7 @@ describe('Button Event Handlers', () => {
     elements['#ghOwner'].value = 'test-owner'
     elements['#ghToken'].value = 'test-token'
 
-    await elements['#startBtn'].dispatchEvent('click')
+    await elements['#mainForm'].dispatchEvent('submit')
 
     assert.strictEqual(sentMessage.action, 'START')
     assert.strictEqual(sentMessage.options.opMode, 'archive')
