@@ -194,9 +194,26 @@ chrome.storage.onChanged.addListener((changes) => {
 function renderState(state) {
   // Log
   if (state.log?.length > 0) {
-    logPre.textContent = state.log.join('\n')
+    // ⚡ Bolt Optimization: Only append new log lines instead of re-joining and
+    // re-rendering the entire log array on every state update. This prevents
+    // massive string allocations and expensive DOM layout thrashing.
+    const currentLines = Number(logPre.dataset.lines) || 0
+
+    if (state.log.length < currentLines || currentLines === 0) {
+      // Full re-render if logs were trimmed/reset
+      logPre.textContent = state.log.join('\n')
+    } else if (state.log.length > currentLines) {
+      // Append only new lines
+      const newLogs = state.log.slice(currentLines).join('\n')
+      logPre.textContent += (logPre.textContent ? '\n' : '') + newLogs
+    }
+
+    logPre.dataset.lines = state.log.length
     logPre.scrollTop = logPre.scrollHeight
     progressSection.style.display = 'block'
+  } else {
+    logPre.textContent = ''
+    logPre.dataset.lines = '0'
   }
 
   // Current info

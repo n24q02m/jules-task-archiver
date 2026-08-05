@@ -7,3 +7,6 @@
 ## 2025-02-25 - Request Coalescing
 **Learning:** When fetching external data (like PRs) in parallel across multiple tabs, caching only the *resolved* result leads to thundering herd problems where multiple identical network requests are fired concurrently.
 **Action:** Cache the *Promise* of the fetch operation synchronously (request coalescing) so concurrent calls to the same resource wait on the same in-flight network request, saving API quota and time.
+## 2025-03-09 - DOM Layout Thrashing Optimization
+**Learning:** Re-joining and re-rendering an entire large array of log lines on every state update causes massive string allocations and expensive DOM layout thrashing, leading to UI freezes, particularly when the log grows over a long-running process.
+**Action:** For frequently updating logs, append only the new lines by tracking the number of lines already rendered. If the log array length matches or exceeds the tracked number, slice the new lines and append them to the existing `textContent`, bypassing full re-renders and reducing DOM operations.
