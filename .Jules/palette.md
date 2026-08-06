@@ -1,3 +1,6 @@
+## 2025-06-30 - Form Controls Enter Key Submission
+**Learning:** Native HTML5 validation attributes (pattern, maxlength) are bypassed if the primary submit button is not inside a semantic <form> element. Users also expect to submit forms by pressing Enter in input fields. Wrapping inputs in a form can break existing styling, so manually invoking .reportValidity() on inputs during click handlers and adding explicit keydown listeners for the Enter key is a clean alternative.
+**Action:** Always wrap form inputs in a <form> element or explicitly handle Enter key events and native validation manually via .reportValidity() to ensure inputs are verified and users can submit forms naturally using the keyboard.
 ## 2025-04-03 - Progressive Disclosure for Multi-Mode UIs
 **Learning:** In a multi-mode UI (like Archive vs Suggestions), showing all settings at once creates cognitive overload, especially when settings like GitHub tokens are only relevant to one mode.
 **Action:** Use progressive disclosure in `popup.js` to hide mode-specific settings (like the `.settings` section and `force` checkbox) when they are not relevant to the currently selected mode, keeping the UI clean and focused.

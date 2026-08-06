@@ -73,6 +73,7 @@ function createMockElement(tag = 'div', attrs = {}) {
     focus: () => {
       element.focused = true
     },
+    reportValidity: () => true,
     textContent: '',
     value: '',
     checked: false,
