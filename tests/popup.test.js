@@ -44,10 +44,18 @@ function createMockElement(tag = 'div', attrs = {}) {
     dispatchEvent: (type) => {
       if (element.listeners?.[type]) {
         element.listeners[type].forEach((cb) => {
-          cb({ target: element })
+          cb({ target: element, preventDefault: () => {}, key: element.mockKey })
         })
       }
     },
+    click: () => {
+      if (element.listeners?.click) {
+        element.listeners.click.forEach((cb) => {
+          cb({ target: element, preventDefault: () => {} })
+        })
+      }
+    },
+    reportValidity: () => true,
     style: { display: '' },
     appendChild: (child) => {
       if (!element.children) element.children = []
@@ -192,6 +200,7 @@ function setupPopupSandbox() {
   }
 
   const elements = {
+    '#mainForm': createMockElement('form'),
     '#ghOwner': createMockElement('input'),
     '#ghToken': createMockElement('input'),
     '#force': createMockElement('input', { type: 'checkbox' }),
@@ -375,7 +384,7 @@ describe('Initialization and Storage', () => {
 })
 
 describe('Button Event Handlers', () => {
-  it('should send START message when startBtn is clicked', async () => {
+  it('should send START message when mainForm is submitted', async () => {
     const { sandbox, elements } = setupPopupSandbox()
     let sentMessage = null
     sandbox.chrome.runtime.sendMessage = (msg) => {
@@ -387,7 +396,7 @@ describe('Button Event Handlers', () => {
     elements['#ghOwner'].value = 'test-owner'
     elements['#ghToken'].value = 'test-token'
 
-    await elements['#startBtn'].dispatchEvent('click')
+    await elements['#mainForm'].dispatchEvent('submit')
 
     assert.strictEqual(sentMessage.action, 'START')
     assert.strictEqual(sentMessage.options.opMode, 'archive')
