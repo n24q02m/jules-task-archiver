@@ -54,7 +54,7 @@ async function jFetch(url, options = {}) {
     throw new Error('Security Error: Disallowed fetch origin')
   }
 
-  const { token, headers = {}, ...rest } = options
+  const { token, headers = {}, timeout = 30000, ...rest } = options
 
   if (token) {
     if (origin !== 'https://api.github.com') {
@@ -65,11 +65,23 @@ async function jFetch(url, options = {}) {
     headers.Authorization = `token ${token}`
   }
 
-  const res = await fetch(url, { headers, ...rest })
-  if (!res.ok) {
-    throw new Error(`HTTP ${res.status}`)
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeout)
+
+  try {
+    const res = await fetch(url, { headers, signal: controller.signal, ...rest })
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`)
+    }
+    return res
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      throw new Error('NetworkError: Request timed out')
+    }
+    throw e
+  } finally {
+    clearTimeout(timeoutId)
   }
-  return res
 }
 
 /**

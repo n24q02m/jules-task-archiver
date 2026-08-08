@@ -85,7 +85,8 @@ function setupEnvironment(initialStorage = {}) {
     console,
     parseInt,
     crypto,
-    importScripts: () => {}
+    importScripts: () => {},
+    AbortController
   }
 
   vm.createContext(sandbox)
