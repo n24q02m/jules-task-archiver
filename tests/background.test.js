@@ -100,6 +100,7 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_addLog = addLog;
     globalThis.test_trimLog = trimLog;
     globalThis.test_MAX_LOG_LINES = MAX_LOG_LINES;
+    globalThis.test_LOG_BUFFER_SIZE = LOG_BUFFER_SIZE;
     globalThis.test_buildBatchRequest = buildBatchRequest;
     globalThis.test_callBatchExecute = callBatchExecute;
     globalThis.test_runInPool = runInPool;
@@ -1345,13 +1346,22 @@ describe('state management', () => {
     assert.strictEqual(JSON.stringify(sessionSetData[0].archiveState.log), JSON.stringify(['Processing task 1']))
   })
 
-  it('caps the retained log at MAX_LOG_LINES, dropping the oldest lines', () => {
+  it('caps the retained log at MAX_LOG_LINES by batching with LOG_BUFFER_SIZE, dropping the oldest lines', () => {
     const { sandbox } = setupEnvironment({})
-    for (let i = 0; i < 2500; i++) sandbox.test_addLog(`line ${i}`)
+    const max = sandbox.test_MAX_LOG_LINES
+    const buffer = sandbox.test_LOG_BUFFER_SIZE
+    const totalLines = max + buffer + 10 // Trigger trimming
+
+    for (let i = 0; i < totalLines; i++) sandbox.test_addLog(`line ${i}`)
+
     const log = sandbox.test_state().log
-    assert.strictEqual(log.length, 2000)
-    assert.strictEqual(log[log.length - 1], 'line 2499')
-    assert.strictEqual(log[0], 'line 500') // oldest 500 lines dropped
+    // At max + buffer (2500) items, the length is 2500. The condition > 2500 is not met.
+    // The next insertion (i = 2500) makes the length 2501 > 2500.
+    // Splice removes 2501 - 2000 = 501 items. The length becomes 2000.
+    // Then 9 more items are added (i = 2501 to 2509). Total length is 2009.
+    assert.strictEqual(log.length, max + 9)
+    assert.strictEqual(log[log.length - 1], `line ${totalLines - 1}`)
+    assert.strictEqual(log[0], `line ${buffer + 1}`) // The first 501 items (0 to 500) were dropped, so the oldest remaining is line 501.
   })
 
   it('coalesces a storm of log writes into a single storage write', async () => {
@@ -2032,32 +2042,36 @@ describe('safeListSources', () => {
 })
 
 describe('trimLog Internal', () => {
-  it('should not trim if log length is equal to MAX_LOG_LINES', () => {
+  it('should not trim if log length is less than MAX_LOG_LINES + LOG_BUFFER_SIZE', () => {
     const { sandbox } = setupEnvironment()
     const max = sandbox.test_MAX_LOG_LINES
+    const buffer = sandbox.test_LOG_BUFFER_SIZE
     const state = sandbox.test_state()
-    state.log = Array.from({ length: max }, (_, i) => `line ${i}`)
+    const lengthToTest = max + buffer - 1
+    state.log = Array.from({ length: lengthToTest }, (_, i) => `line ${i}`)
 
     sandbox.test_trimLog()
 
-    assert.strictEqual(state.log.length, max)
+    assert.strictEqual(state.log.length, lengthToTest)
     assert.strictEqual(state.log[0], 'line 0')
-    assert.strictEqual(state.log[max - 1], `line ${max - 1}`)
+    assert.strictEqual(state.log[lengthToTest - 1], `line ${lengthToTest - 1}`)
   })
 
-  it('should trim oldest entries if log length exceeds MAX_LOG_LINES', () => {
+  it('should trim oldest entries down to MAX_LOG_LINES if log length exceeds MAX_LOG_LINES + LOG_BUFFER_SIZE', () => {
     const { sandbox } = setupEnvironment()
     const max = sandbox.test_MAX_LOG_LINES
+    const buffer = sandbox.test_LOG_BUFFER_SIZE
     const state = sandbox.test_state()
-    // Create max + 10 entries
-    state.log = Array.from({ length: max + 10 }, (_, i) => `line ${i}`)
+    // Create max + buffer + 10 entries
+    const lengthToTest = max + buffer + 10
+    state.log = Array.from({ length: lengthToTest }, (_, i) => `line ${i}`)
 
     sandbox.test_trimLog()
 
     assert.strictEqual(state.log.length, max)
-    // Should have removed the first 10 entries
-    assert.strictEqual(state.log[0], 'line 10')
-    assert.strictEqual(state.log[max - 1], `line ${max + 9}`)
+    // Should have removed the first (buffer + 10) entries
+    assert.strictEqual(state.log[0], `line ${buffer + 10}`)
+    assert.strictEqual(state.log[max - 1], `line ${lengthToTest - 1}`)
   })
 })
 
