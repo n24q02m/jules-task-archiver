@@ -59,10 +59,10 @@ function updateOpModeUI(value) {
   const forceCheckboxContainer = forceCheckbox.closest('.setting-row')
 
   if (settingsSection) {
-    settingsSection.style.display = isArchive ? 'block' : 'none'
+    settingsSection.classList.toggle('hidden', !isArchive)
   }
   if (forceCheckboxContainer) {
-    forceCheckboxContainer.style.display = isArchive ? 'block' : 'none'
+    forceCheckboxContainer.classList.toggle('hidden', !isArchive)
   }
 
   // Context-aware start button text
@@ -157,9 +157,9 @@ startBtn.addEventListener('click', async () => {
   startBtn.disabled = true
   startBtn.setAttribute('aria-busy', 'true')
   startBtn.textContent = getRunningText()
-  resetBtn.style.display = 'none'
-  progressSection.style.display = 'block'
-  summarySection.style.display = 'none'
+  resetBtn.classList.add('hidden')
+  progressSection.classList.remove('hidden')
+  summarySection.classList.add('hidden')
   currentInfo.textContent = 'Starting...'
   progressFill.style.width = '0%'
   progressFill.style.background = '' // Reset error color if present
@@ -174,9 +174,9 @@ resetBtn.addEventListener('click', () => {
   startBtn.disabled = false
   startBtn.removeAttribute('aria-busy')
   updateOpModeUI(opMode)
-  resetBtn.style.display = 'none'
-  progressSection.style.display = 'none'
-  summarySection.style.display = 'none'
+  resetBtn.classList.add('hidden')
+  progressSection.classList.add('hidden')
+  summarySection.classList.add('hidden')
   // Move focus back to the primary action so keyboard users are not stranded
   // on the now-hidden Reset button.
   startBtn.focus()
@@ -196,7 +196,7 @@ function renderState(state) {
   if (state.log?.length > 0) {
     logPre.textContent = state.log.join('\n')
     logPre.scrollTop = logPre.scrollHeight
-    progressSection.style.display = 'block'
+    progressSection.classList.remove('hidden')
   }
 
   // Current info
@@ -219,7 +219,7 @@ function renderState(state) {
     startBtn.disabled = false
     startBtn.removeAttribute('aria-busy')
     updateOpModeUI(opMode)
-    resetBtn.style.display = 'block'
+    resetBtn.classList.remove('hidden')
     progressFill.style.width = '100%'
     progressFill.parentElement.setAttribute('aria-valuenow', '100')
 
@@ -235,13 +235,12 @@ function renderState(state) {
 
 // --- Render summary (safe DOM methods, no innerHTML) ---
 function renderSummary(results) {
-  summarySection.style.display = 'block'
+  summarySection.classList.remove('hidden')
   summaryDiv.textContent = ''
 
   if (!results?.length) {
     const emptyDiv = document.createElement('div')
-    emptyDiv.className = 'hint'
-    emptyDiv.style.marginTop = '4px'
+    emptyDiv.className = 'hint mt-4'
     emptyDiv.textContent = 'No items were processed. Try checking your scope or if tasks exist.'
     summaryDiv.appendChild(emptyDiv)
     return
@@ -286,7 +285,7 @@ chrome.runtime.sendMessage({ action: 'GET_STATE' }, (state) => {
       startBtn.setAttribute('aria-busy', 'true')
       startBtn.textContent = getRunningText()
     } else {
-      resetBtn.style.display = 'block'
+      resetBtn.classList.remove('hidden')
     }
   }
 })
