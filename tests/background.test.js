@@ -1347,11 +1347,14 @@ describe('state management', () => {
 
   it('caps the retained log at MAX_LOG_LINES, dropping the oldest lines', () => {
     const { sandbox } = setupEnvironment({})
-    for (let i = 0; i < 2500; i++) sandbox.test_addLog(`line ${i}`)
+    // MAX_LOG_LINES + LOG_BUFFER = 2000 + 500 = 2500
+    // To trigger trim, we need > 2500 lines. We'll add 2501 lines.
+    for (let i = 0; i < 2501; i++) sandbox.test_addLog(`line ${i}`)
     const log = sandbox.test_state().log
+    // Trims down to MAX_LOG_LINES (2000)
     assert.strictEqual(log.length, 2000)
-    assert.strictEqual(log[log.length - 1], 'line 2499')
-    assert.strictEqual(log[0], 'line 500') // oldest 500 lines dropped
+    assert.strictEqual(log[log.length - 1], 'line 2500')
+    assert.strictEqual(log[0], 'line 501') // oldest 501 lines dropped
   })
 
   it('coalesces a storm of log writes into a single storage write', async () => {
@@ -2045,19 +2048,19 @@ describe('trimLog Internal', () => {
     assert.strictEqual(state.log[max - 1], `line ${max - 1}`)
   })
 
-  it('should trim oldest entries if log length exceeds MAX_LOG_LINES', () => {
+  it('should trim oldest entries if log length exceeds MAX_LOG_LINES + LOG_BUFFER', () => {
     const { sandbox } = setupEnvironment()
     const max = sandbox.test_MAX_LOG_LINES
     const state = sandbox.test_state()
-    // Create max + 10 entries
-    state.log = Array.from({ length: max + 10 }, (_, i) => `line ${i}`)
+    // Create max + 501 entries to trigger trim (buffer is 500)
+    state.log = Array.from({ length: max + 501 }, (_, i) => `line ${i}`)
 
     sandbox.test_trimLog()
 
     assert.strictEqual(state.log.length, max)
-    // Should have removed the first 10 entries
-    assert.strictEqual(state.log[0], 'line 10')
-    assert.strictEqual(state.log[max - 1], `line ${max + 9}`)
+    // Should have removed the first 501 entries
+    assert.strictEqual(state.log[0], 'line 501')
+    assert.strictEqual(state.log[max - 1], `line ${max + 500}`)
   })
 })
 

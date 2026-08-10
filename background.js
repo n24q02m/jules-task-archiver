@@ -890,12 +890,16 @@ const DEFAULT_STATE = {
 // stays bounded — otherwise the array grows without limit and every write
 // re-serializes the whole thing.
 const MAX_LOG_LINES = 2000
+const LOG_BUFFER = 500
 
 let state = { ...DEFAULT_STATE }
 let pendingFlush = null
 
 function trimLog() {
-  if (state.log.length > MAX_LOG_LINES) {
+  // ⚡ Bolt Optimization: Implement a high-water mark buffer to batch cleanup
+  // operations. Frequent .splice(0, n) calls on large arrays cause severe O(N^2)
+  // performance degradation due to constant element shifting.
+  if (state.log.length > MAX_LOG_LINES + LOG_BUFFER) {
     state.log.splice(0, state.log.length - MAX_LOG_LINES)
   }
 }
