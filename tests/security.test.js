@@ -169,7 +169,9 @@ function setupEnvironment(initialTabs = {}) {
     console,
     URL,
     URLSearchParams,
-    importScripts: () => {}
+    importScripts: () => {},
+    AbortController,
+    clearTimeout
   }
 
   vm.createContext(sandbox)
