@@ -1348,11 +1348,17 @@ describe('state management', () => {
 
   it('caps the retained log at MAX_LOG_LINES, dropping the oldest lines', () => {
     const { sandbox } = setupEnvironment({})
-    for (let i = 0; i < 2500; i++) sandbox.test_addLog(`line ${i}`)
+    // Add lines up to exactly the buffer limit
+    for (let i = 0; i < 2200; i++) sandbox.test_addLog(`line ${i}`)
+    // At exactly MAX_LOG_LINES + LOG_BUFFER, it should not trim yet
+    assert.strictEqual(sandbox.test_state().log.length, 2200)
+
+    // Add one more line to trigger the high-water mark trim
+    sandbox.test_addLog('line 2200')
     const log = sandbox.test_state().log
-    assert.strictEqual(log.length, 2000)
-    assert.strictEqual(log[log.length - 1], 'line 2499')
-    assert.strictEqual(log[0], 'line 500') // oldest 500 lines dropped
+    assert.strictEqual(log.length, 2000) // Trims exactly back down to MAX_LOG_LINES
+    assert.strictEqual(log[log.length - 1], 'line 2200')
+    assert.strictEqual(log[0], 'line 201') // oldest 201 lines dropped
   })
 
   it('coalesces a storm of log writes into a single storage write', async () => {
@@ -2049,16 +2055,22 @@ describe('trimLog Internal', () => {
   it('should trim oldest entries if log length exceeds MAX_LOG_LINES', () => {
     const { sandbox } = setupEnvironment()
     const max = sandbox.test_MAX_LOG_LINES
+    // The test environment sandbox doesn't expose LOG_BUFFER, so hardcode 200 based on our implementation
+    const buffer = 200
     const state = sandbox.test_state()
-    // Create max + 10 entries
-    state.log = Array.from({ length: max + 10 }, (_, i) => `line ${i}`)
+    // Create max + buffer + 10 entries to trigger high-water mark
+    state.log = Array.from({ length: max + buffer + 10 }, (_, i) => `line ${i}`)
 
     sandbox.test_trimLog()
 
+    // It should trim down to max (2000) entries, but since state.log had max + buffer + 10 entries
+    // and trimLog removes exactly (current length - max) items
+    // Wait, trimLog does: state.log.splice(0, state.log.length - MAX_LOG_LINES)
+    // So it always leaves exactly MAX_LOG_LINES (2000) entries behind.
     assert.strictEqual(state.log.length, max)
-    // Should have removed the first 10 entries
-    assert.strictEqual(state.log[0], 'line 10')
-    assert.strictEqual(state.log[max - 1], `line ${max + 9}`)
+    // Should have removed the first (buffer + 10) = 210 entries
+    assert.strictEqual(state.log[0], 'line 210')
+    assert.strictEqual(state.log[max - 1], `line ${max + buffer + 9}`)
   })
 })
 
