@@ -408,10 +408,7 @@ async function withRetry(fn) {
       return await fn()
     } catch (e) {
       if (attempt === RETRY_ATTEMPTS - 1 || !isRetryable(e.message)) throw e
-      const randomArray = new Uint32Array(1)
-      crypto.getRandomValues(randomArray)
-      const randomFloat = randomArray[0] / 4294967296
-      const delay = RETRY_BASE_MS * 2 ** attempt + randomFloat * 200
+      const delay = RETRY_BASE_MS * 2 ** attempt + Math.random() * 200
       await new Promise((r) => setTimeout(r, delay))
     }
   }
