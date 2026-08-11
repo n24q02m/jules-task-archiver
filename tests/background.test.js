@@ -534,12 +534,7 @@ describe('Retry Utilities', () => {
         delays.push(ms)
         fn()
       }
-      sandbox.crypto = {
-        getRandomValues: (arr) => {
-          arr[0] = 100 // Constant jitter for testing (100 % 200 = 100)
-          return arr
-        }
-      }
+      sandbox.Math.random = () => 0.5 // Constant jitter for testing
       const base = sandbox.test_RETRY_BASE_MS
 
       let calls = 0
