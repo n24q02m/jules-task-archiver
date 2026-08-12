@@ -1,0 +1,16 @@
+# Local toolchain for the Node-based Chrome extension test suite.
+# CI uses Node.js 22 and the pinned Biome release below.
+
+[tools]
+node = "22"
+
+[settings]
+trusted_config_paths = ["."]
+
+[tasks.lint]
+description = "Run the CI lint and format check"
+run = "npx @biomejs/biome@2.4.16 check ."
+
+[tasks.test]
+description = "Run the unit test suite"
+run = "node --test"
