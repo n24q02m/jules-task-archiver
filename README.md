@@ -3,6 +3,7 @@
 **Chrome Extension for bulk operations on Jules tasks via batchexecute API -- archive tasks and start code suggestions at scale.**
 
 [![CI](https://github.com/n24q02m/jules-task-archiver/actions/workflows/ci.yml/badge.svg)](https://github.com/n24q02m/jules-task-archiver/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/n24q02m/jules-task-archiver/branch/main/graph/badge.svg)](https://codecov.io/gh/n24q02m/jules-task-archiver)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Renovate](https://img.shields.io/badge/renovate-enabled-brightgreen.svg)](https://renovatebot.com)
 [![semantic-release](https://img.shields.io/badge/semantic--release-conventionalcommits-e10079?logo=semantic-release)](https://github.com/semantic-release/semantic-release)
