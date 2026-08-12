@@ -6,7 +6,8 @@ const vm = require('node:vm')
 
 // --- ghToken Storage Cleanup Tests ---
 describe('Security: ghToken Storage Cleanup', () => {
-  const popupJs = fs.readFileSync(path.join(__dirname, '../popup.js'), 'utf8')
+  const popupJsPath = path.join(__dirname, '../popup.js')
+  const popupJs = fs.readFileSync(popupJsPath, 'utf8')
 
   function setupPopupSandbox(initialSync = {}, initialLocal = {}) {
     const syncStorage = { ...initialSync }
@@ -95,7 +96,7 @@ describe('Security: ghToken Storage Cleanup', () => {
       {}
     )
 
-    vm.runInContext(popupJs, sandbox)
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
 
     assert.strictEqual(syncStorage.ghToken, undefined, 'ghToken should be removed from sync storage')
     assert.strictEqual(localStorage.ghToken, 'insecure-token', 'ghToken should be moved to local storage')
@@ -184,7 +185,7 @@ function setupEnvironment(initialTabs = {}) {
     globalThis.test_JULES_ORIGIN = JULES_ORIGIN;
   `
 
-  vm.runInContext(scriptContent, sandbox)
+  vm.runInContext(scriptContent, sandbox, { filename: bgScriptPath })
   return { sandbox, chromeMock, onMessageListeners }
 }
 

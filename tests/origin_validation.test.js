@@ -4,8 +4,10 @@ const fs = require('node:fs')
 const path = require('node:path')
 const vm = require('node:vm')
 
-const contentJs = fs.readFileSync(path.join(__dirname, '../content.js'), 'utf8')
-const mainWorldJs = fs.readFileSync(path.join(__dirname, '../main-world.js'), 'utf8')
+const contentJsPath = path.join(__dirname, '../content.js')
+const mainWorldJsPath = path.join(__dirname, '../main-world.js')
+const contentJs = fs.readFileSync(contentJsPath, 'utf8')
+const mainWorldJs = fs.readFileSync(mainWorldJsPath, 'utf8')
 
 const PAGE_ORIGIN = 'https://jules.google.com'
 
@@ -66,7 +68,7 @@ describe('Origin Validation Security', () => {
   it('content.js should not use wildcard origin in postMessage', () => {
     const { sandbox, postMessages } = setupSandbox()
 
-    vm.runInContext(contentJs, sandbox)
+    vm.runInContext(contentJs, sandbox, { filename: contentJsPath })
 
     if (sandbox.extractConfig) {
       sandbox.extractConfig()
@@ -79,7 +81,7 @@ describe('Origin Validation Security', () => {
   it('main-world.js should not use wildcard origin in postMessage', () => {
     const { sandbox, postMessages } = setupSandbox()
 
-    vm.runInContext(mainWorldJs, sandbox)
+    vm.runInContext(mainWorldJs, sandbox, { filename: mainWorldJsPath })
 
     const wildcards = postMessages.filter((m) => m.origin === '*')
     assert.strictEqual(wildcards.length, 0, 'Found wildcard origin in main-world.js postMessage')
@@ -89,7 +91,7 @@ describe('Origin Validation Security', () => {
 describe('content.js message handler origin checks', () => {
   it('should relay JULES_START_CONFIG from the trusted same-origin window', () => {
     const { sandbox, windowObj, listeners, runtimeMessages } = setupSandbox()
-    vm.runInContext(contentJs, sandbox)
+    vm.runInContext(contentJs, sandbox, { filename: contentJsPath })
 
     listeners.message({
       source: windowObj,
@@ -103,7 +105,7 @@ describe('content.js message handler origin checks', () => {
 
   it('should ignore a message from a foreign origin', () => {
     const { sandbox, windowObj, listeners, runtimeMessages } = setupSandbox()
-    vm.runInContext(contentJs, sandbox)
+    vm.runInContext(contentJs, sandbox, { filename: contentJsPath })
 
     listeners.message({
       source: windowObj,
@@ -116,7 +118,7 @@ describe('content.js message handler origin checks', () => {
 
   it('should ignore a message whose source is not this window', () => {
     const { sandbox, listeners, runtimeMessages } = setupSandbox()
-    vm.runInContext(contentJs, sandbox)
+    vm.runInContext(contentJs, sandbox, { filename: contentJsPath })
 
     listeners.message({
       source: {},
@@ -131,7 +133,7 @@ describe('content.js message handler origin checks', () => {
 describe('main-world.js message handler origin checks', () => {
   it('should re-broadcast config for a trusted same-origin request', () => {
     const { sandbox, windowObj, listeners, postMessages } = setupSandbox()
-    vm.runInContext(mainWorldJs, sandbox)
+    vm.runInContext(mainWorldJs, sandbox, { filename: mainWorldJsPath })
 
     const initialCount = postMessages.length // initial broadcast on load
     listeners.message({
@@ -145,7 +147,7 @@ describe('main-world.js message handler origin checks', () => {
 
   it('should not broadcast for a foreign-origin request', () => {
     const { sandbox, windowObj, listeners, postMessages } = setupSandbox()
-    vm.runInContext(mainWorldJs, sandbox)
+    vm.runInContext(mainWorldJs, sandbox, { filename: mainWorldJsPath })
 
     const initialCount = postMessages.length
     listeners.message({
@@ -159,7 +161,7 @@ describe('main-world.js message handler origin checks', () => {
 
   it('should not broadcast for a request from a different window', () => {
     const { sandbox, listeners, postMessages } = setupSandbox()
-    vm.runInContext(mainWorldJs, sandbox)
+    vm.runInContext(mainWorldJs, sandbox, { filename: mainWorldJsPath })
 
     const initialCount = postMessages.length
     listeners.message({

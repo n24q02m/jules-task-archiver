@@ -64,7 +64,7 @@ function setupEnvironment(initialStorage = {}) {
   }
 
   vm.createContext(sandbox)
-  vm.runInContext(bgScriptContent, sandbox)
+  vm.runInContext(bgScriptContent, sandbox, { filename: bgScriptPath })
 
   return sandbox
 }

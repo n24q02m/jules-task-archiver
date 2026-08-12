@@ -36,7 +36,8 @@ function setup() {
   }
   vm.createContext(sandbox)
   sandbox.globalThis = sandbox
-  vm.runInContext(utilsScriptContent + bgScriptContent, sandbox)
+  vm.runInContext(utilsScriptContent, sandbox, { filename: utilsScriptPath })
+  vm.runInContext(bgScriptContent, sandbox, { filename: bgScriptPath })
   // Expose parseResponse if not already global
   vm.runInContext('globalThis.parseResponse = parseResponse', sandbox)
   return sandbox

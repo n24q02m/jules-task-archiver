@@ -56,7 +56,7 @@ function setupContentSandbox(initialUrl = 'https://jules.google.com/u/0/') {
   }
 
   vm.createContext(sandbox)
-  vm.runInContext(contentJsContent, sandbox)
+  vm.runInContext(contentJsContent, sandbox, { filename: contentJsPath })
 
   return sandbox
 }

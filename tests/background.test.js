@@ -160,7 +160,7 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_getTabConfig = getTabConfig;
   `
 
-  const script = new vm.Script(scriptContent)
+  const script = new vm.Script(scriptContent, { filename: bgScriptPath })
   script.runInContext(sandbox)
 
   return { sandbox, sessionSetData }

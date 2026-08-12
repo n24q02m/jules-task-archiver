@@ -4,7 +4,8 @@ const fs = require('node:fs')
 const path = require('node:path')
 const vm = require('node:vm')
 
-const mainWorldJs = fs.readFileSync(path.join(__dirname, '../main-world.js'), 'utf8')
+const mainWorldJsPath = path.join(__dirname, '../main-world.js')
+const mainWorldJs = fs.readFileSync(mainWorldJsPath, 'utf8')
 
 function setupSandbox(initialWizData = {}) {
   const messages = []
@@ -64,7 +65,7 @@ describe('main-world.js', () => {
       TSDtV: 'beyond:models/gemini-pro'
     })
 
-    vm.runInContext(mainWorldJs, sandbox)
+    vm.runInContext(mainWorldJs, sandbox, { filename: mainWorldJsPath })
 
     assert.strictEqual(messages.length, 1)
     assert.strictEqual(messages[0].targetOrigin, 'https://jules.google.com')
@@ -79,7 +80,7 @@ describe('main-world.js', () => {
   it('should handle missing WIZ_global_data', () => {
     const { sandbox, messages } = setupSandbox(null)
 
-    vm.runInContext(mainWorldJs, sandbox)
+    vm.runInContext(mainWorldJs, sandbox, { filename: mainWorldJsPath })
 
     assert.strictEqual(messages.length, 1)
     assert.strictEqual(messages[0].targetOrigin, 'https://jules.google.com')
@@ -91,7 +92,7 @@ describe('main-world.js', () => {
       SNlM0e: 'at-token'
     })
 
-    vm.runInContext(mainWorldJs, sandbox)
+    vm.runInContext(mainWorldJs, sandbox, { filename: mainWorldJsPath })
 
     assert.strictEqual(messages[0].data.config.at, 'at-token')
     assert.strictEqual(messages[0].data.config.bl, null)
@@ -103,7 +104,7 @@ describe('main-world.js', () => {
       TSDtV: 'invalid-model-string'
     })
 
-    vm.runInContext(mainWorldJs, sandbox)
+    vm.runInContext(mainWorldJs, sandbox, { filename: mainWorldJsPath })
 
     assert.strictEqual(messages[0].data.config.modelId, null)
   })
@@ -111,7 +112,7 @@ describe('main-world.js', () => {
   it('should handle empty WIZ_global_data object', () => {
     const { sandbox, messages } = setupSandbox({})
 
-    vm.runInContext(mainWorldJs, sandbox)
+    vm.runInContext(mainWorldJs, sandbox, { filename: mainWorldJsPath })
 
     assert.strictEqual(messages[0].data.config.at, null)
     assert.strictEqual(messages[0].data.config.bl, null)
@@ -124,7 +125,7 @@ describe('main-world.js', () => {
       SNlM0e: 'at-token'
     })
 
-    vm.runInContext(mainWorldJs, sandbox)
+    vm.runInContext(mainWorldJs, sandbox, { filename: mainWorldJsPath })
     assert.strictEqual(messages.length, 1) // Initial broadcast
 
     // Simulate request message
@@ -147,7 +148,7 @@ describe('main-world.js', () => {
       SNlM0e: 'at-token'
     })
 
-    vm.runInContext(mainWorldJs, sandbox)
+    vm.runInContext(mainWorldJs, sandbox, { filename: mainWorldJsPath })
     assert.strictEqual(messages.length, 1)
 
     // Same window object, but a spoofed cross-origin value
@@ -168,7 +169,7 @@ describe('main-world.js', () => {
       SNlM0e: 'at-token'
     })
 
-    vm.runInContext(mainWorldJs, sandbox)
+    vm.runInContext(mainWorldJs, sandbox, { filename: mainWorldJsPath })
     assert.strictEqual(messages.length, 1)
 
     // Simulate request message from wrong source
@@ -186,7 +187,7 @@ describe('main-world.js', () => {
   it('should intercept Rja83d fetch and broadcast start config', async () => {
     const { sandbox, messages, windowMock } = setupSandbox({})
 
-    vm.runInContext(mainWorldJs, sandbox)
+    vm.runInContext(mainWorldJs, sandbox, { filename: mainWorldJsPath })
     assert.strictEqual(messages.length, 1) // Initial broadcast
 
     // Setup mock payload
@@ -223,7 +224,7 @@ describe('main-world.js', () => {
   it('should gracefully handle malformed fetch payloads', async () => {
     const { sandbox, messages, windowMock } = setupSandbox({})
 
-    vm.runInContext(mainWorldJs, sandbox)
+    vm.runInContext(mainWorldJs, sandbox, { filename: mainWorldJsPath })
     const initialCount = messages.length
 
     // Call fetch with malformed body
@@ -238,7 +239,7 @@ describe('main-world.js', () => {
   it('should handle fetch with missing body', async () => {
     const { sandbox, messages, windowMock } = setupSandbox({})
 
-    vm.runInContext(mainWorldJs, sandbox)
+    vm.runInContext(mainWorldJs, sandbox, { filename: mainWorldJsPath })
     const initialCount = messages.length
 
     await windowMock.fetch('https://jules.google.com/_/Swebot/data/batchexecute?rpcids=Rja83d', {
@@ -251,7 +252,7 @@ describe('main-world.js', () => {
   it('should ignore other fetch calls', async () => {
     const { sandbox, messages, windowMock } = setupSandbox({})
 
-    vm.runInContext(mainWorldJs, sandbox)
+    vm.runInContext(mainWorldJs, sandbox, { filename: mainWorldJsPath })
     const initialCount = messages.length
 
     await windowMock.fetch('https://jules.google.com/other-api')
@@ -262,11 +263,11 @@ describe('main-world.js', () => {
   it('should only install fetch observer once', () => {
     const { sandbox, windowMock } = setupSandbox({})
 
-    vm.runInContext(mainWorldJs, sandbox)
+    vm.runInContext(mainWorldJs, sandbox, { filename: mainWorldJsPath })
     const firstFetch = windowMock.fetch
 
     // Run script again
-    vm.runInContext(mainWorldJs, sandbox)
+    vm.runInContext(mainWorldJs, sandbox, { filename: mainWorldJsPath })
     assert.strictEqual(windowMock.fetch, firstFetch, 'Fetch should not be wrapped again')
   })
 })

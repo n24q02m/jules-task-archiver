@@ -64,7 +64,7 @@ describe('content.js script injection', () => {
     }
 
     vm.createContext(sandbox)
-    vm.runInContext(contentJsCode, sandbox)
+    vm.runInContext(contentJsCode, sandbox, { filename: contentJsPath })
 
     // Assertions
     assert.ok(scriptCreated, 'Script should be created')
@@ -126,7 +126,7 @@ describe('content.js script injection', () => {
     }
 
     vm.createContext(sandbox)
-    vm.runInContext(contentJsCode, sandbox)
+    vm.runInContext(contentJsCode, sandbox, { filename: contentJsPath })
 
     assert.ok(scriptCreated, 'Script should be created')
     assert.strictEqual(appendedTo, 'documentElement', 'Should fallback to documentElement')
@@ -169,7 +169,7 @@ describe('content.js script injection', () => {
     sandbox.location = sandbox.window.location
 
     vm.createContext(sandbox)
-    vm.runInContext(contentJsCode, sandbox)
+    vm.runInContext(contentJsCode, sandbox, { filename: contentJsPath })
 
     const initialCount = scriptCreatedCount
     assert.ok(initialCount >= 1, 'Should have injected at least once on load')

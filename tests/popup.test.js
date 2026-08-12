@@ -4,7 +4,8 @@ const fs = require('node:fs')
 const path = require('node:path')
 const vm = require('node:vm')
 
-const popupJs = fs.readFileSync(path.join(__dirname, '../popup.js'), 'utf8')
+const popupJsPath = path.join(__dirname, '../popup.js')
+const popupJs = fs.readFileSync(popupJsPath, 'utf8')
 
 /**
  * Creates a mock DOM element with basic functionality.
@@ -240,7 +241,7 @@ function setupPopupSandbox() {
 describe('setActiveOpMode', () => {
   it('should toggle active class and aria-pressed on buttons', () => {
     const { sandbox, opModeButtons } = setupPopupSandbox()
-    vm.runInContext(popupJs, sandbox)
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
 
     sandbox.setActiveOpMode('suggestions')
 
@@ -253,7 +254,7 @@ describe('setActiveOpMode', () => {
 
   it('should handle progressive disclosure (showing/hiding settings)', () => {
     const { sandbox, elements } = setupPopupSandbox()
-    vm.runInContext(popupJs, sandbox)
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
 
     // Archive mode (default or set)
     sandbox.setActiveOpMode('archive')
@@ -270,7 +271,7 @@ describe('setActiveOpMode', () => {
 describe('renderState', () => {
   it('should update log and progress bar when running', () => {
     const { sandbox, elements } = setupPopupSandbox()
-    vm.runInContext(popupJs, sandbox)
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
 
     const state = {
       status: 'running',
@@ -288,7 +289,7 @@ describe('renderState', () => {
 
   it('should handle done state correctly', () => {
     const { sandbox, elements } = setupPopupSandbox()
-    vm.runInContext(popupJs, sandbox)
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
 
     const state = {
       status: 'done',
@@ -306,7 +307,7 @@ describe('renderState', () => {
 
   it('should handle error state correctly', () => {
     const { sandbox, elements } = setupPopupSandbox()
-    vm.runInContext(popupJs, sandbox)
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
 
     const state = {
       status: 'error',
@@ -323,7 +324,7 @@ describe('renderState', () => {
 describe('renderSummary', () => {
   it('should render an empty state message when no results are processed', () => {
     const { sandbox, elements } = setupPopupSandbox()
-    vm.runInContext(popupJs, sandbox)
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
 
     sandbox.renderSummary([])
 
@@ -338,7 +339,7 @@ describe('renderSummary', () => {
 
   it('should create elements for each result and a total', () => {
     const { sandbox, elements } = setupPopupSandbox()
-    vm.runInContext(popupJs, sandbox)
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
 
     const results = [
       { label: 'Repo A', count: 5 },
@@ -361,7 +362,7 @@ describe('Initialization and Storage', () => {
     syncStorage.ghToken = 'secret-token'
     syncStorage.ghOwner = 'some-owner'
 
-    vm.runInContext(popupJs, sandbox)
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
 
     // Wait for async storage callbacks
     setTimeout(() => {
@@ -382,7 +383,7 @@ describe('Button Event Handlers', () => {
       sentMessage = msg
     }
 
-    vm.runInContext(popupJs, sandbox)
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
 
     elements['#ghOwner'].value = 'test-owner'
     elements['#ghToken'].value = 'test-token'
@@ -402,7 +403,7 @@ describe('Button Event Handlers', () => {
       sentMessage = msg
     }
 
-    vm.runInContext(popupJs, sandbox)
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
 
     elements['#resetBtn'].dispatchEvent('click')
 
@@ -416,7 +417,7 @@ describe('Button Event Handlers', () => {
     const { sandbox, elements } = setupPopupSandbox()
     sandbox.chrome.runtime.sendMessage = () => {}
 
-    vm.runInContext(popupJs, sandbox)
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
 
     assert.strictEqual(elements['#startBtn'].focused, false)
     elements['#resetBtn'].dispatchEvent('click')
@@ -446,7 +447,7 @@ describe('popup.html accessibility', () => {
 describe('updateOpModeUI details', () => {
   it('should update startBtn text based on opMode and dryRun (Archive/Dry)', () => {
     const { sandbox, elements, radioStates } = setupPopupSandbox()
-    vm.runInContext(popupJs, sandbox)
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
 
     radioStates.mode = 'dry'
     sandbox.setActiveOpMode('archive')
@@ -455,7 +456,7 @@ describe('updateOpModeUI details', () => {
 
   it('should update startBtn text based on opMode and dryRun (Archive/Live)', () => {
     const { sandbox, elements, radioStates } = setupPopupSandbox()
-    vm.runInContext(popupJs, sandbox)
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
 
     radioStates.mode = 'live'
     sandbox.setActiveOpMode('archive')
@@ -464,7 +465,7 @@ describe('updateOpModeUI details', () => {
 
   it('should update startBtn text based on opMode and dryRun (Suggestions/Dry)', () => {
     const { sandbox, elements, radioStates } = setupPopupSandbox()
-    vm.runInContext(popupJs, sandbox)
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
 
     radioStates.mode = 'dry'
     sandbox.setActiveOpMode('suggestions')
@@ -473,7 +474,7 @@ describe('updateOpModeUI details', () => {
 
   it('should update startBtn text based on opMode and dryRun (Suggestions/Live)', () => {
     const { sandbox, elements, radioStates } = setupPopupSandbox()
-    vm.runInContext(popupJs, sandbox)
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
 
     radioStates.mode = 'live'
     sandbox.setActiveOpMode('suggestions')
@@ -482,7 +483,7 @@ describe('updateOpModeUI details', () => {
 
   it('should NOT update startBtn text when button is disabled', () => {
     const { sandbox, elements, radioStates } = setupPopupSandbox()
-    vm.runInContext(popupJs, sandbox)
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
 
     elements['#startBtn'].disabled = true
     elements['#startBtn'].textContent = 'Original Text'
@@ -496,7 +497,7 @@ describe('updateOpModeUI details', () => {
 describe('updateOpModeUI direct calls', () => {
   it('should toggle classes and aria attributes directly', () => {
     const { sandbox, opModeButtons } = setupPopupSandbox()
-    vm.runInContext(popupJs, sandbox)
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
 
     // Reset initial state
     opModeButtons[0].classList.toggle('active', false)

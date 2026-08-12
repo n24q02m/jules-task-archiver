@@ -98,7 +98,7 @@ function setupEnvironment() {
 
   sandbox.globalThis = sandbox
   vm.createContext(sandbox)
-  vm.runInContext(contentJsCode, sandbox)
+  vm.runInContext(contentJsCode, sandbox, { filename: contentJsPath })
 
   return sandbox
 }
