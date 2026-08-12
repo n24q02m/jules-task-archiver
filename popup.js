@@ -18,6 +18,7 @@ const ghTokenInput = $('#ghToken')
 const forceCheckbox = $('#force')
 const startBtn = $('#startBtn')
 const resetBtn = $('#resetBtn')
+const mainForm = $('#mainForm')
 const progressSection = $('#progressSection')
 const summarySection = $('#summarySection')
 const currentInfo = $('#currentInfo')
@@ -122,7 +123,8 @@ ghTokenInput.addEventListener('change', () => {
 })
 
 // --- Start operation ---
-startBtn.addEventListener('click', async () => {
+mainForm.addEventListener('submit', async (e) => {
+  e.preventDefault()
   // Save settings first, ensuring token is only in local storage
   chrome.storage.sync.set({
     ghOwner: ghOwnerInput.value.trim().slice(0, MAX_OWNER_LEN)
