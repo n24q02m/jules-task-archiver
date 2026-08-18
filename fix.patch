@@ -1,0 +1,69 @@
+diff --git a/.Jules/sentinel.md b/.Jules/sentinel.md
+index 981886a..1364266 100644
+--- a/.Jules/sentinel.md
++++ b/.Jules/sentinel.md
+@@ -2,3 +2,7 @@ ## 2024-07-18 - Restrict Content Security Policy
+ **Vulnerability:** The extension's Content Security Policy (CSP) in `manifest.json` lacked explicit `default-src 'none'` and broad network constraints, relying solely on script and object restrictions.
+ **Learning:** A permissive CSP allows unexpected resource loading and potential data exfiltration if an XSS vulnerability occurs. A strict whitelist (`default-src 'none'`) provides a robust defense-in-depth layer.
+ **Prevention:** Always define a strict CSP for extensions, setting `default-src 'none'` and explicitly allowing only required origins (e.g., `connect-src`).
++## 2026-08-18 - Prevent Token Leakage via Open Redirects
++**Vulnerability:** The `jFetch` network wrapper transmitted sensitive GitHub tokens (`Authorization: token ...`) without explicitly disabling redirect following.
++**Learning:** While modern browsers strip `Authorization` headers on cross-origin redirects, relying on implicit or evolving browser behavior for secret protection is risky. If an API endpoint is compromised or misconfigured to issue an open redirect, the HTTP client may automatically follow it, creating a risk of token exfiltration.
++**Prevention:** Always set `redirect: 'error'` (or `'manual'`) in `fetch` options when transmitting sensitive credentials like Bearer tokens or API keys to explicitly instruct the client to abort on unexpected redirects.
+diff --git a/background.js b/background.js
+index 61728be..6837599 100644
+--- a/background.js
++++ b/background.js
+@@ -63,6 +63,14 @@ async function jFetch(url, options = {}) {
+     if (typeof token !== 'string') throw new Error('Token must be a string')
+     if (/[\r\n]/.test(token)) throw new Error('Invalid token: contains newline')
+     headers.Authorization = `token ${token}`
++
++    // 🛡️ Sentinel: Prevent token leakage on open redirects
++    // If the API endpoint is compromised and issues a redirect, explicitly abort
++    // to prevent the browser from sending the Authorization header to an
++    // untrusted cross-origin destination.
++    if (!rest.redirect) {
++      rest.redirect = 'error'
++    }
+   }
+
+   const controller = new AbortController()
+diff --git a/popup.html b/popup.html
+index fc3cf6c..614095f 100644
+--- a/popup.html
++++ b/popup.html
+@@ -62,7 +62,7 @@
+           id="ghToken"
+           placeholder="ghp_..."
+           spellcheck="false"
+-          autocomplete="current-password"
++          autocomplete="off"
+           aria-describedby="ghTokenHint"
+           maxlength="255"
+         />
+diff --git a/tests/security.test.js b/tests/security.test.js
+index 6be189e..04dbc69 100644
+--- a/tests/security.test.js
++++ b/tests/security.test.js
+@@ -312,6 +312,20 @@ describe('jFetch SSRF Security', () => {
+       message: /Security Error: Refusing to send GitHub token to non-GitHub origin/
+     })
+   })
++
++  it('should explicitly set redirect to "error" when token is provided', async () => {
++    const { sandbox } = setupEnvironment()
++    let capturedOptions = null
++    // Mock the global fetch to capture the options passed into it
++    sandbox.fetch = async (_url, options) => {
++      capturedOptions = options
++      return { ok: true }
++    }
++
++    // Pass the test options to our test_jFetch wrapper, matching how background.test.js does it
++    await sandbox.jFetch('https://api.github.com/repos/owner/repo', { token: 'secret-token' })
++    assert.strictEqual(capturedOptions.redirect, 'error', 'Should explicitly prevent redirects when sending tokens')
++  })
+ })
+
+ describe('getTabConfig Path Traversal Security', () => {
