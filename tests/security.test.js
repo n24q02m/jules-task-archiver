@@ -313,23 +313,18 @@ describe('jFetch SSRF Security', () => {
     })
   })
 
-  it('should set redirect: "error" when token is provided to prevent leakage', async () => {
+  it('should explicitly set redirect to "error" when token is provided', async () => {
     const { sandbox } = setupEnvironment()
-    vm.runInContext(
-      `
-      globalThis.fetchOptions = null;
-      globalThis.fetch = async (url, opts) => {
-        globalThis.fetchOptions = opts;
-        return { ok: true };
-      };
-    `,
-      sandbox
-    )
+    let capturedOptions = null
+    // Mock the global fetch to capture the options passed into it
+    sandbox.fetch = async (_url, options) => {
+      capturedOptions = options
+      return { ok: true }
+    }
 
+    // Pass the test options to our test_jFetch wrapper, matching how background.test.js does it
     await sandbox.jFetch('https://api.github.com/repos/owner/repo', { token: 'secret-token' })
-
-    const opts = vm.runInContext('globalThis.fetchOptions', sandbox)
-    assert.strictEqual(opts.redirect, 'error', 'Should explicitly prevent redirects when sending tokens')
+    assert.strictEqual(capturedOptions.redirect, 'error', 'Should explicitly prevent redirects when sending tokens')
   })
 })
 
