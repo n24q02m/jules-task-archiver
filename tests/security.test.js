@@ -312,6 +312,20 @@ describe('jFetch SSRF Security', () => {
       message: /Security Error: Refusing to send GitHub token to non-GitHub origin/
     })
   })
+
+  it('should explicitly set redirect to "error" when token is provided', async () => {
+    const { sandbox } = setupEnvironment()
+    let capturedOptions = null
+    // Mock the global fetch to capture the options passed into it
+    sandbox.fetch = async (_url, options) => {
+      capturedOptions = options
+      return { ok: true }
+    }
+
+    // Pass the test options to our test_jFetch wrapper, matching how background.test.js does it
+    await sandbox.jFetch('https://api.github.com/repos/owner/repo', { token: 'secret-token' })
+    assert.strictEqual(capturedOptions.redirect, 'error', 'Should explicitly prevent redirects when sending tokens')
+  })
 })
 
 describe('getTabConfig Path Traversal Security', () => {

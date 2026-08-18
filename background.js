@@ -63,6 +63,14 @@ async function jFetch(url, options = {}) {
     if (typeof token !== 'string') throw new Error('Token must be a string')
     if (/[\r\n]/.test(token)) throw new Error('Invalid token: contains newline')
     headers.Authorization = `token ${token}`
+
+    // 🛡️ Sentinel: Prevent token leakage on open redirects
+    // If the API endpoint is compromised and issues a redirect, explicitly abort
+    // to prevent the browser from sending the Authorization header to an
+    // untrusted cross-origin destination.
+    if (!rest.redirect) {
+      rest.redirect = 'error'
+    }
   }
 
   const controller = new AbortController()
