@@ -103,7 +103,7 @@ describe('Security: ghToken Storage Cleanup', () => {
     assert.ok(syncRemoved.includes('ghToken'), "sync.remove('ghToken') should have been called")
   })
 
-  it('should ensure startBtn click handler removes ghToken from sync', async () => {
+  it('should ensure mainForm submit handler removes ghToken from sync', async () => {
     // This is harder to test without a full DOM mock, but we can verify the code intent
     assert.ok(
       popupJs.includes("chrome.storage.sync.remove('ghToken')"),
