@@ -42,10 +42,10 @@ function createMockElement(tag = 'div', attrs = {}) {
       if (!element.listeners[type]) element.listeners[type] = []
       element.listeners[type].push(cb)
     },
-    dispatchEvent: (type) => {
+    dispatchEvent: (type, payload = {}) => {
       if (element.listeners?.[type]) {
         element.listeners[type].forEach((cb) => {
-          cb({ target: element })
+          cb({ target: element, ...payload })
         })
       }
     },
@@ -201,6 +201,7 @@ function setupPopupSandbox() {
     '#resetBtn': createMockElement('button'),
     '#progressSection': createMockElement('section'),
     '#summarySection': createMockElement('section'),
+    '#mainForm': createMockElement('form'),
     '#currentInfo': createMockElement('div'),
     '#progressFill': createMockElement('div'),
     '#log': createMockElement('pre'),
@@ -376,7 +377,7 @@ describe('Initialization and Storage', () => {
 })
 
 describe('Button Event Handlers', () => {
-  it('should send START message when startBtn is clicked', async () => {
+  it('should send START message when mainForm is submitted', async () => {
     const { sandbox, elements } = setupPopupSandbox()
     let sentMessage = null
     sandbox.chrome.runtime.sendMessage = (msg) => {
@@ -388,8 +389,14 @@ describe('Button Event Handlers', () => {
     elements['#ghOwner'].value = 'test-owner'
     elements['#ghToken'].value = 'test-token'
 
-    await elements['#startBtn'].dispatchEvent('click')
+    let preventDefaultCalled = false
+    await elements['#mainForm'].dispatchEvent('submit', {
+      preventDefault: () => {
+        preventDefaultCalled = true
+      }
+    })
 
+    assert.strictEqual(preventDefaultCalled, true)
     assert.strictEqual(sentMessage.action, 'START')
     assert.strictEqual(sentMessage.options.opMode, 'archive')
     assert.strictEqual(elements['#startBtn'].disabled, true)
