@@ -903,11 +903,16 @@ const DEFAULT_STATE = {
 // re-serializes the whole thing.
 const MAX_LOG_LINES = 2000
 
+// ⚡ Bolt Optimization: Use a high-water mark buffer to batch array cleanup.
+// Calling `.splice(0, n)` on every insert causes O(N^2) element shifting.
+// Waiting for the buffer to fill before slicing reduces CPU overhead significantly.
+const LOG_BUFFER = 500
+
 let state = { ...DEFAULT_STATE }
 let pendingFlush = null
 
 function trimLog() {
-  if (state.log.length > MAX_LOG_LINES) {
+  if (state.log.length > MAX_LOG_LINES + LOG_BUFFER) {
     state.log.splice(0, state.log.length - MAX_LOG_LINES)
   }
 }
