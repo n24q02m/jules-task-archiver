@@ -7,3 +7,6 @@
 ## 2025-02-25 - Request Coalescing
 **Learning:** When fetching external data (like PRs) in parallel across multiple tabs, caching only the *resolved* result leads to thundering herd problems where multiple identical network requests are fired concurrently.
 **Action:** Cache the *Promise* of the fetch operation synchronously (request coalescing) so concurrent calls to the same resource wait on the same in-flight network request, saving API quota and time.
+## 2026-08-22 - High-Water Mark Array Buffer
+**Learning:** Calling `.splice(0, n)` on large arrays inside high-frequency paths (like `addLog` processing thousands of tasks) causes O(N^2) degradation as every element must be continuously shifted.
+**Action:** Implement a high-water mark buffer (`if (arr.length > MAX + BUFFER)`) to batch cleanup operations. This reduces CPU overhead significantly compared to enforcing the strict `MAX` length on every single insertion.
