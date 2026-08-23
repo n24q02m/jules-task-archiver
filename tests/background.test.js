@@ -101,6 +101,7 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_addLog = addLog;
     globalThis.test_trimLog = trimLog;
     globalThis.test_MAX_LOG_LINES = MAX_LOG_LINES;
+    globalThis.test_LOG_BUFFER_LINES = LOG_BUFFER_LINES;
     globalThis.test_buildBatchRequest = buildBatchRequest;
     globalThis.test_callBatchExecute = callBatchExecute;
     globalThis.test_runInPool = runInPool;
@@ -1348,11 +1349,13 @@ describe('state management', () => {
 
   it('caps the retained log at MAX_LOG_LINES, dropping the oldest lines', () => {
     const { sandbox } = setupEnvironment({})
-    for (let i = 0; i < 2500; i++) sandbox.test_addLog(`line ${i}`)
+    // MAX_LOG_LINES = 2000, LOG_BUFFER_LINES = 500
+    // To trigger a trim, we need more than 2500 lines. Let's insert 2501.
+    for (let i = 0; i < 2501; i++) sandbox.test_addLog(`line ${i}`)
     const log = sandbox.test_state().log
     assert.strictEqual(log.length, 2000)
-    assert.strictEqual(log[log.length - 1], 'line 2499')
-    assert.strictEqual(log[0], 'line 500') // oldest 500 lines dropped
+    assert.strictEqual(log[log.length - 1], 'line 2500')
+    assert.strictEqual(log[0], 'line 501') // oldest 501 lines dropped
   })
 
   it('coalesces a storm of log writes into a single storage write', async () => {
@@ -2046,19 +2049,20 @@ describe('trimLog Internal', () => {
     assert.strictEqual(state.log[max - 1], `line ${max - 1}`)
   })
 
-  it('should trim oldest entries if log length exceeds MAX_LOG_LINES', () => {
+  it('should trim oldest entries if log length exceeds MAX_LOG_LINES + LOG_BUFFER_LINES', () => {
     const { sandbox } = setupEnvironment()
     const max = sandbox.test_MAX_LOG_LINES
+    const buffer = sandbox.test_LOG_BUFFER_LINES
     const state = sandbox.test_state()
-    // Create max + 10 entries
-    state.log = Array.from({ length: max + 10 }, (_, i) => `line ${i}`)
+    // Create max + buffer + 1 entries
+    state.log = Array.from({ length: max + buffer + 1 }, (_, i) => `line ${i}`)
 
     sandbox.test_trimLog()
 
     assert.strictEqual(state.log.length, max)
-    // Should have removed the first 10 entries
-    assert.strictEqual(state.log[0], 'line 10')
-    assert.strictEqual(state.log[max - 1], `line ${max + 9}`)
+    // Should have removed the first buffer + 1 entries
+    assert.strictEqual(state.log[0], `line ${buffer + 1}`)
+    assert.strictEqual(state.log[max - 1], `line ${max + buffer}`)
   })
 })
 
