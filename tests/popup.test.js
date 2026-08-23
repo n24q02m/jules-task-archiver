@@ -193,6 +193,7 @@ function setupPopupSandbox() {
   }
 
   const elements = {
+    '#mainForm': createMockElement('form'),
     '#ghOwner': createMockElement('input'),
     '#ghToken': createMockElement('input'),
     '#force': createMockElement('input', { type: 'checkbox' }),
@@ -376,7 +377,7 @@ describe('Initialization and Storage', () => {
 })
 
 describe('Button Event Handlers', () => {
-  it('should send START message when startBtn is clicked', async () => {
+  it('should send START message when mainForm is submitted', async () => {
     const { sandbox, elements } = setupPopupSandbox()
     let sentMessage = null
     sandbox.chrome.runtime.sendMessage = (msg) => {
@@ -388,7 +389,10 @@ describe('Button Event Handlers', () => {
     elements['#ghOwner'].value = 'test-owner'
     elements['#ghToken'].value = 'test-token'
 
-    await elements['#startBtn'].dispatchEvent('click')
+    // Mock form submission
+    if (elements['#mainForm'].listeners?.submit) {
+      elements['#mainForm'].listeners.submit[0]({ preventDefault: () => {} })
+    }
 
     assert.strictEqual(sentMessage.action, 'START')
     assert.strictEqual(sentMessage.options.opMode, 'archive')
