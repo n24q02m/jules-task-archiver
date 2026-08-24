@@ -907,7 +907,10 @@ let state = { ...DEFAULT_STATE }
 let pendingFlush = null
 
 function trimLog() {
-  if (state.log.length > MAX_LOG_LINES) {
+  // ⚡ Bolt: High-water mark buffer (MAX + 200).
+  // Frequent splice(0, n) calls on every insert cause severe O(N^2) CPU overhead
+  // due to element shifting. Batching cleanup reduces this to amortized O(N).
+  if (state.log.length > MAX_LOG_LINES + 200) {
     state.log.splice(0, state.log.length - MAX_LOG_LINES)
   }
 }
