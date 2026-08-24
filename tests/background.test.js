@@ -2098,3 +2098,15 @@ describe('Prompt Builder', () => {
     assert.strictEqual(categoryConfig['untested-function'], sandbox.test_TESTING_CONFIG)
   })
 })
+
+  it('should set redirect: error when token is present to prevent token leakage', async () => {
+    const { sandbox } = setupEnvironment()
+    let capturedOptions = null
+    sandbox.fetch = async (_url, options) => {
+      capturedOptions = options
+      return { ok: true }
+    }
+
+    await sandbox.test_jFetch('https://api.github.com/api/test', { token: 'valid-token' })
+    assert.strictEqual(capturedOptions.redirect, 'error')
+  })
