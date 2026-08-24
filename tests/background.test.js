@@ -2099,14 +2099,14 @@ describe('Prompt Builder', () => {
   })
 })
 
-  it('should set redirect: error when token is present to prevent token leakage', async () => {
-    const { sandbox } = setupEnvironment()
-    let capturedOptions = null
-    sandbox.fetch = async (_url, options) => {
-      capturedOptions = options
-      return { ok: true }
-    }
+it('should set redirect: error when token is present to prevent token leakage', async () => {
+  const { sandbox } = setupEnvironment()
+  let capturedOptions = null
+  sandbox.fetch = async (_url, options) => {
+    capturedOptions = options
+    return { ok: true }
+  }
 
-    await sandbox.test_jFetch('https://api.github.com/api/test', { token: 'valid-token' })
-    assert.strictEqual(capturedOptions.redirect, 'error')
-  })
+  await sandbox.test_jFetch('https://api.github.com/api/test', { token: 'valid-token' })
+  assert.strictEqual(capturedOptions.redirect, 'error')
+})
