@@ -70,7 +70,7 @@ async function jFetch(url, options = {}) {
   const timeoutId = setTimeout(() => controller.abort(), timeout)
 
   try {
-    const res = await fetch(url, { redirect: 'error', headers, signal: controller.signal, ...rest })
+    const res = await fetch(url, { headers, signal: controller.signal, ...rest })
     if (!res.ok) {
       throw new Error(`HTTP ${res.status}`)
     }
