@@ -63,13 +63,14 @@ async function jFetch(url, options = {}) {
     if (typeof token !== 'string') throw new Error('Token must be a string')
     if (/[\r\n]/.test(token)) throw new Error('Invalid token: contains newline')
     headers.Authorization = `token ${token}`
+    rest.redirect = rest.redirect || 'error'
   }
 
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), timeout)
 
   try {
-    const res = await fetch(url, { headers, signal: controller.signal, ...rest })
+    const res = await fetch(url, { redirect: 'error', headers, signal: controller.signal, ...rest })
     if (!res.ok) {
       throw new Error(`HTTP ${res.status}`)
     }
