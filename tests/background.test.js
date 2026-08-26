@@ -1588,13 +1588,16 @@ describe('jFetch', () => {
   it('should include Authorization header when token is provided', async () => {
     const { sandbox } = setupEnvironment()
     let capturedHeaders = null
+    let capturedOptions = null
     sandbox.fetch = async (_url, options) => {
       capturedHeaders = options.headers
+      capturedOptions = options
       return { ok: true }
     }
 
     await sandbox.test_jFetch('https://api.github.com/api/test', { token: 'valid-token' })
     assert.strictEqual(capturedHeaders.Authorization, 'token valid-token')
+    assert.strictEqual(capturedOptions.redirect, 'error')
   })
 
   it('should throw an error for HTTP 500 status code', async () => {
