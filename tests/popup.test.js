@@ -45,7 +45,7 @@ function createMockElement(tag = 'div', attrs = {}) {
     dispatchEvent: (type) => {
       if (element.listeners?.[type]) {
         element.listeners[type].forEach((cb) => {
-          cb({ target: element })
+          cb({ target: element, preventDefault: () => {} })
         })
       }
     },
@@ -197,6 +197,7 @@ function setupPopupSandbox() {
     '#ghToken': createMockElement('input'),
     '#force': createMockElement('input', { type: 'checkbox' }),
     '#startBtn': createMockElement('button'),
+    '#mainForm': createMockElement('form'),
     'input[name="mode"]:checked': createMockElement('input', { value: 'dry' }),
     '#resetBtn': createMockElement('button'),
     '#progressSection': createMockElement('section'),
@@ -388,7 +389,7 @@ describe('Button Event Handlers', () => {
     elements['#ghOwner'].value = 'test-owner'
     elements['#ghToken'].value = 'test-token'
 
-    await elements['#startBtn'].dispatchEvent('click')
+    await elements['#mainForm'].dispatchEvent('submit')
 
     assert.strictEqual(sentMessage.action, 'START')
     assert.strictEqual(sentMessage.options.opMode, 'archive')
