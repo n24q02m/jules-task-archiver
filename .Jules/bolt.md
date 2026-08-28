@@ -7,3 +7,7 @@
 ## 2025-02-25 - Request Coalescing
 **Learning:** When fetching external data (like PRs) in parallel across multiple tabs, caching only the *resolved* result leads to thundering herd problems where multiple identical network requests are fired concurrently.
 **Action:** Cache the *Promise* of the fetch operation synchronously (request coalescing) so concurrent calls to the same resource wait on the same in-flight network request, saving API quota and time.
+
+## 2024-08-28 - Optimize array trimming in hot path
+**Learning:** Calling `.splice(0, n)` to constantly cap a growing array size at max length causes O(N^2) degradation when executed frequently in a hot path because all remaining elements must shift on every insert.
+**Action:** Implement a high-water mark buffer `MAX + BUFFER` to batch cleanup operations. The array is only spliced when it significantly exceeds the max length, dramatically reducing CPU overhead.
