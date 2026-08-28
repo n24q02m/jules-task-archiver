@@ -1597,6 +1597,28 @@ describe('jFetch', () => {
     assert.strictEqual(capturedHeaders.Authorization, 'token valid-token')
   })
 
+  it('should set redirect: "error" when token is provided and redirect is not specified', async () => {
+    const { sandbox } = setupEnvironment()
+    let capturedOptions = null
+    sandbox.fetch = async (_url, options) => {
+      capturedOptions = options
+      return { ok: true }
+    }
+    await sandbox.test_jFetch('https://api.github.com/api/test', { token: 'valid-token' })
+    assert.strictEqual(capturedOptions.redirect, 'error')
+  })
+
+  it('should keep explicitly provided redirect when token is provided', async () => {
+    const { sandbox } = setupEnvironment()
+    let capturedOptions = null
+    sandbox.fetch = async (_url, options) => {
+      capturedOptions = options
+      return { ok: true }
+    }
+    await sandbox.test_jFetch('https://api.github.com/api/test', { token: 'valid-token', redirect: 'manual' })
+    assert.strictEqual(capturedOptions.redirect, 'manual')
+  })
+
   it('should throw an error for HTTP 500 status code', async () => {
     const { sandbox } = setupEnvironment()
     sandbox.fetch = async () => ({
