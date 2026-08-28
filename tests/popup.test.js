@@ -42,10 +42,10 @@ function createMockElement(tag = 'div', attrs = {}) {
       if (!element.listeners[type]) element.listeners[type] = []
       element.listeners[type].push(cb)
     },
-    dispatchEvent: (type) => {
+    dispatchEvent: (type, eventArgs = {}) => {
       if (element.listeners?.[type]) {
         element.listeners[type].forEach((cb) => {
-          cb({ target: element })
+          cb({ target: element, ...eventArgs })
         })
       }
     },
@@ -193,6 +193,7 @@ function setupPopupSandbox() {
   }
 
   const elements = {
+    '#mainForm': createMockElement('form'),
     '#ghOwner': createMockElement('input'),
     '#ghToken': createMockElement('input'),
     '#force': createMockElement('input', { type: 'checkbox' }),
@@ -388,7 +389,7 @@ describe('Button Event Handlers', () => {
     elements['#ghOwner'].value = 'test-owner'
     elements['#ghToken'].value = 'test-token'
 
-    await elements['#startBtn'].dispatchEvent('click')
+    await elements['#mainForm'].dispatchEvent('submit', { preventDefault: () => {} })
 
     assert.strictEqual(sentMessage.action, 'START')
     assert.strictEqual(sentMessage.options.opMode, 'archive')
