@@ -312,6 +312,23 @@ describe('jFetch SSRF Security', () => {
       message: /Security Error: Refusing to send GitHub token to non-GitHub origin/
     })
   })
+
+  it('should prevent token leakage via open redirects by defaulting redirect to error', async () => {
+    const { sandbox, chromeMock } = setupEnvironment()
+
+    // We capture the options used in the internal fetch
+    sandbox.fetch = async (_url, options) => {
+      chromeMock.lastFetch = { options }
+      return { ok: true, json: async () => [] }
+    }
+
+    await sandbox.jFetch('https://api.github.com/user', { token: 'secret-token' })
+    assert.strictEqual(
+      chromeMock.lastFetch.options.redirect,
+      'error',
+      'redirect option should default to error when token is present'
+    )
+  })
 })
 
 describe('getTabConfig Path Traversal Security', () => {
