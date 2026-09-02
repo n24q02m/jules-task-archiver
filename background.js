@@ -63,6 +63,9 @@ async function jFetch(url, options = {}) {
     if (typeof token !== 'string') throw new Error('Token must be a string')
     if (/[\r\n]/.test(token)) throw new Error('Invalid token: contains newline')
     headers.Authorization = `token ${token}`
+    if (rest.redirect === undefined) {
+      rest.redirect = 'error'
+    }
   }
 
   const controller = new AbortController()

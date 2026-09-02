@@ -162,7 +162,10 @@ function setupEnvironment(initialTabs = {}) {
 
   const sandbox = {
     chrome: chromeMock,
-    fetch: async () => ({ ok: true, json: async () => [], text: async () => ")]}'\n\n4\n[[]]" }),
+    fetch: async (url, options) => {
+      chromeMock.lastFetch = { url, options }
+      return { ok: true, json: async () => [], text: async () => ")]}'\n\n4\n[[]]" }
+    },
     setTimeout,
     Date,
     Promise,
@@ -418,5 +421,15 @@ describe('Orchestrator Privilege Escalation Security', () => {
       'Security Error: Payload exceeds size limit',
       'Should reject CACHE_START_CONFIG payload over 50KB'
     )
+  })
+})
+
+describe('jFetch Open Redirect Security', () => {
+  it('should set redirect to error when credentials are provided', async () => {
+    const { sandbox } = setupEnvironment()
+
+    await sandbox.jFetch('https://api.github.com/repos/owner/repo', { token: 'secret-token' })
+
+    assert.strictEqual(sandbox.chrome.lastFetch.options.redirect, 'error')
   })
 })
