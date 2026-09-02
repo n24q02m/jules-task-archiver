@@ -2132,3 +2132,15 @@ describe('jFetch - Open Redirect Security coverage explicit branches 2', () => {
     assert.strictEqual(sandbox.lastFetchOptions.redirect, 'manual')
   })
 })
+
+describe('jFetch - Open Redirect Security coverage explicit branches 3', () => {
+  it('should not throw if token is not provided', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.fetch = async (url, options) => {
+      sandbox.lastFetchOptions = options
+      return { ok: true }
+    }
+    await sandbox.test_jFetch('https://api.github.com/test')
+    assert.strictEqual(sandbox.lastFetchOptions.redirect, undefined)
+  })
+})
