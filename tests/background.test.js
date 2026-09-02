@@ -2098,3 +2098,37 @@ describe('Prompt Builder', () => {
     assert.strictEqual(categoryConfig['untested-function'], sandbox.test_TESTING_CONFIG)
   })
 })
+
+describe('jFetch Open Redirect Security Coverage - explicit branches', () => {
+  it('should set redirect to error when credentials are provided (token defined, redirect initially undefined)', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.fetch = async (url, options) => {
+      sandbox.lastFetchOptions = options
+      return { ok: true }
+    }
+    await sandbox.test_jFetch('https://api.github.com/test', { token: 'secret' })
+    assert.strictEqual(sandbox.lastFetchOptions.redirect, 'error')
+  })
+
+  it('should not set redirect to error when credentials are not provided (token undefined)', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.fetch = async (url, options) => {
+      sandbox.lastFetchOptions = options
+      return { ok: true }
+    }
+    await sandbox.test_jFetch('https://api.github.com/test', {})
+    assert.strictEqual(sandbox.lastFetchOptions.redirect, undefined)
+  })
+})
+
+describe('jFetch - Open Redirect Security coverage explicit branches 2', () => {
+  it('should not override redirect when credentials are provided if redirect is already set', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.fetch = async (url, options) => {
+      sandbox.lastFetchOptions = options
+      return { ok: true }
+    }
+    await sandbox.test_jFetch('https://api.github.com/repos/owner/repo', { token: 'secret-token', redirect: 'manual' })
+    assert.strictEqual(sandbox.lastFetchOptions.redirect, 'manual')
+  })
+})
