@@ -65,7 +65,7 @@ async function jFetch(url, options = {}) {
     headers.Authorization = `token ${token}`
 
     // Prevent token leakage via cross-origin open redirects
-    if (!rest.redirect) {
+    if (rest.redirect === undefined) {
       rest.redirect = 'error'
     }
   }

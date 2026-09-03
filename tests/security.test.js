@@ -322,6 +322,9 @@ describe('jFetch SSRF Security', () => {
     await sandbox.jFetch('https://api.github.com/repos/owner/repo', { token: 'secret-token' })
     assert.strictEqual(chromeMock.lastFetch.options.redirect, 'error')
 
+    await sandbox.jFetch('https://api.github.com/repos/owner/repo', { token: 'secret-token', redirect: 'manual' })
+    assert.strictEqual(chromeMock.lastFetch.options.redirect, 'manual')
+
     await sandbox.jFetch('https://jules.google.com/u/1/tasks')
     assert.strictEqual(chromeMock.lastFetch.options?.redirect, undefined)
   })
