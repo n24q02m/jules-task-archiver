@@ -107,11 +107,18 @@ input[type="password"]:focus {
   color: #94a3b8;
   cursor: pointer;
   font-size: 12px;
-  transition: background 0.2s;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.1s ease;
 }
 
 .segmented button:hover {
   background: #1e293b;
+}
+
+.segmented button:active:not(:disabled) {
+  transform: scale(0.98);
 }
 
 .segmented button.active {
@@ -206,12 +213,17 @@ button.secondary {
   margin-bottom: 12px;
   transition:
     border-color 0.2s ease,
-    color 0.2s ease;
+    color 0.2s ease,
+    transform 0.1s ease;
 }
 
 button.secondary:hover {
   border-color: #94a3b8;
   color: #e2e8f0;
+}
+
+button.secondary:active:not(:disabled) {
+  transform: scale(0.98);
 }
 
 .current-info {
