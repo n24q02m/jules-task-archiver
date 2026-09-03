@@ -1585,16 +1585,28 @@ describe('jFetch', () => {
     })
   })
 
-  it('should include Authorization header when token is provided', async () => {
+  it('should throw an error if token is sent to non-GitHub origin', async () => {
+    const { sandbox } = setupEnvironment()
+
+    await assert.rejects(() => sandbox.test_jFetch('https://jules.google.com/u/1/tasks', { token: 'valid-token' }), {
+      name: 'Error',
+      message: 'Security Error: Refusing to send GitHub token to non-GitHub origin'
+    })
+  })
+
+  it('should include Authorization header and restrict redirect when token is provided', async () => {
     const { sandbox } = setupEnvironment()
     let capturedHeaders = null
+    let capturedRedirect = null
     sandbox.fetch = async (_url, options) => {
       capturedHeaders = options.headers
+      capturedRedirect = options.redirect
       return { ok: true }
     }
 
     await sandbox.test_jFetch('https://api.github.com/api/test', { token: 'valid-token' })
     assert.strictEqual(capturedHeaders.Authorization, 'token valid-token')
+    assert.strictEqual(capturedRedirect, 'error')
   })
 
   it('should throw an error for HTTP 500 status code', async () => {
