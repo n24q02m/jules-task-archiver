@@ -906,8 +906,11 @@ const MAX_LOG_LINES = 2000
 let state = { ...DEFAULT_STATE }
 let pendingFlush = null
 
+// ⚡ Bolt Optimization: Implement a high-water mark buffer (MAX_LOG_LINES + 500)
+// to batch cleanup operations. Frequent .splice() on every insert for a max length
+// on large arrays causes severe O(N^2) degradation due to constant element shifting.
 function trimLog() {
-  if (state.log.length > MAX_LOG_LINES) {
+  if (state.log.length > MAX_LOG_LINES + 500) {
     state.log.splice(0, state.log.length - MAX_LOG_LINES)
   }
 }
