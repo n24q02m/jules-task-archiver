@@ -312,6 +312,17 @@ describe('jFetch SSRF Security', () => {
       message: /Security Error: Refusing to send GitHub token to non-GitHub origin/
     })
   })
+
+  it('should prevent token leakage via cross-origin redirects', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.fetch = async (url, options) => {
+      sandbox.chrome.lastFetch = { url, options }
+      return { ok: true, json: async () => [], text: async () => ")]}'\n\n4\n[[]]" }
+    }
+
+    await sandbox.jFetch('https://api.github.com/repos/owner/repo', { token: 'secret-token' })
+    assert.strictEqual(sandbox.chrome.lastFetch.options.redirect, 'error')
+  })
 })
 
 describe('getTabConfig Path Traversal Security', () => {
