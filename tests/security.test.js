@@ -162,7 +162,10 @@ function setupEnvironment(initialTabs = {}) {
 
   const sandbox = {
     chrome: chromeMock,
-    fetch: async () => ({ ok: true, json: async () => [], text: async () => ")]}'\n\n4\n[[]]" }),
+    fetch: async (url, options) => {
+      chromeMock.lastFetch = { url, options }
+      return { ok: true, json: async () => [], text: async () => ")]}'\n\n4\n[[]]" }
+    },
     setTimeout,
     Date,
     Promise,
@@ -311,6 +314,15 @@ describe('jFetch SSRF Security', () => {
     await assert.rejects(sandbox.jFetch('https://jules.google.com/u/1/tasks', { token: 'secret-token' }), {
       message: /Security Error: Refusing to send GitHub token to non-GitHub origin/
     })
+  })
+
+  it('should prevent token leakage via redirects by setting redirect to error', async () => {
+    const { sandbox, chromeMock } = setupEnvironment()
+
+    await sandbox.jFetch('https://api.github.com/repos/owner/repo', { token: 'secret-token' })
+
+    assert.ok(chromeMock.lastFetch)
+    assert.strictEqual(chromeMock.lastFetch.options.redirect, 'error')
   })
 })
 
