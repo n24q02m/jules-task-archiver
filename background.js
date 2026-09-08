@@ -902,12 +902,13 @@ const DEFAULT_STATE = {
 // stays bounded — otherwise the array grows without limit and every write
 // re-serializes the whole thing.
 const MAX_LOG_LINES = 2000
+const LOG_BUFFER = 500
 
 let state = { ...DEFAULT_STATE }
 let pendingFlush = null
 
 function trimLog() {
-  if (state.log.length > MAX_LOG_LINES) {
+  if (state.log.length > MAX_LOG_LINES + LOG_BUFFER) {
     state.log.splice(0, state.log.length - MAX_LOG_LINES)
   }
 }
