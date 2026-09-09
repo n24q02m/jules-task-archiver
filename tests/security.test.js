@@ -314,18 +314,18 @@ describe('jFetch SSRF Security', () => {
   })
 
   it('should enforce redirect: error when transmitting GitHub token to prevent token leakage via cross-origin open redirects', async () => {
-    const { sandbox, chromeMock } = setupEnvironment()
+    const { sandbox } = setupEnvironment()
 
     // We mock fetch inside the sandbox to assert the options passed to it
-    let fetchOptions = null;
-    sandbox.fetch = async (url, options) => {
-        fetchOptions = options;
-        return { ok: true, json: async () => ({}) };
-    };
+    let fetchOptions = null
+    sandbox.fetch = async (_url, options) => {
+      fetchOptions = options
+      return { ok: true, json: async () => ({}) }
+    }
 
     await sandbox.jFetch('https://api.github.com/repos/owner/repo', { token: 'secret-token' })
 
-    assert.strictEqual(fetchOptions.redirect, 'error');
+    assert.strictEqual(fetchOptions.redirect, 'error')
   })
 })
 
