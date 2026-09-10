@@ -183,6 +183,7 @@ function setupEnvironment(initialTabs = {}) {
     `
     globalThis.test_ensureContentScript = ensureContentScript;
     globalThis.test_JULES_ORIGIN = JULES_ORIGIN;
+    globalThis.test_jFetch = jFetch;
   `
 
   vm.runInContext(scriptContent, sandbox, { filename: bgScriptPath })
@@ -284,12 +285,12 @@ describe('jFetch SSRF Security', () => {
     const { sandbox } = setupEnvironment()
 
     // Test with malicious origin
-    await assert.rejects(sandbox.jFetch('https://evil.com/api/data'), {
+    await assert.rejects(sandbox.test_jFetch('https://evil.com/api/data'), {
       message: /Security Error: Disallowed fetch origin/
     })
 
     // Test with localhost
-    await assert.rejects(sandbox.jFetch('http://localhost:8080/data'), {
+    await assert.rejects(sandbox.test_jFetch('http://localhost:8080/data'), {
       message: /Security Error: Disallowed fetch origin/
     })
   })
@@ -298,33 +299,34 @@ describe('jFetch SSRF Security', () => {
     const { sandbox } = setupEnvironment()
 
     // We expect these to resolve correctly because the mocked fetch returns { ok: true }
-    const res1 = await sandbox.jFetch('https://jules.google.com/u/1/tasks')
+    const res1 = await sandbox.test_jFetch('https://jules.google.com/u/1/tasks')
     assert.strictEqual(res1.ok, true)
 
-    const res2 = await sandbox.jFetch('https://api.github.com/repos/owner/repo')
+    const res2 = await sandbox.test_jFetch('https://api.github.com/repos/owner/repo')
     assert.strictEqual(res2.ok, true)
   })
 
   it('should block sending token to non-GitHub origin', async () => {
     const { sandbox } = setupEnvironment()
 
-    await assert.rejects(sandbox.jFetch('https://jules.google.com/u/1/tasks', { token: 'secret-token' }), {
+    await assert.rejects(sandbox.test_jFetch('https://jules.google.com/u/1/tasks', { token: 'secret-token' }), {
       message: /Security Error: Refusing to send GitHub token to non-GitHub origin/
     })
   })
 
   it('should prevent token leakage via redirects', async () => {
-    const { sandbox } = setupEnvironment()
+    const { sandbox, chromeMock } = setupEnvironment()
 
     // We capture the options to verify redirect is set to error
     sandbox.fetch = async (url, options) => {
-      sandbox.chrome.lastFetch = { url, options }
+      chromeMock.lastFetch = { url, options }
       return { ok: true }
     }
 
-    await sandbox.jFetch('https://api.github.com/repos/owner/repo', { token: 'secret-token' })
+    // Call the test alias (test_jFetch) rather than jFetch directly
+    await sandbox.test_jFetch('https://api.github.com/repos/owner/repo', { token: 'secret-token' })
 
-    assert.strictEqual(sandbox.chrome.lastFetch.options.redirect, 'error')
+    assert.strictEqual(chromeMock.lastFetch.options.redirect, 'error')
   })
 })
 
