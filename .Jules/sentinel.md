@@ -2,3 +2,8 @@
 **Vulnerability:** The extension's Content Security Policy (CSP) in `manifest.json` lacked explicit `default-src 'none'` and broad network constraints, relying solely on script and object restrictions.
 **Learning:** A permissive CSP allows unexpected resource loading and potential data exfiltration if an XSS vulnerability occurs. A strict whitelist (`default-src 'none'`) provides a robust defense-in-depth layer.
 **Prevention:** Always define a strict CSP for extensions, setting `default-src 'none'` and explicitly allowing only required origins (e.g., `connect-src`).
+
+## 2024-09-10 - Fix token leakage via open redirects
+**Vulnerability:** The fetch wrapper `jFetch` did not specify redirect behavior when sending sensitive GitHub tokens in headers.
+**Learning:** If a legitimate endpoint (like an API) is compromised or responds with a 301/302 redirect to an attacker-controlled origin, standard `fetch` automatically follows the redirect and passes the `Authorization` header along, leaking the token.
+**Prevention:** Always conditionally set `redirect: 'error'` or `redirect: 'manual'` in fetch options when transmitting credentials or API tokens.
