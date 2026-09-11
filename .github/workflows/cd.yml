@@ -1,6 +1,10 @@
 name: CD
 
 on:
+  push:
+    branches:
+      - staging
+      - main
   workflow_dispatch:
     inputs:
       release_type:
@@ -20,6 +24,10 @@ on:
           - patch
           - minor
           - major
+
+env:
+  # Unified release ladder: push to staging = beta, push to main = stable.
+  RELEASE_TYPE: ${{ github.event_name == 'push' && (github.ref_name == 'staging' && 'beta' || 'stable') || inputs.release_type }}
 
 permissions:
   contents: write
@@ -59,7 +67,7 @@ jobs:
         with:
           github_token: ${{ steps.app-token.outputs.token }}
           config_file: semantic-release.toml
-          prerelease: ${{ inputs.release_type == 'beta' }}
+          prerelease: ${{ env.RELEASE_TYPE == 'beta' }}
           prerelease_token: beta
           force: ${{ inputs.force != 'none' && inputs.force || '' }}
 
