@@ -69,7 +69,8 @@ async function jFetch(url, options = {}) {
   const timeoutId = setTimeout(() => controller.abort(), timeout)
 
   try {
-    const res = await fetch(url, { headers, signal: controller.signal, ...rest })
+    // 🛡️ Sentinel: Prevent accidental token leakage via open redirects
+    const res = await fetch(url, { headers, signal: controller.signal, redirect: 'error', ...rest })
     if (!res.ok) {
       throw new Error(`HTTP ${res.status}`)
     }
