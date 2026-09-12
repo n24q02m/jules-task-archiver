@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "tier": 1,
+  "description": "Chrome Extension for bulk operations on Jules tasks via batchexecute API -- archive tasks and start code suggestions at scale.",
+  "homepage": "https://github.com/n24q02m/jules-task-archiver",
+  "topics": [
+    "automation",
+    "browser-extension",
+    "chrome-extension",
+    "github-api",
+    "google-jules",
+    "jules",
+    "manifest-v3",
+    "task-archiver"
+  ]
+}
