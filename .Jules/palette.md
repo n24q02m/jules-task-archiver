@@ -40,3 +40,6 @@
 ## 2025-06-30 - Native Form Validation and Submission
 **Learning:** Using standalone `<button>` elements outside of `<form>` tags prevents native HTML5 validation (like `pattern` or `maxlength` attributes on inputs) from working correctly, and breaks the implicit "Enter" key submission expected by keyboard users.
 **Action:** Always wrap form inputs and their primary action buttons in a semantic `<form>` element, change the primary button to `type="submit"`, and handle the form's `submit` event (using `e.preventDefault()`) rather than listening to the button's `click` event.
+## 2024-05-18 - Improve checkbox hit area and scrollable container accessibility
+**Learning:** Visually separated hint text for checkboxes reduces the clickable hit area, and scrollable container elements (like `<pre>`) require a `tabindex="0"` to be accessible via keyboard navigation.
+**Action:** Convert hint text to a secondary `<label for="inputId">` with `cursor: pointer`, and add `tabindex="0"` to all scrollable elements.
