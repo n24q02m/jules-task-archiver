@@ -283,3 +283,21 @@ button.secondary:active:not(:disabled) {
 .summary .skipped {
   color: #fbbf24;
 }
+
+/* CSP compliance additions */
+.hidden {
+  display: none;
+}
+
+.fieldset-reset {
+  border: none;
+  padding: 0;
+  margin: 0;
+  display: contents;
+}
+
+.block-hint {
+  display: block;
+  margin-left: 20px;
+  margin-top: 2px;
+}

@@ -28,6 +28,7 @@ function createMockElement(tag = 'div', attrs = {}) {
         }
       },
       add: (cls) => element.classList.classes.add(cls),
+      remove: (cls) => element.classList.classes.delete(cls),
       contains: (cls) => element.classList.classes.has(cls)
     },
     setAttribute: (name, val) => {
@@ -259,13 +260,13 @@ describe('setActiveOpMode', () => {
 
     // Archive mode (default or set)
     sandbox.setActiveOpMode('archive')
-    assert.strictEqual(elements['.settings'].style.display, 'block')
-    assert.strictEqual(elements['#force'].closest('.setting-row').style.display, 'block')
+    assert.strictEqual(elements['.settings'].classList.contains('hidden'), false)
+    assert.strictEqual(elements['#force'].closest('.setting-row').classList.contains('hidden'), false)
 
     // Suggestions mode
     sandbox.setActiveOpMode('suggestions')
-    assert.strictEqual(elements['.settings'].style.display, 'none')
-    assert.strictEqual(elements['#force'].closest('.setting-row').style.display, 'none')
+    assert.strictEqual(elements['.settings'].classList.contains('hidden'), true)
+    assert.strictEqual(elements['#force'].closest('.setting-row').classList.contains('hidden'), true)
   })
 })
 
@@ -301,8 +302,8 @@ describe('renderState', () => {
 
     assert.strictEqual(elements['#progressFill'].style.width, '100%')
     assert.strictEqual(elements['#startBtn'].disabled, false)
-    assert.strictEqual(elements['#resetBtn'].style.display, 'block')
-    assert.strictEqual(elements['#summarySection'].style.display, 'block')
+    assert.strictEqual(elements['#resetBtn'].classList.contains('hidden'), false)
+    assert.strictEqual(elements['#summarySection'].classList.contains('hidden'), false)
     assert.strictEqual(elements['#progressFill'].parentElement.getAttribute('aria-valuenow'), '100')
   })
 
@@ -411,7 +412,7 @@ describe('Button Event Handlers', () => {
     assert.strictEqual(sentMessage.action, 'RESET')
     assert.strictEqual(elements['#startBtn'].disabled, false)
     assert.strictEqual(elements['#startBtn'].textContent, 'Dry Run Archive')
-    assert.strictEqual(elements['#resetBtn'].style.display, 'none')
+    assert.strictEqual(elements['#resetBtn'].classList.contains('hidden'), true)
   })
 
   it('should move keyboard focus to startBtn after reset', () => {
