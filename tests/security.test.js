@@ -313,6 +313,23 @@ describe('jFetch SSRF Security', () => {
     })
   })
 
+  it('should allow standard redirects when no credentials are provided', async () => {
+    const { sandbox } = setupEnvironment()
+
+    let fetchOptions = null
+    sandbox.fetch = async (_url, options) => {
+      fetchOptions = options
+      return { ok: true, json: async () => [], text: async () => ")]}'\\n\\n4\\n[[]]" }
+    }
+
+    await sandbox.jFetch('https://jules.google.com/u/1/tasks')
+    assert.notStrictEqual(
+      fetchOptions.redirect,
+      'error',
+      'fetch should not restrict redirects when no credentials are provided'
+    )
+  })
+
   it('should prevent token leakage via open redirects', async () => {
     const { sandbox } = setupEnvironment()
 
