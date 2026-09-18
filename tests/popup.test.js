@@ -443,6 +443,15 @@ describe('popup.html accessibility', () => {
     assert.ok(popupHtml.includes('<legend id="execModeLabel">'), 'mode group should use legend')
     assert.ok(popupHtml.includes('id="scopeLabel"'), 'scopeLabel should exist')
     assert.ok(popupHtml.includes('<legend id="scopeLabel">'), 'scope group should use legend')
+    assert.ok(popupHtml.includes('role="radiogroup"'), 'radio groups should have role="radiogroup"')
+    assert.ok(
+      popupHtml.includes('aria-labelledby="execModeLabel"'),
+      'mode group should reference legend via aria-labelledby'
+    )
+    assert.ok(
+      popupHtml.includes('aria-labelledby="scopeLabel"'),
+      'scope group should reference legend via aria-labelledby'
+    )
   })
 })
 
