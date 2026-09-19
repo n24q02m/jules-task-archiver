@@ -328,6 +328,16 @@ describe('jFetch SSRF Security', () => {
       'error',
       'fetch should be configured to error on redirects to prevent token leakage'
     )
+
+    await sandbox.jFetch('https://jules.google.com/u/1/tasks', { credentials: 'include' })
+    assert.strictEqual(
+      fetchOptions.redirect,
+      'error',
+      'fetch should be configured to error on redirects when credentials: include is used'
+    )
+
+    await sandbox.jFetch('https://api.github.com/repos/owner/repo')
+    assert.strictEqual(fetchOptions.redirect, 'follow', 'fetch should allow redirects for uncredentialed requests')
   })
 })
 
