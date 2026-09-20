@@ -40,3 +40,8 @@
 ## 2025-06-30 - Native Form Validation and Submission
 **Learning:** Using standalone `<button>` elements outside of `<form>` tags prevents native HTML5 validation (like `pattern` or `maxlength` attributes on inputs) from working correctly, and breaks the implicit "Enter" key submission expected by keyboard users.
 **Action:** Always wrap form inputs and their primary action buttons in a semantic `<form>` element, change the primary button to `type="submit"`, and handle the form's `submit` event (using `e.preventDefault()`) rather than listening to the button's `click` event.
+## 2026-09-20 - Fix radio group accessibility
+
+**Learning:** When grouping radio inputs with `<fieldset>` and `<legend>`, if the inputs are nested inside a generic structural container (like a `<div>` for styling), screen readers may lose the semantic connection. Adding `role="radiogroup"` to the immediate container and linking it back to the `<legend>` using `aria-labelledby` preserves this connection.
+
+**Action:** Always add `role="radiogroup"` and `aria-labelledby` to styling containers wrapping radio inputs inside a `<fieldset>`.
