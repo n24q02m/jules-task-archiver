@@ -45,3 +45,7 @@
 **Learning:** When grouping radio inputs with `<fieldset>` and `<legend>`, if the inputs are nested inside a generic structural container (like a `<div>` for styling), screen readers may lose the semantic connection. Adding `role="radiogroup"` to the immediate container and linking it back to the `<legend>` using `aria-labelledby` preserves this connection.
 
 **Action:** Always add `role="radiogroup"` and `aria-labelledby` to styling containers wrapping radio inputs inside a `<fieldset>`.
+
+## 2025-10-24 - Expand checkbox hint hit area
+**Learning:** Hint texts that are visually detached from their primary checkbox inputs are unclickable, causing user frustration when they click the hint text but the checkbox doesn't toggle.
+**Action:** Always convert visually detached form hints (like `.block-hint`) into secondary `<label for="inputId">` elements and apply `cursor: pointer` to expand the hit area, improving accessibility and reducing user friction.
