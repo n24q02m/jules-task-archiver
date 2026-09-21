@@ -313,7 +313,7 @@ describe('jFetch SSRF Security', () => {
     })
   })
 
-  it('should prevent token leakage via open redirects', async () => {
+  it('should prevent token leakage via open redirects, even if explicitly bypassed', async () => {
     const { sandbox } = setupEnvironment()
 
     let fetchOptions = null
@@ -322,12 +322,25 @@ describe('jFetch SSRF Security', () => {
       return { ok: true, json: async () => [], text: async () => ")]}'\\n\\n4\\n[[]]" }
     }
 
-    await sandbox.jFetch('https://api.github.com/repos/owner/repo', { token: 'secret-token' })
+    await sandbox.jFetch('https://api.github.com/repos/owner/repo', { token: 'secret-token', redirect: 'follow' })
     assert.strictEqual(
       fetchOptions.redirect,
       'error',
-      'fetch should be configured to error on redirects to prevent token leakage'
+      'fetch should be configured to error on redirects to prevent token leakage, overriding user input'
     )
+  })
+
+  it('should allow default follow behavior for uncredentialed requests', async () => {
+    const { sandbox } = setupEnvironment()
+
+    let fetchOptions = null
+    sandbox.fetch = async (_url, options) => {
+      fetchOptions = options
+      return { ok: true, json: async () => [], text: async () => ")]}'\\n\\n4\\n[[]]" }
+    }
+
+    await sandbox.jFetch('https://jules.google.com/u/1/tasks')
+    assert.strictEqual(fetchOptions.redirect, 'follow', 'uncredentialed fetch should default to following redirects')
   })
 })
 
