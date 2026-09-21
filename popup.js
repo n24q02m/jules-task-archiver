@@ -147,6 +147,16 @@ mainForm.addEventListener('submit', async (e) => {
     activeTabId = tab?.id
   }
 
+  if (mode === 'run' && forceCheckbox.checked && opMode === 'archive') {
+    if (
+      !window.confirm(
+        '⚠️ WARNING: You are about to FORCE archive tasks.\n\nThis will ignore task state and open Pull Requests.\n\nAre you sure you want to proceed?'
+      )
+    ) {
+      return
+    }
+  }
+
   const options = {
     dryRun: mode === 'dry',
     force: forceCheckbox.checked,
