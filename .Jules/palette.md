@@ -52,3 +52,6 @@
 ## 2025-06-30 - Confirmation Dialogs for Destructive Actions
 **Learning:** Destructive actions like "Force Archiving" (which ignores task state and open PRs) can cause unintentional data loss or state modification if triggered accidentally.
 **Action:** Always provide a confirmation dialog before proceeding with destructive actions, clearly explaining the consequences so users can back out if they clicked by mistake.
+## 2025-06-30 - Form Validation with Inline Feedback
+**Learning:** Using native HTML5 pattern validation attributes without providing visible, inline error feedback leaves users confused when their input is rejected, especially since native browser tooltips can be inconsistent or inaccessible.
+**Action:** Always provide an explicit inline validation error message (e.g., `<div class="validation-error">`) styled with CSS `:invalid` pseudo-class and sibling combinators to display immediate, accessible feedback when input constraints are not met.
