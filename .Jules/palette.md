@@ -49,3 +49,6 @@
 ## 2025-10-24 - Expand checkbox hint hit area
 **Learning:** Hint texts that are visually detached from their primary checkbox inputs are unclickable, causing user frustration when they click the hint text but the checkbox doesn't toggle.
 **Action:** Always convert visually detached form hints (like `.block-hint`) into secondary `<label for="inputId">` elements and apply `cursor: pointer` to expand the hit area, improving accessibility and reducing user friction.
+## 2025-06-30 - Confirmation Dialogs for Destructive Actions
+**Learning:** Destructive actions like "Force Archiving" (which ignores task state and open PRs) can cause unintentional data loss or state modification if triggered accidentally.
+**Action:** Always provide a confirmation dialog before proceeding with destructive actions, clearly explaining the consequences so users can back out if they clicked by mistake.

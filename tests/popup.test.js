@@ -378,6 +378,63 @@ describe('Initialization and Storage', () => {
 })
 
 describe('Button Event Handlers', () => {
+  it('should prompt for confirmation and abort if cancelled when force archiving', async () => {
+    const { sandbox, elements, radioStates } = setupPopupSandbox()
+    let confirmCalled = false
+    let sentMessage = null
+
+    sandbox.window = {
+      confirm: (_msg) => {
+        confirmCalled = true
+        return false
+      }
+    }
+    sandbox.chrome.runtime.sendMessage = (msg) => {
+      sentMessage = msg
+    }
+
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
+
+    radioStates.mode = 'run'
+    elements['#force'].checked = true
+    sandbox.setActiveOpMode('archive')
+
+    // Reset sentMessage before submit
+    sentMessage = null
+    await elements['#mainForm'].dispatchEvent('submit', { preventDefault: () => {} })
+
+    assert.strictEqual(confirmCalled, true)
+    assert.strictEqual(sentMessage, null)
+  })
+
+  it('should prompt for confirmation and proceed if accepted when force archiving', async () => {
+    const { sandbox, elements, radioStates } = setupPopupSandbox()
+    let confirmCalled = false
+    let sentMessage = null
+
+    sandbox.window = {
+      confirm: (_msg) => {
+        confirmCalled = true
+        return true
+      }
+    }
+    sandbox.chrome.runtime.sendMessage = (msg) => {
+      sentMessage = msg
+    }
+
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
+
+    radioStates.mode = 'run'
+    elements['#force'].checked = true
+    sandbox.setActiveOpMode('archive')
+
+    await elements['#mainForm'].dispatchEvent('submit', { preventDefault: () => {} })
+
+    assert.strictEqual(confirmCalled, true)
+    assert.strictEqual(sentMessage.action, 'START')
+    assert.strictEqual(sentMessage.options.force, true)
+  })
+
   it('should send START message when mainForm is submitted', async () => {
     const { sandbox, elements } = setupPopupSandbox()
     let sentMessage = null
