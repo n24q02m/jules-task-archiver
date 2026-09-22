@@ -10,3 +10,6 @@
 ## 2026-09-10 - Array Splice High-Water Mark
 **Learning:** Frequent `.splice(0, n)` calls on large arrays to enforce a maximum length on every insert cause severe O(N^2) performance degradation due to constant element shifting.
 **Action:** Implement a high-water mark buffer (e.g., `if (arr.length > MAX + BUFFER) arr.splice(0, arr.length - MAX)`) to batch cleanup operations and significantly reduce CPU overhead in high-frequency paths.
+## 2025-02-25 - API Quota Short-Circuit
+**Learning:** Checking quotas or limits *after* executing expensive discovery network requests (e.g., retrieving lists of items to process) results in wasted network calls and latency if the quota was already exhausted.
+**Action:** Always fetch quotas and check session limits early in a workflow so the application can short-circuit and avoid O(N) wasteful network calls.

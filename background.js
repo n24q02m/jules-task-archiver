@@ -731,6 +731,22 @@ async function processSuggestionsForTab(tab, options) {
     addLog(`[${label}] Tip: Click Start on any suggestion in Jules UI to capture config.`)
   }
 
+  // ⚡ Bolt Optimization: Fetch quota before network discovery. If the limit is
+  // already reached, short-circuit to avoid O(N) wasteful batchexecute API calls.
+  let quota = null
+  try {
+    quota = await getDailySessionQuota(config)
+    if (quota) {
+      addLog(`[${label}] Daily sessions: ${quota.used}/${quota.limit} used, ${quota.remaining} remaining`)
+      if (quota.remaining === 0) {
+        addLog(`[${label}] Daily limit reached. Skipping suggestion discovery.`)
+        return 0
+      }
+    }
+  } catch (e) {
+    addLog(`[${label}] WARNING: Could not fetch daily quota: ${e.message}`)
+  }
+
   // Only repos whose Jules Suggestions toggle is ON. Enumerating every connected
   // source instead caused the extension to start suggestions on repos the user
   // never enabled (and blow past the daily session limit).
@@ -775,17 +791,9 @@ async function processSuggestionsForTab(tab, options) {
   // Respect Jules' daily session limit: never start more suggestions than the
   // account's remaining quota. Each started suggestion consumes one session.
   let toStart = work
-  const quota = await getDailySessionQuota(config)
-  if (quota) {
-    addLog(`\n[${label}] Daily sessions: ${quota.used}/${quota.limit} used, ${quota.remaining} remaining`)
-    if (quota.remaining === 0) {
-      addLog(`[${label}] Daily limit reached. Starting 0 suggestions.`)
-      return 0
-    }
-    if (work.length > quota.remaining) {
-      addLog(`[${label}] Capping ${work.length} suggestions to ${quota.remaining} (daily limit)`)
-      toStart = work.slice(0, quota.remaining)
-    }
+  if (quota && work.length > quota.remaining) {
+    addLog(`[${label}] Capping ${work.length} suggestions to ${quota.remaining} (daily limit)`)
+    toStart = work.slice(0, quota.remaining)
   }
 
   if (!options.dryRun) {
