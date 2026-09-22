@@ -13,3 +13,6 @@
 ## 2025-02-25 - API Quota Short-Circuit
 **Learning:** Checking quotas or limits *after* executing expensive discovery network requests (e.g., retrieving lists of items to process) results in wasted network calls and latency if the quota was already exhausted.
 **Action:** Always fetch quotas and check session limits early in a workflow so the application can short-circuit and avoid O(N) wasteful network calls.
+## 2025-02-25 - Regex exec vs String split
+**Learning:** Using `.split()` for string parsing (like URL pathnames) creates intermediate array allocations that increase GC pressure in high-frequency paths.
+**Action:** Use pre-compiled regular expressions with `.exec()` instead of `.split()` to parse structured strings without allocating intermediate arrays.
