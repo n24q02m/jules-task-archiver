@@ -13,3 +13,6 @@
 ## 2025-02-25 - API Quota Short-Circuit
 **Learning:** Checking quotas or limits *after* executing expensive discovery network requests (e.g., retrieving lists of items to process) results in wasted network calls and latency if the quota was already exhausted.
 **Action:** Always fetch quotas and check session limits early in a workflow so the application can short-circuit and avoid O(N) wasteful network calls.
+## 2026-09-23 - Array Allocation and Push Overhead
+**Learning:** In performance-critical hot paths (like concurrent pool management), using `[].push()` introduces measurable overhead due to dynamic array resizing and closure allocation.
+**Action:** When the final array size is known or bounded, pre-allocate the array using `new Array(size)` and assign elements by index (e.g., `pool[i] = drain()`) instead of dynamically pushing them.

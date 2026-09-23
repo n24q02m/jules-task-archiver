@@ -93,20 +93,21 @@ async function jFetch(url, options = {}) {
  * this bounds concurrency so large fan-outs cannot overwhelm the network.
  */
 async function runInPool(items, limit, worker) {
-  const results = new Array(items.length)
+  const len = items.length
+  const results = new Array(len)
   let cursor = 0
 
   async function drain() {
-    while (cursor < items.length) {
+    while (cursor < len) {
       const index = cursor++
       results[index] = await worker(items[index], index)
     }
   }
 
-  const poolSize = items.length > 0 ? Math.max(1, Math.min(Math.floor(limit) || 1, items.length)) : 0
-  const pool = []
+  const poolSize = len > 0 ? Math.max(1, Math.min(Math.floor(limit) || 1, len)) : 0
+  const pool = new Array(poolSize)
   for (let i = 0; i < poolSize; i++) {
-    pool.push(drain())
+    pool[i] = drain()
   }
   await Promise.all(pool)
   return results
@@ -265,7 +266,10 @@ function parseResponse(text, rpcId) {
   if (!Array.isArray(outer)) throw new Error('Invalid batchexecute response: expected array')
 
   // Find the entry matching our rpcId
-  for (const entry of outer) {
+  // ⚡ Bolt Optimization: Replace `for...of` loop over outer with a standard `for` loop to avoid
+  // iterator allocation and closure overhead in this hot path parsing large response arrays.
+  for (let i = 0; i < outer.length; i++) {
+    const entry = outer[i]
     if (!Array.isArray(entry) || entry[1] !== rpcId) continue
     if (typeof entry[2] !== 'string') return null
     const innerFixed = fixJsonControlChars(entry[2])
