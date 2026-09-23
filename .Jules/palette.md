@@ -52,3 +52,6 @@
 ## 2025-06-30 - Confirmation Dialogs for Destructive Actions
 **Learning:** Destructive actions like "Force Archiving" (which ignores task state and open PRs) can cause unintentional data loss or state modification if triggered accidentally.
 **Action:** Always provide a confirmation dialog before proceeding with destructive actions, clearly explaining the consequences so users can back out if they clicked by mistake.
+## 2023-11-20 - Inline Validation Feedback
+**Learning:** Native HTML5 `pattern` attributes are implicitly anchored by the browser. Including explicit `^` and `$` anchors in the `pattern` string can cause pattern mismatch logic to evaluate invalid input as valid. Furthermore, when styling `:invalid` pseudo-classes for inputs, ensure the CSS specificity is high enough (e.g. `input[type="text"]:invalid:focus`) to override default or focus styles, ensuring error borders display correctly when the field is actively being edited.
+**Action:** Remove explicit anchors from HTML5 validation attributes and use high-specificity CSS for error states.

@@ -302,3 +302,15 @@ button.secondary:active:not(:disabled) {
   margin-top: 2px;
   cursor: pointer;
 }
+
+/* Inline Validation Feedback */
+input[type="text"]:invalid,
+input[type="password"]:invalid,
+input[type="text"]:invalid:focus,
+input[type="password"]:invalid:focus {
+  border-color: #f87171;
+}
+
+input:invalid:focus-visible {
+  outline-color: #f87171;
+}
