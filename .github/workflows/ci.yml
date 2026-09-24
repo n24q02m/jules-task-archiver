@@ -3,7 +3,7 @@ name: CI
 on:
   pull_request:
     branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, edited, ready_for_review]
   push:
     branches: [main]
   issues:
@@ -15,6 +15,28 @@ permissions:
   pull-requests: write
 
 jobs:
+
+  # PR title drives the squash-merge subject (repo setting squash_merge_commit_title=PR_TITLE),
+  # and semantic-release only releases on conventional commits. Emoji-titled bot PRs
+  # (Bolt/Palette/Sentinel) landed with non-conventional subjects and silently produced no
+  # release. This gate forces a conventional title before merge; retitle + `edited` re-runs it.
+  pr-title:
+    name: PR Title Lint
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            fix
+            feat
+            perf
+          requireScope: false
+          subjectPattern: ^(?![A-Z]).+$
+          subjectPatternError: |
+            The subject must not start with an uppercase character.
   lint:
     name: Lint & Format
     if: github.event_name == 'pull_request' || github.event_name == 'push'
