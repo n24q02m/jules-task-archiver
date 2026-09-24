@@ -61,7 +61,7 @@ jobs:
           token: ${{ steps.app-token.outputs.token }}
           fetch-depth: 0
 
-      - uses: n24q02m/better-semantic-release@a994102ce3aa588fe3038e79707ae7ae3971b336 # v1.7.0
+      - uses: n24q02m/better-semantic-release@74b0a68304cca17aa5608e1a48b1a22ded2f8a6c # v1.7.2
         id: release
         with:
           github_token: ${{ steps.app-token.outputs.token }}
@@ -70,7 +70,7 @@ jobs:
           prerelease_token: beta
           force: ${{ inputs.force != 'none' && inputs.force || '' }}
 
-      - uses: python-semantic-release/publish-action@6d89e2de8d40ecb3717316ecbbf15a6fa8ea9039 # v10.6.2
+      - uses: python-semantic-release/publish-action@99d4062dd393b5a7a62c5fe9ed78fb364b5674f2 # v10.7.0
         if: steps.release.outputs.released == 'true'
         with:
           github_token: ${{ steps.app-token.outputs.token }}
