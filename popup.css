@@ -296,6 +296,25 @@ button.secondary:active:not(:disabled) {
   display: contents;
 }
 
+.validation-error {
+  display: none;
+  color: #f87171;
+  font-size: 11px;
+  margin-top: 4px;
+}
+
+input:invalid {
+  border-color: #f87171;
+}
+
+input:invalid:focus-visible {
+  outline-color: #f87171;
+}
+
+input:invalid ~ .validation-error {
+  display: block;
+}
+
 .block-hint {
   display: block;
   margin-left: 20px;
