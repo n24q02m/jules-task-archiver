@@ -73,12 +73,13 @@ function extractConfig() {
 }
 
 // Detect account from URL
+// ⚡ Bolt Optimization: Use a pre-compiled regex and .exec() instead of .split('/')
+// to avoid creating intermediate array allocations when parsing the URL pathname.
+const ACCOUNT_NUM_REGEX = /\/u\/(\d+)(?:\/|$)/
 function getAccountNum() {
   try {
-    const parts = new URL(location.href).pathname.split('/')
-    const uIdx = parts.indexOf('u')
-    const val = uIdx !== -1 && parts[uIdx + 1] ? parts[uIdx + 1] : '0'
-    return /^\d+$/.test(val) ? val : '0'
+    const match = ACCOUNT_NUM_REGEX.exec(new URL(location.href).pathname)
+    return match ? match[1] : '0'
   } catch (_e) {
     return '0'
   }
