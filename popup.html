@@ -52,13 +52,17 @@
 
     <section class="settings">
       <h2>Settings</h2>
-      <label for="ghOwner">
-        GitHub Owner <span class="hint" id="ghOwnerHint">(optional, used for PR checks)</span>
+      <div class="setting-row">
+        <label for="ghOwner">
+          GitHub Owner <span class="hint" id="ghOwnerHint">(optional, used for PR checks)</span>
+        </label>
         <input type="text" id="ghOwner" placeholder="your-github-username" spellcheck="false" autocomplete="username" aria-describedby="ghOwnerHint" maxlength="39" pattern="[a-zA-Z0-9\-]+" />
         <div class="validation-error">Only alphanumeric characters and hyphens allowed.</div>
-      </label>
-      <label for="ghToken">
-        GitHub Token <span class="hint" id="ghTokenHint">(optional, for private repos)</span>
+      </div>
+      <div class="setting-row">
+        <label for="ghToken">
+          GitHub Token <span class="hint" id="ghTokenHint">(optional, for private repos)</span>
+        </label>
         <input
           type="password"
           id="ghToken"
@@ -68,7 +72,7 @@
           aria-describedby="ghTokenHint"
           maxlength="255"
         />
-      </label>
+      </div>
     </section>
 
     <button type="submit" id="startBtn" class="primary">Start Archiving</button>

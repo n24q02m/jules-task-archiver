@@ -55,3 +55,6 @@
 ## 2025-06-30 - Form Validation with Inline Feedback
 **Learning:** Using native HTML5 pattern validation attributes without providing visible, inline error feedback leaves users confused when their input is rejected, especially since native browser tooltips can be inconsistent or inaccessible.
 **Action:** Always provide an explicit inline validation error message (e.g., `<div class="validation-error">`) styled with CSS `:invalid` pseudo-class and sibling combinators to display immediate, accessible feedback when input constraints are not met.
+## 2025-10-24 - Avoid Nesting Inputs and Validation Errors Inside Labels
+**Learning:** Nesting form inputs and their subsequent validation error elements directly inside a `<label>` tag can cause screen readers to incorrectly read the validation error message as part of the label itself, polluting the semantic name of the field. Additionally, it breaks consistent layout spacing when `.setting-row` structural wrappers are used elsewhere.
+**Action:** Always un-nest inputs and validation error containers from `<label>` elements, link them explicitly using `for` and `id`, and wrap the logical grouping in a generic structural container like `.setting-row` for styling.
