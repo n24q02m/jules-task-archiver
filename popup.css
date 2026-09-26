@@ -303,12 +303,17 @@ button.secondary:active:not(:disabled) {
   margin-top: 4px;
 }
 
-input:invalid {
+input[type="text"]:invalid,
+input[type="password"]:invalid {
   border-color: #f87171;
 }
 
-input:invalid:focus-visible {
+input[type="text"]:invalid:focus,
+input[type="password"]:invalid:focus,
+input[type="text"]:invalid:focus-visible,
+input[type="password"]:invalid:focus-visible {
   outline-color: #f87171;
+  border-color: #f87171;
 }
 
 input:invalid ~ .validation-error {
