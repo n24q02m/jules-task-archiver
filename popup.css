@@ -70,6 +70,7 @@ input[type="password"] {
   color: #e2e8f0;
   font-size: 13px;
   outline: none;
+  transition: border-color 0.2s ease, outline-color 0.2s ease;
 }
 
 input[type="text"]:focus,
