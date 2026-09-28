@@ -58,3 +58,6 @@
 ## 2025-10-24 - Avoid Nesting Inputs and Validation Errors Inside Labels
 **Learning:** Nesting form inputs and their subsequent validation error elements directly inside a `<label>` tag can cause screen readers to incorrectly read the validation error message as part of the label itself, polluting the semantic name of the field. Additionally, it breaks consistent layout spacing when `.setting-row` structural wrappers are used elsewhere.
 **Action:** Always un-nest inputs and validation error containers from `<label>` elements, link them explicitly using `for` and `id`, and wrap the logical grouping in a generic structural container like `.setting-row` for styling.
+## 2025-10-25 - Scrollable Overflow Containers Need Keyboard Access
+**Learning:** Biome's `a11y/noNoninteractiveTabindex` rule flags `tabindex` on non-interactive elements like `<pre>`. However, if the element acts as a scrollable container (e.g., `overflow: auto` or `overflow-y: auto`), it must have `tabindex="0"` to allow keyboard-only users to scroll its content.
+**Action:** Add a biome-ignore comment for `lint/a11y/noNoninteractiveTabindex` specifically for scrollable overflow containers to ensure keyboard accessibility while satisfying the linter.
