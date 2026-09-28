@@ -356,7 +356,11 @@ describe('jFetch SSRF Security', () => {
     await sandbox.jFetch('https://api.github.com/repos/owner/repo', options)
 
     assert.strictEqual(options.headers.Authorization, undefined, 'options.headers should not be mutated')
-    assert.strictEqual(fetchOptions.headers.Authorization, 'token secret-token', 'fetch options should include Authorization')
+    assert.strictEqual(
+      fetchOptions.headers.Authorization,
+      'token secret-token',
+      'fetch options should include Authorization'
+    )
   })
 })
 
