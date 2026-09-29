@@ -313,6 +313,17 @@ describe('jFetch SSRF Security', () => {
     })
   })
 
+  it('should not mutate original options.headers to prevent credential leakage', async () => {
+    const { sandbox } = setupEnvironment()
+    const sharedOptions = { headers: { 'X-Custom': '1' }, token: 'secret-token' }
+
+    sandbox.fetch = async () => ({ ok: true, json: async () => [], text: async () => ")]}'\\n\\n4\\n[[]]" })
+
+    await sandbox.jFetch('https://api.github.com/repos/owner/repo', sharedOptions)
+
+    assert.strictEqual(sharedOptions.headers.Authorization, undefined, 'Original options.headers should not be mutated with Authorization token')
+  })
+
   it('should prevent token leakage via open redirects, even if explicitly bypassed', async () => {
     const { sandbox } = setupEnvironment()
 
