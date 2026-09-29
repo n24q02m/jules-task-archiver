@@ -321,7 +321,11 @@ describe('jFetch SSRF Security', () => {
 
     await sandbox.jFetch('https://api.github.com/repos/owner/repo', sharedOptions)
 
-    assert.strictEqual(sharedOptions.headers.Authorization, undefined, 'Original options.headers should not be mutated with Authorization token')
+    assert.strictEqual(
+      sharedOptions.headers.Authorization,
+      undefined,
+      'Original options.headers should not be mutated with Authorization token'
+    )
   })
 
   it('should prevent token leakage via open redirects, even if explicitly bypassed', async () => {
