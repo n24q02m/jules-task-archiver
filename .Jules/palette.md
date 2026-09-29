@@ -64,3 +64,6 @@
 ## 2025-10-24 - Input Invalid Focus Specificity
 **Learning:** When styling `:invalid` pseudo-classes for inputs, ensure the CSS specificity is high enough to override default or focus styles (e.g., `input[type="text"]:invalid:focus`). Additionally, account for `outline` overriding `border` colors on focus; ensure you set `outline-color` alongside border colors so error states remain visible.
 **Action:** Always use specific type selectors like `input[type="text"]:invalid:focus` rather than just `input:invalid` to ensure error states are not overridden by generic focus styles.
+## 2025-10-25 - Link Inline Validation Errors to Inputs
+**Learning:** Adding visual inline validation errors without linking them semantically to the input field makes them inaccessible to screen reader users, who won't be notified when an input becomes invalid during navigation.
+**Action:** Always link inline validation error elements to their respective input fields using `aria-describedby` (combining multiple IDs if a hint already exists, like `aria-describedby="hintId errorId"`) and apply `aria-live="polite"` to the error container so assistive technologies announce the error when it appears.
