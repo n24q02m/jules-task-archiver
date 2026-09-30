@@ -280,6 +280,35 @@ describe('ensureContentScript Security', () => {
 })
 
 describe('jFetch SSRF Security', () => {
+  it('should not mutate the provided headers object', async () => {
+    const { sandbox } = setupEnvironment()
+
+    let capturedHeaders = null
+    sandbox.fetch = async (_url, options) => {
+      capturedHeaders = options.headers
+      return { ok: true, json: async () => [], text: async () => ")]}'\\n\\n4\\n[[]]" }
+    }
+
+    const sharedHeaders = { Accept: 'application/json' }
+
+    await sandbox.jFetch('https://api.github.com/repos/owner/repo', {
+      headers: sharedHeaders,
+      token: 'secret-token'
+    })
+
+    assert.strictEqual(capturedHeaders.Authorization, 'token secret-token')
+
+    await sandbox.jFetch('https://jules.google.com/u/1/tasks', {
+      headers: sharedHeaders
+    })
+
+    assert.strictEqual(
+      capturedHeaders.Authorization,
+      undefined,
+      'Token leaked to Jules origin due to headers mutation!'
+    )
+  })
+
   it('should block requests to unauthorized origins', async () => {
     const { sandbox } = setupEnvironment()
 
