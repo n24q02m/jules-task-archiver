@@ -487,6 +487,14 @@ describe('Button Event Handlers', () => {
 describe('popup.html accessibility', () => {
   const popupHtml = fs.readFileSync(path.join(__dirname, '../popup.html'), 'utf8')
 
+  it('should link the GitHub owner input to its hint and error via aria-describedby', () => {
+    assert.ok(popupHtml.includes('id="ghOwnerError"'), 'owner error div should have an id')
+    assert.ok(
+      popupHtml.includes('aria-describedby="ghOwnerHint ghOwnerError"'),
+      'owner input should reference both hint and error via aria-describedby'
+    )
+  })
+
   it('should link the GitHub token input to its hint via aria-describedby', () => {
     assert.ok(popupHtml.includes('id="ghTokenHint"'), 'token hint span should have an id')
     assert.ok(

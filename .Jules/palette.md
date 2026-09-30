@@ -58,3 +58,6 @@
 ## 2025-10-24 - Avoid Nesting Inputs and Validation Errors Inside Labels
 **Learning:** Nesting form inputs and their subsequent validation error elements directly inside a `<label>` tag can cause screen readers to incorrectly read the validation error message as part of the label itself, polluting the semantic name of the field. Additionally, it breaks consistent layout spacing when `.setting-row` structural wrappers are used elsewhere.
 **Action:** Always un-nest inputs and validation error containers from `<label>` elements, link them explicitly using `for` and `id`, and wrap the logical grouping in a generic structural container like `.setting-row` for styling.
+## 2025-10-24 - Accessible CSS-only Validation Feedback
+**Learning:** CSS-only inline validation errors (displayed via `input:invalid ~ .error`) are visually helpful but completely invisible to screen readers unless explicitly linked to the input field.
+**Action:** Always assign an `id` to the validation error container and append it to the input's `aria-describedby` attribute (e.g., `aria-describedby="hintId errorId"`). Adding `aria-live="polite"` to the error container also ensures screen readers announce the error dynamically when it appears.
