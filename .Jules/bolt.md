@@ -19,3 +19,6 @@
 ## 2025-02-25 - Regex exec vs String split
 **Learning:** Using `.split()` for string parsing (like URL pathnames) creates intermediate array allocations that increase GC pressure in high-frequency paths.
 **Action:** Use pre-compiled regular expressions with `.exec()` instead of `.split()` to parse structured strings without allocating intermediate arrays.
+## 2024-05-19 - Pre-allocate Arrays to Avoid Dynamic Resizing Overhead
+**Learning:** In performance-critical hot paths (like concurrent pool management and large array mapping), using `[].push()` introduces measurable overhead due to dynamic array resizing and closure allocation.
+**Action:** When the final array size is known or bounded, pre-allocate the array using `new Array(size)` and assign elements by index (e.g., `result[i] = parsed[i]`) instead of dynamically pushing them.
