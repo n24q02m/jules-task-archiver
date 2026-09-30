@@ -54,7 +54,8 @@ async function jFetch(url, options = {}) {
     throw new Error('Security Error: Disallowed fetch origin')
   }
 
-  const { token, headers = {}, timeout = 30000, ...rest } = options
+  const { token, timeout = 30000, headers: originalHeaders, ...rest } = options
+  const headers = { ...(originalHeaders || {}) }
 
   if (token) {
     if (origin !== 'https://api.github.com') {

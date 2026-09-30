@@ -342,6 +342,26 @@ describe('jFetch SSRF Security', () => {
     await sandbox.jFetch('https://jules.google.com/u/1/tasks')
     assert.strictEqual(fetchOptions.redirect, 'follow', 'uncredentialed fetch should default to following redirects')
   })
+
+  it('should not mutate the provided options.headers object', async () => {
+    const { sandbox } = setupEnvironment()
+
+    let fetchOptions = null
+    sandbox.fetch = async (_url, options) => {
+      fetchOptions = options
+      return { ok: true, json: async () => [], text: async () => ")]}'\\n\\n4\\n[[]]" }
+    }
+
+    const options = { token: 'secret-token', headers: { Accept: 'application/json' } }
+    await sandbox.jFetch('https://api.github.com/repos/owner/repo', options)
+
+    assert.strictEqual(options.headers.Authorization, undefined, 'options.headers should not be mutated')
+    assert.strictEqual(
+      fetchOptions.headers.Authorization,
+      'token secret-token',
+      'fetch options should include Authorization'
+    )
+  })
 })
 
 describe('getTabConfig Path Traversal Security', () => {
