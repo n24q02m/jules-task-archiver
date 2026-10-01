@@ -763,17 +763,32 @@ async function processSuggestionsForTab(tab, options) {
   )
 
   addLog(`\n[${label}] Fetching suggestions for ${repos.length} repos concurrently...`)
-  const allSuggestions = await runInPool(repos, PER_ACCOUNT_CONCURRENCY, (repo) =>
-    globalLimit(() => listSuggestions(repo, config))
-      .then((suggestions) => ({ repo, suggestions }))
+  let totalDiscovered = 0
+  const allSuggestions = await runInPool(repos, PER_ACCOUNT_CONCURRENCY, (repo) => {
+    // ⚡ Bolt Optimization: Short-circuit network discovery if we've already
+    // found enough suggestions to satisfy the daily quota limit. This prevents
+    // dozens of wasteful `listSuggestions` batchexecute API calls.
+    if (quota && totalDiscovered >= quota.remaining) {
+      return Promise.resolve({ repo, suggestions: [], skipped: true })
+    }
+    return globalLimit(() => listSuggestions(repo, config))
+      .then((suggestions) => {
+        totalDiscovered += suggestions.length
+        return { repo, suggestions }
+      })
       .catch((e) => ({ repo, error: e.message }))
-  )
+  })
 
   // Flatten (repo, suggestion) pairs across all repos so the pool stays
   // saturated instead of draining one repo at a time.
   const work = []
   const discoveryLogs = []
-  for (const { repo, suggestions, error } of allSuggestions) {
+  let skippedCount = 0
+  for (const { repo, suggestions, error, skipped } of allSuggestions) {
+    if (skipped) {
+      skippedCount++
+      continue
+    }
     if (error) {
       discoveryLogs.push(`\n[${label}] ERROR fetching suggestions for ${repo}: ${error}`)
       continue
@@ -784,6 +799,9 @@ async function processSuggestionsForTab(tab, options) {
     }
     discoveryLogs.push(`\n[${label}] ${repo}: Found ${suggestions.length} suggestions`)
     for (const s of suggestions) work.push({ repo, s })
+  }
+  if (skippedCount > 0) {
+    discoveryLogs.push(`\n[${label}] Skipped discovering suggestions for ${skippedCount} repo(s) (quota met)`)
   }
   if (discoveryLogs.length > 0) addLog(discoveryLogs.join(''))
 
