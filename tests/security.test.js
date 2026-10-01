@@ -305,6 +305,21 @@ describe('jFetch SSRF Security', () => {
     assert.strictEqual(res2.ok, true)
   })
 
+  it('should not mutate the provided options.headers object to prevent credential leakage', async () => {
+    const { sandbox } = setupEnvironment()
+    let fetchOptions = null
+    sandbox.fetch = async (_url, options) => {
+      fetchOptions = options
+      return { ok: true, json: async () => [], text: async () => ")]}'\\n\\n4\\n[[]]" }
+    }
+
+    const headers = { Accept: 'application/json' }
+    await sandbox.jFetch('https://api.github.com/repos/owner/repo', { token: 'secret-token', headers })
+
+    assert.strictEqual(fetchOptions.headers.Authorization, 'token secret-token')
+    assert.strictEqual(headers.Authorization, undefined)
+  })
+
   it('should block sending token to non-GitHub origin', async () => {
     const { sandbox } = setupEnvironment()
 

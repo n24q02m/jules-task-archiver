@@ -14,3 +14,8 @@
 **Vulnerability:** A previous security fix hardcoded `redirect: 'error'` in `fetch` options before the `...rest` spread operator. This allowed calling code to inadvertently override the secure default by passing `redirect: 'follow'` in the `rest` object. Furthermore, enforcing `redirect: 'error'` globally for all requests broke legitimate endpoints that rely on standard HTTP redirects but don't carry sensitive credentials.
 **Learning:** When enforcing security constraints on an options object (like `fetch` options), secure defaults must be applied *after* spreading user-provided arguments so they cannot be overridden. Additionally, security restrictions should be scoped only to the context that requires them (e.g., only when credentials are included) to avoid breaking legitimate functionality.
 **Prevention:** Conditionally apply secure configuration values and always place them at the end of the object literal, overriding any potentially unsafe values provided via spread arguments.
+## 2024-05-24 - Shared Configuration Object Mutation
+
+**Vulnerability:** jFetch wrapper directly mutated the passed `options.headers` object by injecting the Authorization header.
+**Learning:** If callers reuse the same headers configuration object across different origins, this mutability causes credential leakage to unauthorized endpoints.
+**Prevention:** Always perform a shallow (or deep) copy of configuration objects (`const headers = { ...options.headers }`) before mutating them in security-sensitive wrappers.
