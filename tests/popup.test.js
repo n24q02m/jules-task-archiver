@@ -501,6 +501,15 @@ describe('popup.html accessibility', () => {
     assert.ok(popupHtml.includes('id="scopeLabel"'), 'scopeLabel should exist')
     assert.ok(popupHtml.includes('<legend id="scopeLabel">'), 'scope group should use legend')
   })
+
+  it('should link inline validation errors to the input using aria-describedby and use aria-live polite', () => {
+    assert.ok(popupHtml.includes('id="ghOwnerError"'), 'validation error div should have an id')
+    assert.ok(
+      popupHtml.includes('aria-describedby="ghOwnerHint ghOwnerError"'),
+      'owner input should reference both the hint and the error via aria-describedby'
+    )
+    assert.ok(popupHtml.includes('aria-live="polite"'), 'validation error div should have aria-live="polite"')
+  })
 })
 
 describe('updateOpModeUI details', () => {
