@@ -1536,6 +1536,15 @@ describe('startOperation refactoring', () => {
 // =============================================================================
 
 describe('jFetch', () => {
+
+  it('should not mutate original options.headers without token and headers', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.fetch = async () => ({ ok: true })
+    const options = { }
+    await sandbox.test_jFetch('https://api.github.com/api/test', options)
+    assert.deepStrictEqual(options.headers, undefined)
+  })
+
   it('should not mutate original options.headers without token', async () => {
     const { sandbox } = setupEnvironment()
     sandbox.fetch = async () => ({ ok: true })
@@ -1580,7 +1589,7 @@ describe('jFetch', () => {
   it('should throw an error for disallowed fetch origins', async () => {
     const { sandbox } = setupEnvironment()
 
-    await assert.rejects(() => sandbox.test_jFetch('https://malicious.com/api/test'), {
+    await assert.rejects(() => sandbox.test_jFetch('https://malicious.com/api/test', { headers: { 'X-Test': '1' }, token: '1' }), {
       name: 'Error',
       message: 'Security Error: Disallowed fetch origin'
     })
