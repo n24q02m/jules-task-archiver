@@ -1536,6 +1536,24 @@ describe('startOperation refactoring', () => {
 // =============================================================================
 
 describe('jFetch', () => {
+  it('should not mutate original options.headers without token', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.fetch = async () => ({ ok: true })
+    const sharedHeaders = { 'X-Custom': '1' }
+    const options = { headers: sharedHeaders }
+    await sandbox.test_jFetch('https://api.github.com/api/test', options)
+    assert.deepStrictEqual(sharedHeaders, { 'X-Custom': '1' })
+  })
+
+  it('should not mutate original options.headers', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.fetch = async () => ({ ok: true })
+    const sharedHeaders = { 'X-Custom': '1' }
+    const options = { token: 'secret', headers: sharedHeaders }
+    await sandbox.test_jFetch('https://api.github.com/api/test', options)
+    assert.strictEqual(sharedHeaders.Authorization, undefined)
+  })
+
   it('should throw an error for non-OK HTTP responses', async () => {
     const { sandbox } = setupEnvironment()
     sandbox.fetch = async () => ({
