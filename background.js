@@ -1024,9 +1024,11 @@ async function getJulesTabs() {
 
   parsed.sort((a, b) => a.n - b.n)
 
-  const result = []
+  // ⚡ Bolt Optimization: Replace `[].push()` with pre-allocated arrays where the final size is known.
+  // This avoids dynamic array resizing overhead and reduces memory allocations in hot paths.
+  const result = new Array(parsed.length)
   for (let i = 0; i < parsed.length; i++) {
-    result.push(parsed[i].t)
+    result[i] = parsed[i].t
   }
 
   return result
@@ -1188,9 +1190,12 @@ async function executeArchive(label, toArchive, config) {
   let grandTotal = 0
   let lastUpdate = 0
 
-  const batches = []
-  for (let i = 0; i < toArchive.length; i += ARCHIVE_BATCH_SIZE) {
-    batches.push(toArchive.slice(i, i + ARCHIVE_BATCH_SIZE))
+  // ⚡ Bolt Optimization: Replace `[].push()` with pre-allocated arrays where the final size is known.
+  // This avoids dynamic array resizing overhead and reduces memory allocations in hot paths.
+  const numBatches = Math.ceil(toArchive.length / ARCHIVE_BATCH_SIZE)
+  const batches = new Array(numBatches)
+  for (let i = 0; i < numBatches; i++) {
+    batches[i] = toArchive.slice(i * ARCHIVE_BATCH_SIZE, (i + 1) * ARCHIVE_BATCH_SIZE)
   }
 
   await runInPool(batches, PER_ACCOUNT_CONCURRENCY, async (batch) => {
