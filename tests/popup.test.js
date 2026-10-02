@@ -495,6 +495,15 @@ describe('popup.html accessibility', () => {
     )
   })
 
+  it('should link the GitHub owner input to its hint and error via aria-describedby', () => {
+    assert.ok(
+      popupHtml.includes('aria-describedby="ghOwnerHint ghOwnerError"'),
+      'owner input should reference both hint and error via aria-describedby'
+    )
+    assert.ok(popupHtml.includes('id="ghOwnerError"'), 'owner error div should have an id')
+    assert.ok(popupHtml.includes('aria-live="polite"'), 'owner error div should have aria-live="polite"')
+  })
+
   it('should use explicit visible labels for groups using legend', () => {
     assert.ok(popupHtml.includes('id="execModeLabel"'), 'execModeLabel should exist')
     assert.ok(popupHtml.includes('<legend id="execModeLabel">'), 'mode group should use legend')
