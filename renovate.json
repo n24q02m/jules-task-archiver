@@ -47,6 +47,14 @@
       "minimumReleaseAge": "7 days"
     },
     {
+      "description": "Auto-merge GitHub Actions digest and pin updates",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["digest", "pin"],
+      "automerge": true,
+      "automergeType": "pr",
+      "minimumReleaseAge": "7 days"
+    },
+    {
       "description": "Pin PSR to v10",
       "matchPackagePatterns": ["^python-semantic-release/"],
       "matchManagers": ["github-actions"],
