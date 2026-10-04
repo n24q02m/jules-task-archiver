@@ -55,6 +55,7 @@ async function jFetch(url, options = {}) {
   }
 
   const { token, headers = {}, timeout = 30000, ...rest } = options
+  const safeHeaders = { ...headers }
 
   if (token) {
     if (origin !== 'https://api.github.com') {
@@ -62,7 +63,7 @@ async function jFetch(url, options = {}) {
     }
     if (typeof token !== 'string') throw new Error('Token must be a string')
     if (/[\r\n]/.test(token)) throw new Error('Invalid token: contains newline')
-    headers.Authorization = `token ${token}`
+    safeHeaders.Authorization = `token ${token}`
   }
 
   const controller = new AbortController()
@@ -72,7 +73,7 @@ async function jFetch(url, options = {}) {
     // 🛡️ Sentinel: Prevent accidental token leakage via open redirects
     // Only restrict redirects when sending credentials, and ensure the restriction cannot be bypassed by `...rest`
     const finalRedirect = token ? 'error' : rest.redirect || 'follow'
-    const res = await fetch(url, { headers, signal: controller.signal, ...rest, redirect: finalRedirect })
+    const res = await fetch(url, { headers: safeHeaders, signal: controller.signal, ...rest, redirect: finalRedirect })
     if (!res.ok) {
       throw new Error(`HTTP ${res.status}`)
     }

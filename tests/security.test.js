@@ -313,6 +313,28 @@ describe('jFetch SSRF Security', () => {
     })
   })
 
+  it('should not leak credentials into subsequent requests using shared header objects', async () => {
+    const { sandbox } = setupEnvironment()
+
+    let lastHeaders = null
+    sandbox.fetch = async (_url, options) => {
+      lastHeaders = options.headers
+      return { ok: true, json: async () => [], text: async () => ")]}'\\n\\n4\\n[[]]" }
+    }
+
+    const sharedOptions = { headers: { 'X-Custom': 'value' } }
+
+    await sandbox.jFetch('https://api.github.com/repos/owner/repo', { ...sharedOptions, token: 'secret-token' })
+    assert.strictEqual(lastHeaders.Authorization, 'token secret-token', 'Token should be sent to GitHub')
+
+    await sandbox.jFetch('https://jules.google.com/u/1/tasks', sharedOptions)
+    assert.strictEqual(
+      lastHeaders.Authorization,
+      undefined,
+      'Token must not leak to subsequent uncredentialed requests'
+    )
+  })
+
   it('should prevent token leakage via open redirects, even if explicitly bypassed', async () => {
     const { sandbox } = setupEnvironment()
 
