@@ -2109,7 +2109,7 @@ describe('executeArchive', () => {
     const mockTasks = Array.from({ length: 120 }, (_, i) => ({ id: `id-${i}`, repo: 'owner/repo' }))
     const batches = []
 
-    sandbox.archiveTasksWithRetry = async (ids, config) => {
+    sandbox.archiveTasksWithRetry = async (ids, _config) => {
       batches.push(ids)
     }
 
@@ -2129,8 +2129,64 @@ describe('executeArchive', () => {
 describe('listTasks', () => {
   it('should parse valid list tasks response successfully with pre-allocated array logic', async () => {
     const { sandbox } = setupEnvironment()
-    const mockTaskRow1 = [1, 't1', null, null, 'github/owner/repo1', 2, 0, 0, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 200, 'T1 Title']
-    const mockTaskRow2 = [2, 't2', null, null, 'github/owner/repo2', 4, 0, 0, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 200, 'T2 Title']
+    const mockTaskRow1 = [
+      1,
+      't1',
+      null,
+      null,
+      'github/owner/repo1',
+      2,
+      0,
+      0,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      200,
+      'T1 Title'
+    ]
+    const mockTaskRow2 = [
+      2,
+      't2',
+      null,
+      null,
+      'github/owner/repo2',
+      4,
+      0,
+      0,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      200,
+      'T2 Title'
+    ]
 
     sandbox.callBatchExecute = async () => [[mockTaskRow1, mockTaskRow2]]
     const tasks = await sandbox.test_listTasks('filter', {})
