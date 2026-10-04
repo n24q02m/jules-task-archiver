@@ -388,7 +388,14 @@ async function listTasks(filter, config) {
   const payload = [filter, 4]
   const result = await callBatchExecute('p1Takd', payload, config)
   if (!result?.[0]) return []
-  return result[0].map(parseTask)
+
+  const arr = result[0]
+  const len = arr.length
+  const tasks = new Array(len)
+  for (let i = 0; i < len; i++) {
+    tasks[i] = parseTask(arr[i])
+  }
+  return tasks
 }
 
 async function safeListTasks(label, config) {
@@ -1043,9 +1050,10 @@ async function getJulesTabs() {
 
   parsed.sort((a, b) => a.n - b.n)
 
-  const result = []
-  for (let i = 0; i < parsed.length; i++) {
-    result.push(parsed[i].t)
+  const len = parsed.length
+  const result = new Array(len)
+  for (let i = 0; i < len; i++) {
+    result[i] = parsed[i].t
   }
 
   return result
@@ -1213,7 +1221,11 @@ async function executeArchive(label, toArchive, config) {
   }
 
   await runInPool(batches, PER_ACCOUNT_CONCURRENCY, async (batch) => {
-    const taskIds = batch.map((t) => t.id)
+    const len = batch.length
+    const taskIds = new Array(len)
+    for (let i = 0; i < len; i++) {
+      taskIds[i] = batch[i].id
+    }
     const now = Date.now()
     if (now - lastUpdate > 500) {
       updateState({ currentRepo: batch[0].repo || '(no repo)' })
