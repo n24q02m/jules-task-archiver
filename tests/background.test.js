@@ -1536,11 +1536,10 @@ describe('startOperation refactoring', () => {
 // =============================================================================
 
 describe('jFetch', () => {
-
   it('should not mutate original options.headers without token and headers', async () => {
     const { sandbox } = setupEnvironment()
     sandbox.fetch = async () => ({ ok: true })
-    const options = { }
+    const options = {}
     await sandbox.test_jFetch('https://api.github.com/api/test', options)
     assert.deepStrictEqual(options.headers, undefined)
   })
@@ -1589,10 +1588,13 @@ describe('jFetch', () => {
   it('should throw an error for disallowed fetch origins', async () => {
     const { sandbox } = setupEnvironment()
 
-    await assert.rejects(() => sandbox.test_jFetch('https://malicious.com/api/test', { headers: { 'X-Test': '1' }, token: '1' }), {
-      name: 'Error',
-      message: 'Security Error: Disallowed fetch origin'
-    })
+    await assert.rejects(
+      () => sandbox.test_jFetch('https://malicious.com/api/test', { headers: { 'X-Test': '1' }, token: '1' }),
+      {
+        name: 'Error',
+        message: 'Security Error: Disallowed fetch origin'
+      }
+    )
   })
 
   it('should throw an error if token is not a string', async () => {
