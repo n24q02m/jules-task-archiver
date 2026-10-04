@@ -56,8 +56,8 @@
         <label for="ghOwner">
           GitHub Owner <span class="hint" id="ghOwnerHint">(optional, used for PR checks)</span>
         </label>
-        <input type="text" id="ghOwner" placeholder="your-github-username" spellcheck="false" autocomplete="username" aria-describedby="ghOwnerHint" maxlength="39" pattern="[a-zA-Z0-9\-]+" />
-        <div class="validation-error">Only alphanumeric characters and hyphens allowed.</div>
+        <input type="text" id="ghOwner" placeholder="your-github-username" spellcheck="false" autocomplete="username" aria-describedby="ghOwnerHint ghOwnerError" maxlength="39" pattern="[a-zA-Z0-9\-]+" />
+        <div id="ghOwnerError" class="validation-error" aria-live="polite">Only alphanumeric characters and hyphens allowed.</div>
       </div>
       <div class="setting-row">
         <label for="ghToken">
