@@ -61,3 +61,6 @@
 ## 2025-10-25 - Scrollable Overflow Containers Need Keyboard Access
 **Learning:** Biome's `a11y/noNoninteractiveTabindex` rule flags `tabindex` on non-interactive elements like `<pre>`. However, if the element acts as a scrollable container (e.g., `overflow: auto` or `overflow-y: auto`), it must have `tabindex="0"` to allow keyboard-only users to scroll its content.
 **Action:** Add a biome-ignore comment for `lint/a11y/noNoninteractiveTabindex` specifically for scrollable overflow containers to ensure keyboard accessibility while satisfying the linter.
+## 2025-10-24 - Input Invalid Focus Specificity
+**Learning:** When styling `:invalid` pseudo-classes for inputs, ensure the CSS specificity is high enough to override default or focus styles (e.g., `input[type="text"]:invalid:focus`). Additionally, account for `outline` overriding `border` colors on focus; ensure you set `outline-color` alongside border colors so error states remain visible.
+**Action:** Always use specific type selectors like `input[type="text"]:invalid:focus` rather than just `input:invalid` to ensure error states are not overridden by generic focus styles.
