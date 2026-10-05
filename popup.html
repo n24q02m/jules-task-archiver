@@ -54,13 +54,13 @@
       <h2>Settings</h2>
       <div class="setting-row">
         <label for="ghOwner">GitHub Owner</label>
-        <span class="hint block-hint" id="ghOwnerHint">(optional, used for PR checks)</span>
+        <label for="ghOwner" class="hint block-hint" id="ghOwnerHint">(optional, used for PR checks)</label>
         <input type="text" id="ghOwner" placeholder="your-github-username" spellcheck="false" autocomplete="username" aria-describedby="ghOwnerHint ghOwnerError" maxlength="39" pattern="[a-zA-Z0-9\-]+" />
         <div id="ghOwnerError" class="validation-error" aria-live="polite">Only alphanumeric characters and hyphens allowed.</div>
       </div>
       <div class="setting-row">
         <label for="ghToken">GitHub Token</label>
-        <span class="hint block-hint" id="ghTokenHint">(optional, for private repos)</span>
+        <label for="ghToken" class="hint block-hint" id="ghTokenHint">(optional, for private repos)</label>
         <input
           type="password"
           id="ghToken"
