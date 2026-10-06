@@ -497,7 +497,7 @@ describe('popup.html accessibility', () => {
   })
 
   it('should link the GitHub token input to its hint via aria-describedby', () => {
-    assert.ok(popupHtml.includes('id="ghTokenHint"'), 'token hint span should have an id')
+    assert.ok(popupHtml.includes('id="ghTokenHint"'), 'token hint label should have an id')
     assert.ok(
       popupHtml.includes('aria-describedby="ghTokenHint"'),
       'token input should reference the hint via aria-describedby'
