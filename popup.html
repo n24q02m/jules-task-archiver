@@ -73,6 +73,52 @@
       </div>
     </section>
 
+    <section class="schedule">
+      <h2>Schedule</h2>
+      <div class="setting-row">
+        <label class="checkbox">
+          <input type="checkbox" id="schedEnabled" aria-describedby="schedEnabledHint" />
+          Auto-archive on a schedule
+        </label>
+        <span class="hint block-hint" id="schedEnabledHint">Periodically archives finished tasks across all Jules tabs (background alarm)</span>
+      </div>
+      <div class="setting-row">
+        <label for="schedInterval">Every</label>
+        <input
+          type="number"
+          id="schedInterval"
+          min="1"
+          max="1440"
+          step="1"
+          value="60"
+          inputmode="numeric"
+          aria-describedby="schedIntervalHint"
+        />
+        <span class="hint" id="schedIntervalHint">minutes (1–1440)</span>
+      </div>
+      <div class="setting-row">
+        <label class="checkbox">
+          <input type="checkbox" id="schedSuggestions" aria-describedby="schedSuggestionsHint" />
+          Also start suggestions each tick
+        </label>
+        <span class="hint block-hint" id="schedSuggestionsHint">Starts queued code suggestions after archiving, capped per tick</span>
+      </div>
+      <div class="setting-row">
+        <label for="schedMaxStarts">Max starts per tick</label>
+        <input
+          type="number"
+          id="schedMaxStarts"
+          min="1"
+          max="500"
+          step="1"
+          value="20"
+          inputmode="numeric"
+          aria-describedby="schedMaxStartsHint"
+        />
+        <span class="hint" id="schedMaxStartsHint">(1–500, shared across all accounts)</span>
+      </div>
+    </section>
+
     <button type="submit" id="startBtn" class="primary">Start Archiving</button>
     <button type="button" id="resetBtn" class="secondary hidden">Reset</button>
     </form>

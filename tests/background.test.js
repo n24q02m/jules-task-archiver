@@ -9,9 +9,13 @@ const utilsScriptPath = path.join(__dirname, '..', 'utils.js')
 const bgScriptContent = fs.readFileSync(bgScriptPath, 'utf8')
 const utilsScriptContent = fs.readFileSync(utilsScriptPath, 'utf8')
 
-function setupEnvironment(initialStorage = {}) {
+function setupEnvironment(initialStorage = {}, initialSyncStorage = {}) {
   const sessionSetData = []
   let currentStorage = { ...initialStorage }
+  let syncStorage = { ...initialSyncStorage }
+  const storageChangeListeners = []
+  const alarmListeners = []
+  const alarmsStore = new Map()
 
   const chromeMock = {
     storage: {
@@ -25,10 +29,48 @@ function setupEnvironment(initialStorage = {}) {
         }
       },
       sync: {
-        get: async () => ({})
+        get: async (keys) => {
+          if (Array.isArray(keys)) {
+            const res = {}
+            for (const k of keys) res[k] = syncStorage[k]
+            return res
+          }
+          return { ...syncStorage }
+        },
+        set: async (data) => {
+          const changes = {}
+          for (const k of Object.keys(data)) {
+            changes[k] = { oldValue: syncStorage[k], newValue: data[k] }
+          }
+          syncStorage = { ...syncStorage, ...data }
+          for (const cb of storageChangeListeners) cb(changes, 'sync')
+        },
+        remove: async (key) => {
+          delete syncStorage[key]
+        }
       },
       local: {
-        get: async () => ({})
+        get: async () => ({}),
+        set: async () => {}
+      },
+      onChanged: {
+        addListener: (cb) => storageChangeListeners.push(cb)
+      }
+    },
+    alarms: {
+      create: async (name, info) => {
+        alarmsStore.set(name, { name, ...info })
+      },
+      get: async (name) => alarmsStore.get(name),
+      clear: async (name) => {
+        const had = alarmsStore.delete(name)
+        return had
+      },
+      clearAll: async () => {
+        alarmsStore.clear()
+      },
+      onAlarm: {
+        addListener: (cb) => alarmListeners.push(cb)
       }
     },
     runtime: {
@@ -160,12 +202,26 @@ function setupEnvironment(initialStorage = {}) {
     globalThis.test_getDailySessionQuota = getDailySessionQuota;
     globalThis.test_ensureContentScript = ensureContentScript;
     globalThis.test_getTabConfig = getTabConfig;
+    globalThis.test_normalizeSchedule = normalizeSchedule;
+    globalThis.test_getScheduleConfig = getScheduleConfig;
+    globalThis.test_syncScheduleAlarm = syncScheduleAlarm;
+    globalThis.test_runScheduledTick = runScheduledTick;
+    globalThis.test_processSuggestionsForTab = processSuggestionsForTab;
+    globalThis.test_SCHEDULE_ALARM_NAME = SCHEDULE_ALARM_NAME;
+    globalThis.test_DEFAULT_SCHEDULE = DEFAULT_SCHEDULE;
   `
 
   const script = new vm.Script(scriptContent, { filename: bgScriptPath })
   script.runInContext(sandbox)
 
-  return { sandbox, sessionSetData }
+  return {
+    sandbox,
+    sessionSetData,
+    alarmsStore,
+    alarmListeners,
+    storageChangeListeners,
+    getSyncStorage: () => syncStorage
+  }
 }
 
 // =============================================================================
@@ -2227,5 +2283,191 @@ describe('listTasks', () => {
     assert.strictEqual(tasks[1].id, 2)
     assert.strictEqual(tasks[1].title, 'T2 Title')
     assert.strictEqual(tasks[1].repo, 'owner/repo2')
+  })
+})
+
+// =============================================================================
+// Scheduling Tests (chrome.alarms)
+// =============================================================================
+
+describe('normalizeSchedule', () => {
+  it('returns safe defaults for empty/missing storage', () => {
+    const { sandbox } = setupEnvironment()
+    const cfg = sandbox.test_normalizeSchedule({})
+    assert.strictEqual(cfg.schedEnabled, false)
+    assert.strictEqual(cfg.schedIntervalMin, 60)
+    assert.strictEqual(cfg.schedStartSuggestions, false)
+    assert.strictEqual(cfg.schedMaxStarts, 20)
+  })
+
+  it('clamps interval and max-starts into bounds', () => {
+    const { sandbox } = setupEnvironment()
+    const low = sandbox.test_normalizeSchedule({ schedEnabled: true, schedIntervalMin: 0, schedMaxStarts: 0 })
+    assert.strictEqual(low.schedIntervalMin, 1)
+    assert.strictEqual(low.schedMaxStarts, 1)
+
+    const high = sandbox.test_normalizeSchedule({ schedIntervalMin: 99999, schedMaxStarts: 99999 })
+    assert.strictEqual(high.schedIntervalMin, 1440)
+    assert.strictEqual(high.schedMaxStarts, 500)
+  })
+
+  it('falls back on non-numeric values instead of producing NaN', () => {
+    const { sandbox } = setupEnvironment()
+    const cfg = sandbox.test_normalizeSchedule({ schedIntervalMin: 'abc', schedMaxStarts: null })
+    assert.strictEqual(cfg.schedIntervalMin, 60)
+    assert.strictEqual(cfg.schedMaxStarts, 20)
+  })
+
+  it('only accepts strict true for toggles', () => {
+    const { sandbox } = setupEnvironment()
+    const cfg = sandbox.test_normalizeSchedule({ schedEnabled: 'yes', schedStartSuggestions: 1 })
+    assert.strictEqual(cfg.schedEnabled, false)
+    assert.strictEqual(cfg.schedStartSuggestions, false)
+  })
+})
+
+describe('getScheduleConfig', () => {
+  it('merges persisted values over defaults', async () => {
+    const { sandbox } = setupEnvironment({}, { schedEnabled: true, schedIntervalMin: 30 })
+    const cfg = await sandbox.test_getScheduleConfig()
+    assert.strictEqual(cfg.schedEnabled, true)
+    assert.strictEqual(cfg.schedIntervalMin, 30)
+    assert.strictEqual(cfg.schedStartSuggestions, false)
+    assert.strictEqual(cfg.schedMaxStarts, 20)
+  })
+})
+
+describe('syncScheduleAlarm', () => {
+  it('creates the periodic alarm when enabled', async () => {
+    const { sandbox, alarmsStore } = setupEnvironment({}, { schedEnabled: true, schedIntervalMin: 45 })
+    // Startup reconciliation is async; let the microtask chain settle.
+    await new Promise((r) => setImmediate(r))
+    const alarm = alarmsStore.get(sandbox.test_SCHEDULE_ALARM_NAME)
+    assert.ok(alarm, 'alarm should exist')
+    assert.strictEqual(alarm.periodInMinutes, 45)
+    assert.strictEqual(alarm.delayInMinutes, 45)
+  })
+
+  it('does not create an alarm when disabled', async () => {
+    const { sandbox, alarmsStore } = setupEnvironment()
+    await sandbox.test_syncScheduleAlarm()
+    assert.strictEqual(alarmsStore.has(sandbox.test_SCHEDULE_ALARM_NAME), false)
+  })
+
+  it('clears an existing alarm when toggled off', async () => {
+    const { sandbox, alarmsStore, getSyncStorage } = setupEnvironment({}, { schedEnabled: true, schedIntervalMin: 60 })
+    await new Promise((r) => setImmediate(r)) // startup reconcile ran async
+    assert.ok(alarmsStore.get(sandbox.test_SCHEDULE_ALARM_NAME), 'alarm should exist before toggle-off')
+    // Simulate the popup writing schedEnabled=false via chrome.storage.sync.set
+    await sandbox.chrome.storage.sync.set({ schedEnabled: false })
+    await new Promise((r) => setImmediate(r)) // let the onChanged->sync microtask settle
+    assert.strictEqual(alarmsStore.has(sandbox.test_SCHEDULE_ALARM_NAME), false)
+    assert.strictEqual(getSyncStorage().schedEnabled, false)
+  })
+
+  it('re-creates the alarm when the interval changes', async () => {
+    const { sandbox, alarmsStore } = setupEnvironment({}, { schedEnabled: true, schedIntervalMin: 60 })
+    await sandbox.chrome.storage.sync.set({ schedIntervalMin: 15 })
+    await new Promise((r) => setImmediate(r))
+    const alarm = alarmsStore.get(sandbox.test_SCHEDULE_ALARM_NAME)
+    assert.strictEqual(alarm.periodInMinutes, 15)
+  })
+
+  it('leaves a matching alarm untouched on restart reconcile', async () => {
+    const { sandbox, alarmsStore } = setupEnvironment({}, { schedEnabled: true, schedIntervalMin: 60 })
+    await new Promise((r) => setImmediate(r)) // startup reconcile ran async
+    // Mutate a marker on the stored object — a re-create would overwrite it.
+    const original = alarmsStore.get(sandbox.test_SCHEDULE_ALARM_NAME)
+    original.marker = 'kept'
+    await sandbox.test_syncScheduleAlarm()
+    assert.strictEqual(alarmsStore.get(sandbox.test_SCHEDULE_ALARM_NAME).marker, 'kept')
+  })
+})
+
+describe('runScheduledTick', () => {
+  it('does nothing when disabled', async () => {
+    const { sandbox } = setupEnvironment()
+    await sandbox.test_runScheduledTick()
+    assert.strictEqual(sandbox.test_state().status, 'idle')
+  })
+
+  it('runs an archive operation (all tabs) when enabled', async () => {
+    const { sandbox } = setupEnvironment({}, { schedEnabled: true, schedIntervalMin: 60 })
+    await sandbox.test_runScheduledTick()
+    // Mock has no Jules tabs -> archive op ends in error state with a clear message.
+    const state = sandbox.test_state()
+    assert.strictEqual(state.status, 'error')
+    assert.strictEqual(state.error, 'No Jules tabs found')
+    assert.ok(state.log.some((l) => l.includes('SCHEDULED (chrome.alarms)')))
+    assert.ok(state.log.some((l) => l.includes('ARCHIVE MODE')))
+  })
+
+  it('also runs a capped suggestions pass when schedStartSuggestions is on', async () => {
+    const { sandbox } = setupEnvironment(
+      {},
+      { schedEnabled: true, schedIntervalMin: 60, schedStartSuggestions: true, schedMaxStarts: 3 }
+    )
+    await sandbox.test_runScheduledTick()
+    const state = sandbox.test_state()
+    // Final state comes from the suggestions pass (no tabs -> error), and both
+    // banners appear in order in the log.
+    const log = state.log.join('\n')
+    assert.ok(log.indexOf('ARCHIVE MODE') < log.indexOf('SUGGESTIONS MODE'), 'archive runs before suggestions')
+  })
+
+  it('skips the tick while a manual operation is running', async () => {
+    const { sandbox } = setupEnvironment({}, { schedEnabled: true })
+    sandbox.test_updateState({ status: 'running' })
+    const logLenBefore = sandbox.test_state().log.length
+    await sandbox.test_runScheduledTick()
+    const state = sandbox.test_state()
+    assert.strictEqual(state.status, 'running', 'manual run is not clobbered')
+    assert.strictEqual(state.log.length, logLenBefore, 'no tick banner is logged on skip')
+  })
+})
+
+describe('suggestion per-tick cap', () => {
+  it('initOperationState converts maxSuggestions into a shared budget', () => {
+    const { sandbox } = setupEnvironment()
+    const options = { opMode: 'suggestions', maxSuggestions: 7 }
+    const isSuggestions = sandbox.test_initOperationState(options)
+    assert.strictEqual(isSuggestions, true)
+    assert.strictEqual(options._remainingStarts, 7)
+  })
+
+  it('leaves budget unset for manual runs without maxSuggestions', () => {
+    const { sandbox } = setupEnvironment()
+    const options = { opMode: 'suggestions' }
+    sandbox.test_initOperationState(options)
+    assert.strictEqual(options._remainingStarts, undefined)
+  })
+
+  it('processSuggestionsForTab bails early when the budget is spent', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.test_updateState({ status: 'running' })
+    const options = { opMode: 'suggestions', _remainingStarts: 0 }
+    const tab = { id: 1, url: 'https://jules.google.com/u/0/session' }
+    const started = await sandbox.test_processSuggestionsForTab(tab, options)
+    assert.strictEqual(started, 0)
+    const log = sandbox.test_state().log.join('\n')
+    assert.ok(log.includes('cap already spent'))
+  })
+
+  it('clamps a negative maxSuggestions to zero budget', () => {
+    const { sandbox } = setupEnvironment()
+    const options = { opMode: 'suggestions', maxSuggestions: -5 }
+    sandbox.test_initOperationState(options)
+    assert.strictEqual(options._remainingStarts, 0)
+  })
+})
+
+describe('alarm listener wiring', () => {
+  it('registers an onAlarm listener that ignores foreign alarm names', async () => {
+    const { sandbox, alarmListeners } = setupEnvironment({}, { schedEnabled: true })
+    assert.strictEqual(alarmListeners.length, 1)
+    // Foreign alarm: must not touch state.
+    alarmListeners[0]({ name: 'someone-elses-alarm' })
+    await new Promise((r) => setImmediate(r))
+    assert.strictEqual(sandbox.test_state().status, 'idle')
   })
 })

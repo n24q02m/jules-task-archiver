@@ -30,6 +30,109 @@ const ARCHIVE_BATCH_SIZE = 50
 // the account ID instead of allocating string arrays via `.split('/')`. This avoids
 // object allocation overhead while preserving the original strict URL validation.
 const ACCOUNT_NUM_REGEX = /\/u\/(\d+)(?:\/|$)/
+
+// =============================================================================
+// Scheduling (chrome.alarms)
+// =============================================================================
+
+// MV3 service workers cannot rely on setInterval — the worker is killed between
+// invocations — so scheduled runs use chrome.alarms, which persists across
+// worker restarts and survives popup close. One periodic alarm drives the
+// whole scheduled tick (archive, then optional suggestion-start).
+const SCHEDULE_ALARM_NAME = 'jta-scheduled-tick'
+
+const DEFAULT_SCHEDULE = {
+  schedEnabled: false,
+  schedIntervalMin: 60,
+  schedStartSuggestions: false,
+  // Cap on suggestion-starts per tick (across ALL accounts) so a scheduled run
+  // cannot fan out into hundreds of Rja83d calls. Jules' per-account daily
+  // session quota (KQOO7) still applies on top of this.
+  schedMaxStarts: 20
+}
+
+const MIN_INTERVAL_MIN = 1
+const MAX_INTERVAL_MIN = 24 * 60 // 1 day — the useful ceiling for a cleanup cron
+const MIN_MAX_STARTS = 1
+const MAX_MAX_STARTS = 500
+
+function clampInt(value, min, max, fallback) {
+  if (value === null || value === undefined) return fallback
+  const n = Number(value)
+  if (!Number.isFinite(n)) return fallback
+  return Math.min(max, Math.max(min, Math.floor(n)))
+}
+
+// Coerce whatever is in storage (or partially stored) into a valid config.
+// Missing/bad values fall back to DEFAULT_SCHEDULE so a corrupted sync entry
+// can never yield interval 0 (Chrome throws for periodInMinutes < 1) or an
+// unbounded suggestion fan-out.
+function normalizeSchedule(raw) {
+  const src = raw || {}
+  return {
+    schedEnabled: src.schedEnabled === true,
+    schedIntervalMin: clampInt(
+      src.schedIntervalMin,
+      MIN_INTERVAL_MIN,
+      MAX_INTERVAL_MIN,
+      DEFAULT_SCHEDULE.schedIntervalMin
+    ),
+    schedStartSuggestions: src.schedStartSuggestions === true,
+    schedMaxStarts: clampInt(src.schedMaxStarts, MIN_MAX_STARTS, MAX_MAX_STARTS, DEFAULT_SCHEDULE.schedMaxStarts)
+  }
+}
+
+async function getScheduleConfig() {
+  const data = await chrome.storage.sync.get(Object.keys(DEFAULT_SCHEDULE))
+  return normalizeSchedule(data)
+}
+
+// Reconcile the persisted alarm with current config. The service worker runs
+// this on every startup (alarms survive worker restarts, the worker does not),
+// so it checks the existing alarm's period before re-creating — re-creating
+// unconditionally would push the next fire time forward on every SW restart.
+async function syncScheduleAlarm() {
+  if (!chrome.alarms) return
+  const cfg = await getScheduleConfig()
+  const existing = await chrome.alarms.get(SCHEDULE_ALARM_NAME)
+  if (!cfg.schedEnabled) {
+    if (existing) await chrome.alarms.clear(SCHEDULE_ALARM_NAME)
+    return
+  }
+  if (!existing || existing.periodInMinutes !== cfg.schedIntervalMin) {
+    await chrome.alarms.create(SCHEDULE_ALARM_NAME, {
+      delayInMinutes: cfg.schedIntervalMin,
+      periodInMinutes: cfg.schedIntervalMin
+    })
+  }
+}
+
+// One alarm tick: archive (normal mode — finished-state filter + open-PR check,
+// same defaults a manual Run uses; Force stays a deliberate manual choice), then
+// optionally start queued suggestions with a per-tick global cap.
+async function runScheduledTick() {
+  await stateReadyPromise
+  if (state.status === 'running') {
+    // A manual operation is in flight; skipping is safer than racing two bulk
+    // runs against the same accounts (Jules rate-limits with HTTP 429).
+    console.log('[JTA] Scheduled tick skipped: operation already running')
+    return
+  }
+  const cfg = await getScheduleConfig()
+  if (!cfg.schedEnabled) return // defensive: config toggled off after alarm fired
+
+  await startOperation({ dryRun: false, force: false, scope: 'all', opMode: 'archive', scheduled: true })
+  if (cfg.schedStartSuggestions) {
+    await startOperation({
+      dryRun: false,
+      force: false,
+      scope: 'all',
+      opMode: 'suggestions',
+      maxSuggestions: cfg.schedMaxStarts,
+      scheduled: true
+    })
+  }
+}
 function extractAccountNum(url) {
   try {
     const pathname = new URL(url).pathname
@@ -736,6 +839,10 @@ async function processSuggestionsForTab(tab, options) {
   const prepared = await prepareTab(tab)
   if (!prepared) return 0
   const { label, config } = prepared
+  if (options._remainingStarts <= 0) {
+    addLog(`[${label}] Skipped: scheduled tick's suggestion cap already spent`)
+    return 0
+  }
 
   const startConfig = await getStartConfig()
   if (!startConfig) {
@@ -820,10 +927,20 @@ async function processSuggestionsForTab(tab, options) {
 
   // Respect Jules' daily session limit: never start more suggestions than the
   // account's remaining quota. Each started suggestion consumes one session.
+  // Scheduled runs may also cap suggestion-starts across the whole tick
+  // (options._remainingStarts). Take the tighter of the two limits; decrement
+  // the shared budget per item taken so parallel accounts cannot overspend.
   let toStart = work
-  if (quota && work.length > quota.remaining) {
-    addLog(`[${label}] Capping ${work.length} suggestions to ${quota.remaining} (daily limit)`)
-    toStart = work.slice(0, quota.remaining)
+  if (quota && toStart.length > quota.remaining) {
+    addLog(`[${label}] Capping ${toStart.length} suggestions to ${quota.remaining} (daily limit)`)
+    toStart = toStart.slice(0, quota.remaining)
+  }
+  if (options._remainingStarts !== undefined && toStart.length > options._remainingStarts) {
+    addLog(`[${label}] Capping ${toStart.length} suggestions to ${options._remainingStarts} (per-tick cap)`)
+    toStart = toStart.slice(0, Math.max(0, options._remainingStarts))
+  }
+  if (options._remainingStarts !== undefined) {
+    options._remainingStarts -= toStart.length
   }
 
   if (!options.dryRun) {
@@ -1306,8 +1423,17 @@ function initOperationState(options) {
 
   const isSuggestions = options.opMode === 'suggestions'
   addLog(options.dryRun ? '=== DRY RUN MODE ===' : isSuggestions ? '=== SUGGESTIONS MODE ===' : '=== ARCHIVE MODE ===')
+  if (options.scheduled) addLog('=== SCHEDULED (chrome.alarms) ===')
   if (options.force) addLog('=== FORCE MODE (skip PR check) ===')
   addLog('=== v2: batchexecute API ===')
+  // Global per-run cap on suggestion-starts, used by scheduled ticks to bound
+  // API fan-out across ALL accounts. Object state is required because accounts
+  // run in parallel — a plain integer snapshot per tab would let every tab
+  // spend the full cap. Decremented once per suggestion before the RPC; even
+  // failed starts consume budget (the API call still happened).
+  if (isSuggestions && Number.isFinite(options.maxSuggestions)) {
+    options._remainingStarts = Math.max(0, Math.floor(options.maxSuggestions))
+  }
   return isSuggestions
 }
 
@@ -1436,3 +1562,32 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       break
   }
 })
+
+// =============================================================================
+// Scheduled Tick Wiring
+// =============================================================================
+
+// Optional chaining keeps the script loadable in non-extension contexts where
+// these APIs may be absent (e.g. unit-test sandboxes with partial mocks).
+chrome.alarms?.onAlarm?.addListener((alarm) => {
+  if (alarm.name !== SCHEDULE_ALARM_NAME) return
+  // Fire-and-forget is fine here: a tick that throws still resolves cleanly —
+  // startOperation captures failures into state.error for the popup to show.
+  runScheduledTick().catch((e) => console.error('[JTA] Scheduled tick failed:', e))
+})
+
+// The popup writes schedule settings straight to chrome.storage.sync; the SW
+// reacts to those changes here so no message round-trip is needed and the
+// alarm stays correct even if the popup is closed mid-change.
+chrome.storage?.onChanged?.addListener((changes, area) => {
+  if (area !== 'sync') return
+  for (const key of Object.keys(DEFAULT_SCHEDULE)) {
+    if (key in changes) {
+      syncScheduleAlarm().catch((e) => console.error('[JTA] Alarm sync failed:', e))
+      return
+    }
+  }
+})
+
+// Reconcile alarm vs config on every SW startup (alarms outlive the worker).
+syncScheduleAlarm().catch((e) => console.error('[JTA] Alarm sync failed:', e))

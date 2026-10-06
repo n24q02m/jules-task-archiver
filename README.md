@@ -65,6 +65,12 @@
 - **Category-aware prompts** -- generates tailored prompts per suggestion category (security fix, performance optimization, test coverage, code cleanup)
 - **Config capture** -- observes Jules UI to capture model config and experiment IDs for accurate reproduction
 
+### Scheduled Operations
+
+- **Auto-archive on a schedule** -- `chrome.alarms`-driven periodic archive of finished tasks across all Jules tabs; runs in the background while the popup is closed (service-worker safe, no `setInterval`)
+- **Scheduled suggestion start** -- optionally start queued code suggestions after each archive tick, capped per tick to bound API usage (Jules' daily session quota still applies)
+- **Configurable** -- interval in minutes and independent toggles in the popup's Schedule section; both default to OFF
+
 ### General
 
 - **Multi-account** -- processes all Jules tabs (`/u/0`, `/u/1`, etc.) automatically
@@ -93,6 +99,8 @@
    - **Force** -- archive every task regardless of state or open PRs (archive mode only)
    - **Scope** -- current tab only or all Jules tabs
 4. Click **Start**
+
+5. (Optional) In **Schedule**, enable **Auto-archive on a schedule**, set the interval in minutes, and optionally enable **Also start suggestions each tick** with a max-starts cap. Scheduled runs use normal archive safety (finished-state filter + open-PR check) — they never Force.
 
 ### Start Suggestions tips
 
@@ -128,9 +136,10 @@ popup.js (UI) <-> background.js (batchexecute client) <-> content.js (message re
 
 | Permission | Why |
 |-----------|-----|
-| `storage` | Save settings and operation state |
+| `storage` | Save settings, schedule config, and operation state |
 | `tabs` | Query all Jules tabs for multi-account support |
 | `scripting` | Inject content script into pre-existing tabs |
+| `alarms` | Periodic scheduled archive/suggestion ticks via `chrome.alarms` |
 | `jules.google.com` | Content script for token extraction |
 | `api.github.com` | Check open PRs via GitHub REST API |
 

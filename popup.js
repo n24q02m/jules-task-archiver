@@ -26,6 +26,20 @@ const progressFill = $('#progressFill')
 const logPre = $('#log')
 const summaryDiv = $('#summary')
 
+// --- Schedule settings (read by background.js's chrome.alarms tick) ---
+const schedEnabledInput = $('#schedEnabled')
+const schedIntervalInput = $('#schedInterval')
+const schedSuggestionsInput = $('#schedSuggestions')
+const schedMaxStartsInput = $('#schedMaxStarts')
+
+// Storage-side bounds match background.js; the background re-validates anyway,
+// these just keep obviously-bad values out of sync storage.
+function readClampedNumber(input, min, max, fallback) {
+  const n = Number.parseInt(input?.value, 10)
+  if (!Number.isFinite(n)) return fallback
+  return Math.min(max, Math.max(min, n))
+}
+
 // --- Operation mode state ---
 let opMode = 'archive'
 
@@ -95,31 +109,57 @@ document.querySelectorAll('input[name="mode"]').forEach((radio) => {
 })
 
 // --- Load saved settings & cleanup insecure storage ---
-chrome.storage.sync.get(['ghOwner', 'opMode', 'ghToken'], (syncData) => {
-  if (syncData.ghOwner) ghOwnerInput.value = syncData.ghOwner
-  if (syncData.opMode) {
-    setActiveOpMode(syncData.opMode)
-  }
+chrome.storage.sync.get(
+  ['ghOwner', 'opMode', 'ghToken', 'schedEnabled', 'schedIntervalMin', 'schedStartSuggestions', 'schedMaxStarts'],
+  (syncData) => {
+    schedEnabledInput.checked = syncData.schedEnabled === true
+    if (syncData.schedIntervalMin !== undefined) schedIntervalInput.value = String(syncData.schedIntervalMin)
+    schedSuggestionsInput.checked = syncData.schedStartSuggestions === true
+    if (syncData.schedMaxStarts !== undefined) schedMaxStartsInput.value = String(syncData.schedMaxStarts)
+    if (syncData.ghOwner) ghOwnerInput.value = syncData.ghOwner
+    if (syncData.opMode) {
+      setActiveOpMode(syncData.opMode)
+    }
 
-  // Cleanup legacy insecure storage of token in sync
-  if (syncData.ghToken) {
-    const ghToken = syncData.ghToken.slice(0, MAX_TOKEN_LEN)
-    chrome.storage.local.set({ ghToken }, () => {
-      chrome.storage.sync.remove('ghToken')
+    // Cleanup legacy insecure storage of token in sync
+    if (syncData.ghToken) {
+      const ghToken = syncData.ghToken.slice(0, MAX_TOKEN_LEN)
+      chrome.storage.local.set({ ghToken }, () => {
+        chrome.storage.sync.remove('ghToken')
+      })
+      ghTokenInput.value = ghToken
+    }
+
+    chrome.storage.local.get(['ghToken'], (localData) => {
+      if (localData.ghToken) ghTokenInput.value = localData.ghToken
     })
-    ghTokenInput.value = ghToken
   }
-
-  chrome.storage.local.get(['ghToken'], (localData) => {
-    if (localData.ghToken) ghTokenInput.value = localData.ghToken
-  })
-})
+)
 // --- Save settings on change ---
 ghOwnerInput.addEventListener('change', () => {
   chrome.storage.sync.set({ ghOwner: ghOwnerInput.value.trim().slice(0, MAX_OWNER_LEN) })
 })
 ghTokenInput.addEventListener('change', () => {
   chrome.storage.local.set({ ghToken: ghTokenInput.value.trim().slice(0, MAX_TOKEN_LEN) })
+})
+
+// Schedule settings persist on change; background.js's storage.onChanged
+// listener reconciles the chrome.alarms schedule — no message needed.
+schedEnabledInput.addEventListener('change', () => {
+  chrome.storage.sync.set({ schedEnabled: schedEnabledInput.checked === true })
+})
+schedIntervalInput.addEventListener('change', () => {
+  const minutes = readClampedNumber(schedIntervalInput, 1, 1440, 60)
+  schedIntervalInput.value = String(minutes)
+  chrome.storage.sync.set({ schedIntervalMin: minutes })
+})
+schedSuggestionsInput.addEventListener('change', () => {
+  chrome.storage.sync.set({ schedStartSuggestions: schedSuggestionsInput.checked === true })
+})
+schedMaxStartsInput.addEventListener('change', () => {
+  const maxStarts = readClampedNumber(schedMaxStartsInput, 1, 500, 20)
+  schedMaxStartsInput.value = String(maxStarts)
+  chrome.storage.sync.set({ schedMaxStarts: maxStarts })
 })
 
 // --- Start operation ---
