@@ -54,13 +54,13 @@
       <h2>Settings</h2>
       <div class="setting-row">
         <label for="ghOwner">GitHub Owner</label>
-        <span class="hint block-hint" id="ghOwnerHint">(optional, used for PR checks)</span>
+        <label for="ghOwner" class="hint block-hint" id="ghOwnerHint">(optional, used for PR checks)</label>
         <input type="text" id="ghOwner" placeholder="your-github-username" spellcheck="false" autocomplete="username" aria-describedby="ghOwnerHint ghOwnerError" maxlength="39" pattern="[a-zA-Z0-9\-]+" />
         <div id="ghOwnerError" class="validation-error" aria-live="polite">Only alphanumeric characters and hyphens allowed.</div>
       </div>
       <div class="setting-row">
         <label for="ghToken">GitHub Token</label>
-        <span class="hint block-hint" id="ghTokenHint">(optional, for private repos)</span>
+        <label for="ghToken" class="hint block-hint" id="ghTokenHint">(optional, for private repos)</label>
         <input
           type="password"
           id="ghToken"
@@ -80,7 +80,7 @@
           <input type="checkbox" id="schedEnabled" aria-describedby="schedEnabledHint" />
           Auto-archive on a schedule
         </label>
-        <span class="hint block-hint" id="schedEnabledHint">Periodically archives finished tasks across all Jules tabs (background alarm)</span>
+        <label for="schedEnabled" class="hint block-hint" id="schedEnabledHint">Periodically archives finished tasks across all Jules tabs (background alarm)</label>
       </div>
       <div class="setting-row">
         <label for="schedInterval">Every</label>
@@ -94,14 +94,14 @@
           inputmode="numeric"
           aria-describedby="schedIntervalHint"
         />
-        <span class="hint" id="schedIntervalHint">minutes (1–1440)</span>
+        <label for="schedInterval" class="hint" id="schedIntervalHint">minutes (1–1440)</label>
       </div>
       <div class="setting-row">
         <label class="checkbox">
           <input type="checkbox" id="schedSuggestions" aria-describedby="schedSuggestionsHint" />
           Also start suggestions each tick
         </label>
-        <span class="hint block-hint" id="schedSuggestionsHint">Starts queued code suggestions after archiving, capped per tick</span>
+        <label for="schedSuggestions" class="hint block-hint" id="schedSuggestionsHint">Starts queued code suggestions after archiving, capped per tick</label>
       </div>
       <div class="setting-row">
         <label for="schedMaxStarts">Max starts per tick</label>
@@ -115,7 +115,7 @@
           inputmode="numeric"
           aria-describedby="schedMaxStartsHint"
         />
-        <span class="hint" id="schedMaxStartsHint">(1–500, shared across all accounts)</span>
+        <label for="schedMaxStarts" class="hint" id="schedMaxStartsHint">(1–500, shared across all accounts)</label>
       </div>
     </section>
 
