@@ -225,12 +225,21 @@ async function runInPool(items, limit, worker) {
  */
 function createLimiter(max) {
   let active = 0
+  let head = 0
   const queue = []
 
   function next() {
-    if (active >= max || queue.length === 0) return
+    if (active >= max || head >= queue.length) return
     active++
-    const { fn, resolve, reject } = queue.shift()
+
+    // ⚡ Bolt Optimization: Use a head pointer instead of queue.shift()
+    // to avoid O(N) array shifting overhead. Batch cleanup to save memory.
+    const { fn, resolve, reject } = queue[head++]
+    if (head > 1000) {
+      queue.splice(0, head)
+      head = 0
+    }
+
     Promise.resolve()
       .then(fn)
       .then(resolve, reject)
