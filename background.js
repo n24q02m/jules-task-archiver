@@ -226,11 +226,26 @@ async function runInPool(items, limit, worker) {
 function createLimiter(max) {
   let active = 0
   const queue = []
+  // ⚡ Bolt Optimization: Replace O(N) array shift with a head pointer and periodic cleanup.
+  // This keeps dequeue time O(1) in the hot path for high-frequency rate limiters.
+  let head = 0
 
   function next() {
-    if (active >= max || queue.length === 0) return
+    if (active >= max || head >= queue.length) return
     active++
-    const { fn, resolve, reject } = queue.shift()
+    const item = queue[head]
+    queue[head++] = null // Release memory immediately
+    const { fn, resolve, reject } = item
+
+    // Reset if empty, else use high-water mark cleanup
+    if (head >= queue.length) {
+      queue.length = 0
+      head = 0
+    } else if (head > 1000) {
+      queue.splice(0, head)
+      head = 0
+    }
+
     Promise.resolve()
       .then(fn)
       .then(resolve, reject)
