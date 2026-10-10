@@ -32,6 +32,21 @@ const schedIntervalInput = $('#schedInterval')
 const schedSuggestionsInput = $('#schedSuggestions')
 const schedMaxStartsInput = $('#schedMaxStarts')
 
+// --- Interactive Hints ---
+document.querySelectorAll('.block-hint').forEach((hint) => {
+  hint.addEventListener('click', () => {
+    if (!hint.id) return
+    const input = document.querySelector(`[aria-describedby~="${hint.id}"]`)
+    if (input) {
+      if (input.type === 'checkbox' || input.type === 'radio') {
+        input.click()
+      } else {
+        input.focus()
+      }
+    }
+  })
+})
+
 // Storage-side bounds match background.js; the background re-validates anyway,
 // these just keep obviously-bad values out of sync storage.
 function readClampedNumber(input, min, max, fallback) {
