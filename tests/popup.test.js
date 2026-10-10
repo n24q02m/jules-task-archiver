@@ -587,15 +587,16 @@ describe('updateOpModeUI direct calls', () => {
 
 describe('Interactive Hints', () => {
   it('should cover the block-hint click listener', () => {
-    // Just mock it so that when popup.js runs, it executes the code path inside the event listener!
     const { sandbox } = setupPopupSandbox()
 
     const hint = createMockElement('span', { class: 'block-hint', id: 'myHint' })
+    hint.id = 'myHint'
     const input = createMockElement('input', { type: 'checkbox' })
-
-    // We must define getters on the object that popup.js can use!
     Object.defineProperty(input, 'type', { get: () => 'checkbox' })
-    input.click = () => {}
+    let clicked = false
+    input.click = () => {
+      clicked = true
+    }
 
     const oldQSA = sandbox.document.querySelectorAll
     sandbox.document.querySelectorAll = (sel) => {
@@ -609,27 +610,28 @@ describe('Interactive Hints', () => {
       return oldQS(sel)
     }
 
-    // Now run popup.js. It will attach the listener.
     vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
 
-    // Now invoke the listener directly!
     if (hint.listeners?.click) {
       hint.listeners.click.forEach((cb) => {
         cb()
       })
     }
 
-    // We just care that it executes without throwing to get coverage.
-    assert.ok(true)
+    assert.strictEqual(clicked, true)
   })
 
   it('should cover the block-hint focus listener', () => {
     const { sandbox } = setupPopupSandbox()
 
     const hint = createMockElement('span', { class: 'block-hint', id: 'textHint' })
+    hint.id = 'textHint'
     const input = createMockElement('input', { type: 'text' })
     Object.defineProperty(input, 'type', { get: () => 'text' })
-    input.focus = () => {}
+    let focused = false
+    input.focus = () => {
+      focused = true
+    }
 
     const oldQSA = sandbox.document.querySelectorAll
     sandbox.document.querySelectorAll = (sel) => {
@@ -651,7 +653,7 @@ describe('Interactive Hints', () => {
       })
     }
 
-    assert.ok(true)
+    assert.strictEqual(focused, true)
   })
 
   it('should cover no id hint', () => {
@@ -671,13 +673,12 @@ describe('Interactive Hints', () => {
         cb()
       })
     }
-
-    assert.ok(true)
   })
 
   it('should cover no input found', () => {
     const { sandbox } = setupPopupSandbox()
     const hint = createMockElement('span', { class: 'block-hint', id: 'missingHint' })
+    hint.id = 'missingHint'
 
     const oldQSA = sandbox.document.querySelectorAll
     sandbox.document.querySelectorAll = (sel) => {
@@ -698,7 +699,5 @@ describe('Interactive Hints', () => {
         cb()
       })
     }
-
-    assert.ok(true)
   })
 })
