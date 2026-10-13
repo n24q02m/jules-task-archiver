@@ -325,6 +325,27 @@ function renderSummary(results) {
   summaryDiv.appendChild(fragment)
 }
 
+// --- Enhance hit areas for block hints ---
+document.querySelectorAll('.block-hint').forEach((hint) => {
+  hint.addEventListener('click', (e) => {
+    // If the hint is a label, the browser already handles the click.
+    if (hint.tagName === 'LABEL') return
+
+    const hintId = hint.id
+    if (!hintId) return
+    const input = document.querySelector(`[aria-describedby~="${hintId}"]`)
+    if (input) {
+      if (input.type === 'checkbox' || input.type === 'radio') {
+        // Prevent label click bubbling if nested unexpectedly
+        if (typeof e.preventDefault === 'function') e.preventDefault()
+        input.click()
+      } else {
+        input.focus()
+      }
+    }
+  })
+})
+
 // --- Check for existing state on popup open ---
 chrome.runtime.sendMessage({ action: 'GET_STATE' }, (state) => {
   if (state && state.status !== 'idle') {

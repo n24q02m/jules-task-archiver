@@ -562,6 +562,149 @@ describe('updateOpModeUI details', () => {
   })
 })
 
+describe('Block Hint Click Enhancements', () => {
+  it('should programmatically focus a text input', () => {
+    const { sandbox } = setupPopupSandbox()
+
+    // Create elements
+    const hint = createMockElement('span', { id: 'testHint' })
+    hint.id = 'testHint'
+    const input = createMockElement('input', { type: 'text' })
+    input.type = 'text'
+    input.setAttribute('aria-describedby', 'testHint')
+
+    // Setup mock querySelector
+    const originalQuerySelector = sandbox.document.querySelector
+    sandbox.document.querySelector = (sel) => {
+      if (sel === '[aria-describedby~="testHint"]') return input
+      return originalQuerySelector(sel)
+    }
+
+    // Setup mock querySelectorAll for block hints
+    const originalQuerySelectorAll = sandbox.document.querySelectorAll
+    sandbox.document.querySelectorAll = (sel) => {
+      if (sel === '.block-hint') return [hint]
+      return originalQuerySelectorAll(sel)
+    }
+
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
+
+    hint.dispatchEvent('click', { preventDefault: () => {} })
+
+    assert.strictEqual(input.focused, true)
+  })
+
+  it('should programmatically click a checkbox input and prevent default', () => {
+    const { sandbox } = setupPopupSandbox()
+
+    // Create elements
+    const hint = createMockElement('span', { id: 'testHint' })
+    hint.id = 'testHint'
+    const input = createMockElement('input', { type: 'checkbox' })
+    input.type = 'checkbox'
+    input.setAttribute('aria-describedby', 'testHint')
+    let inputClicked = false
+    input.click = () => {
+      inputClicked = true
+    }
+
+    // Setup mock querySelector
+    const originalQuerySelector = sandbox.document.querySelector
+    sandbox.document.querySelector = (sel) => {
+      if (sel === '[aria-describedby~="testHint"]') return input
+      return originalQuerySelector(sel)
+    }
+
+    // Setup mock querySelectorAll
+    const originalQuerySelectorAll = sandbox.document.querySelectorAll
+    sandbox.document.querySelectorAll = (sel) => {
+      if (sel === '.block-hint') return [hint]
+      return originalQuerySelectorAll(sel)
+    }
+
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
+
+    let defaultPrevented = false
+    hint.dispatchEvent('click', {
+      preventDefault: () => {
+        defaultPrevented = true
+      }
+    })
+
+    assert.strictEqual(inputClicked, true)
+    assert.strictEqual(defaultPrevented, true)
+  })
+
+  it('should return early if hint has no id or input is not found', () => {
+    const { sandbox } = setupPopupSandbox()
+
+    // Create element with no ID
+    const hintNoId = createMockElement('span')
+    hintNoId.id = ''
+
+    // Create element with ID but no input
+    const hintNoInput = createMockElement('span', { id: 'noInputHint' })
+    hintNoInput.id = 'noInputHint'
+
+    // Setup mock querySelector
+    const originalQuerySelector = sandbox.document.querySelector
+    sandbox.document.querySelector = (sel) => originalQuerySelector(sel)
+
+    // Setup mock querySelectorAll
+    const originalQuerySelectorAll = sandbox.document.querySelectorAll
+    sandbox.document.querySelectorAll = (sel) => {
+      if (sel === '.block-hint') return [hintNoId, hintNoInput]
+      return originalQuerySelectorAll(sel)
+    }
+
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
+
+    let defaultPrevented = false
+    const pd = () => {
+      defaultPrevented = true
+    }
+
+    hintNoId.dispatchEvent('click', { preventDefault: pd })
+    hintNoInput.dispatchEvent('click', { preventDefault: pd })
+
+    assert.strictEqual(defaultPrevented, false)
+  })
+
+  it('should return early if the hint is a LABEL element', () => {
+    const { sandbox } = setupPopupSandbox()
+
+    // Create label element
+    const hintLabel = createMockElement('label', { id: 'labelHint' })
+    hintLabel.id = 'labelHint'
+    const input = createMockElement('input', { type: 'checkbox' })
+    let inputClicked = false
+    input.click = () => {
+      inputClicked = true
+    }
+
+    // Setup mock querySelector
+    const originalQuerySelector = sandbox.document.querySelector
+    sandbox.document.querySelector = (sel) => {
+      if (sel === '[aria-describedby~="labelHint"]') return input
+      return originalQuerySelector(sel)
+    }
+
+    // Setup mock querySelectorAll
+    const originalQuerySelectorAll = sandbox.document.querySelectorAll
+    sandbox.document.querySelectorAll = (sel) => {
+      if (sel === '.block-hint') return [hintLabel]
+      return originalQuerySelectorAll(sel)
+    }
+
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
+
+    hintLabel.dispatchEvent('click', { preventDefault: () => {} })
+
+    // Should not programmatically click
+    assert.strictEqual(inputClicked, false)
+  })
+})
+
 describe('updateOpModeUI direct calls', () => {
   it('should toggle classes and aria attributes directly', () => {
     const { sandbox, opModeButtons } = setupPopupSandbox()
