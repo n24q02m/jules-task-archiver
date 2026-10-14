@@ -26,6 +26,22 @@ const progressFill = $('#progressFill')
 const logPre = $('#log')
 const summaryDiv = $('#summary')
 
+// Make hints clickable to expand hit area without redundantly announcing via screen readers
+document.querySelectorAll('.block-hint').forEach((hint) => {
+  hint.addEventListener('click', (_e) => {
+    if (hint.tagName === 'LABEL') return
+    const inputId = hint.id.replace('Hint', '')
+    const input = document.getElementById(inputId)
+    if (input) {
+      if (input.type === 'checkbox' || input.type === 'radio') {
+        input.click()
+      } else {
+        input.focus()
+      }
+    }
+  })
+})
+
 // --- Schedule settings (read by background.js's chrome.alarms tick) ---
 const schedEnabledInput = $('#schedEnabled')
 const schedIntervalInput = $('#schedInterval')
