@@ -50,6 +50,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - name: Setup Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.13"
+
+      - name: Project SOT
+        run: python -I scripts/repo-bootstrap/sot_check.py --repo . --mode warn
+
       - name: Run Biome check
         # Pin to the version declared in biome.json $schema. Unpinned `npx @biomejs/biome`
         # pulls latest, which auto-upgraded past 2.4.16 and broke CI with new lint rules
