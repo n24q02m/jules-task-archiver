@@ -56,7 +56,7 @@ jobs:
           python-version: "3.13"
 
       - name: Project SOT
-        run: python -I scripts/repo-bootstrap/sot_check.py --repo . --mode warn
+        run: python -I scripts/repo-bootstrap/sot_check.py --repo . --mode gate
 
       - name: Run Biome check
         # Pin to the version declared in biome.json $schema. Unpinned `npx @biomejs/biome`
