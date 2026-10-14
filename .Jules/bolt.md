@@ -22,3 +22,6 @@
 ## 2025-02-25 - API Quota and Concurrent Network Requests Short-Circuiting
 **Learning:** When fetching paginated or partitioned network data concurrently (e.g., retrieving lists of items across multiple repos), running all concurrent workers to completion wastes API quota and increases latency if the global quota is already met midway through.
 **Action:** Implement a short-circuit check inside the concurrency pool worker to track globally discovered items and immediately resolve with a skip flag (e.g., `skipped: true`) if the quota limit has been reached. This prevents wasteful trailing network API calls that will be discarded.
+## 2025-02-25 - Avoid Array.shift() in High-Frequency Queues
+**Learning:** In high-frequency queues (like rate limiters), using `Array.prototype.shift()` causes O(N) overhead because it shifts all remaining elements down one index on every call.
+**Action:** Replace `shift()` with a `head` index pointer (`queue[head]`). Set processed indices to `null` to prevent memory leaks by releasing closures, and reset the array (`queue.length = 0; head = 0`) when empty, or use a high-water mark cleanup (e.g., `queue.splice(0, head)`) to maintain efficiency.
