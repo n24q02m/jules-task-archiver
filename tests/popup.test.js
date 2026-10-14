@@ -14,6 +14,8 @@ function createMockElement(tag = 'div', attrs = {}) {
   const element = {
     tagName: tag.toUpperCase(),
     attributes: { ...attrs },
+    id: attrs.id,
+    type: attrs.type,
     dataset: attrs.dataset || {},
     classList: {
       classes: new Set(),
@@ -172,6 +174,19 @@ function createMockDocument(elements, opModeButtons, radioStates) {
           forEach: (cb) => opModeButtons.forEach(cb)
         }
       }
+      if (sel === 'input[name="mode"]') {
+        return {
+          forEach: (cb) => cb(elements['input[name="mode"]'] || createMockElement('input'))
+        }
+      }
+      if (sel === '.block-hint') {
+        return {
+          forEach: (cb) => {
+            cb(elements['#forceHint'])
+            cb(elements['#ghOwnerHint'])
+          }
+        }
+      }
       return { forEach: () => {} }
     },
     createElement: (tag) => createMockElement(tag),
@@ -195,7 +210,7 @@ function setupPopupSandbox() {
 
   const elements = {
     '#mainForm': createMockElement('form'),
-    '#ghOwner': createMockElement('input'),
+    '#ghOwner': createMockElement('input', { type: 'text' }),
     '#ghToken': createMockElement('input'),
     '#force': createMockElement('input', { type: 'checkbox' }),
     '#startBtn': createMockElement('button'),
@@ -208,8 +223,16 @@ function setupPopupSandbox() {
     '#log': createMockElement('pre'),
     '#summary': createMockElement('div'),
     '.settings': createMockElement('section'),
-    '.setting-row': createMockElement('div')
+    '.setting-row': createMockElement('div'),
+    '#forceHint': createMockElement('span', { id: 'forceHint' }),
+    '#ghOwnerHint': createMockElement('span', { id: 'ghOwnerHint' }),
+    '[aria-describedby~="forceHint"]': createMockElement('input', { type: 'checkbox' }),
+    '[aria-describedby~="ghOwnerHint"]': createMockElement('input', { type: 'text' })
   }
+
+  // Link hint target lookup to specific elements
+  elements['[aria-describedby~="forceHint"]'] = elements['#force']
+  elements['[aria-describedby~="ghOwnerHint"]'] = elements['#ghOwner']
 
   // Parent element for elements that use .parentElement in popup.js
   elements['#force'].closest = (sel) => (sel === '.setting-row' ? elements['.setting-row'] : null)
@@ -481,6 +504,38 @@ describe('Button Event Handlers', () => {
     assert.strictEqual(elements['#startBtn'].focused, false)
     elements['#resetBtn'].dispatchEvent('click')
     assert.strictEqual(elements['#startBtn'].focused, true, 'focus should return to the primary action')
+  })
+})
+
+describe('Hint Hit Area Expansion', () => {
+  it('should click checkbox input when its hint is clicked', async () => {
+    const { sandbox, elements } = setupPopupSandbox()
+    let checkboxClicked = false
+
+    elements['#force'].click = () => {
+      checkboxClicked = true
+    }
+
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
+
+    await elements['#forceHint'].dispatchEvent('click')
+
+    assert.strictEqual(checkboxClicked, true)
+  })
+
+  it('should focus text input when its hint is clicked', async () => {
+    const { sandbox, elements } = setupPopupSandbox()
+    let inputFocused = false
+
+    elements['#ghOwner'].focus = () => {
+      inputFocused = true
+    }
+
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
+
+    await elements['#ghOwnerHint'].dispatchEvent('click')
+
+    assert.strictEqual(inputFocused, true)
   })
 })
 

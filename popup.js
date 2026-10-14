@@ -108,6 +108,20 @@ document.querySelectorAll('input[name="mode"]').forEach((radio) => {
   })
 })
 
+// Expand hit area for hints without using redundant <label> tags
+document.querySelectorAll('.block-hint').forEach((hint) => {
+  hint.addEventListener('click', () => {
+    const input = document.querySelector(`[aria-describedby~="${hint.id}"]`)
+    if (input) {
+      if (input.type === 'checkbox' || input.type === 'radio') {
+        input.click()
+      } else {
+        input.focus()
+      }
+    }
+  })
+})
+
 // --- Load saved settings & cleanup insecure storage ---
 chrome.storage.sync.get(
   ['ghOwner', 'opMode', 'ghToken', 'schedEnabled', 'schedIntervalMin', 'schedStartSuggestions', 'schedMaxStarts'],
