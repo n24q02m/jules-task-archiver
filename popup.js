@@ -99,6 +99,23 @@ document.querySelectorAll('#opMode button').forEach((btn) => {
   })
 })
 
+// Expand hit area for hints not wrapped in <label>
+document.querySelectorAll('.block-hint').forEach((hint) => {
+  hint.addEventListener('click', () => {
+    if (hint.tagName === 'LABEL') return
+
+    // Find inputs that mention this hint's ID in aria-describedby
+    const input = document.querySelector(`[aria-describedby~="${hint.id}"]`)
+    if (input) {
+      if (input.type === 'checkbox' || input.type === 'radio') {
+        input.click()
+      } else {
+        input.focus()
+      }
+    }
+  })
+})
+
 // Update button text when execution mode changes
 document.querySelectorAll('input[name="mode"]').forEach((radio) => {
   radio.addEventListener('change', () => {
