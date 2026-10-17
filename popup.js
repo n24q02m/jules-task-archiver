@@ -135,6 +135,22 @@ chrome.storage.sync.get(
     })
   }
 )
+
+// Expand hit areas for block hints without redundantly reading as labels
+document.querySelectorAll('.block-hint').forEach((hint) => {
+  hint.addEventListener('click', (_e) => {
+    if (hint.tagName === 'LABEL') return
+    const input = document.querySelector(`[aria-describedby~="${hint.id}"]`)
+    if (input) {
+      if (input.type === 'checkbox' || input.type === 'radio') {
+        input.click()
+      } else {
+        input.focus()
+      }
+    }
+  })
+})
+
 // --- Save settings on change ---
 ghOwnerInput.addEventListener('change', () => {
   chrome.storage.sync.set({ ghOwner: ghOwnerInput.value.trim().slice(0, MAX_OWNER_LEN) })

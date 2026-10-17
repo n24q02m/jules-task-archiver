@@ -12,7 +12,9 @@ const popupJs = fs.readFileSync(popupJsPath, 'utf8')
  */
 function createMockElement(tag = 'div', attrs = {}) {
   const element = {
+    ...attrs,
     tagName: tag.toUpperCase(),
+    ...attrs,
     attributes: { ...attrs },
     dataset: attrs.dataset || {},
     classList: {
@@ -163,7 +165,13 @@ function createMockDocument(elements, opModeButtons, radioStates) {
     querySelector: (sel) => {
       if (sel === 'input[name="mode"]:checked') return { value: radioStates.mode }
       if (sel === 'input[name="scope"]:checked') return { value: radioStates.scope }
+      if (sel.includes('aria-describedby')) {
+        const input = createMockElement('input')
+        input.type = sel.includes('testCheck') ? 'checkbox' : 'text'
+        return input
+      }
       if (elements[sel]) return elements[sel]
+
       return createMockElement()
     },
     querySelectorAll: (sel) => {
@@ -237,7 +245,7 @@ function setupPopupSandbox() {
   }
   vm.createContext(sandbox)
 
-  return { sandbox, elements, opModeButtons, syncStorage, localStorage, listeners, radioStates }
+  return { sandbox, elements, opModeButtons, syncStorage, localStorage, listeners, radioStates, createMockElement }
 }
 
 describe('setActiveOpMode', () => {
@@ -582,5 +590,139 @@ describe('updateOpModeUI direct calls', () => {
     assert.strictEqual(opModeButtons[0].getAttribute('aria-pressed'), 'false')
     assert.ok(opModeButtons[1].classList.contains('active'))
     assert.strictEqual(opModeButtons[1].getAttribute('aria-pressed'), 'true')
+  })
+})
+
+describe('block-hint click handler', () => {
+  const _fs = require('node:fs')
+  const _path = require('node:path')
+  const vm = require('node:vm')
+
+  it('should click associated checkbox inputs', () => {
+    const { sandbox, createMockElement } = setupPopupSandbox()
+
+    // Create elements
+    const hint = createMockElement('span', { id: 'testHint', tagName: 'SPAN' })
+    const checkbox = createMockElement('input', { type: 'checkbox', id: 'testCheck' })
+    let clicked = false
+    checkbox.click = () => {
+      clicked = true
+    }
+
+    const origQuerySelectorAll = sandbox.document.querySelectorAll
+    sandbox.document.querySelectorAll = (sel) => {
+      if (sel === '.block-hint') return [hint]
+      return origQuerySelectorAll(sel)
+    }
+
+    const origQuerySelector = sandbox.document.querySelector
+    sandbox.document.querySelector = (sel) => {
+      if (sel.includes('testHint'))
+        return sel.includes('testHint2') || sel.includes('testHint3')
+          ? textInput
+          : sel.includes('testHint4')
+            ? null
+            : checkbox
+      return origQuerySelector(sel)
+    }
+
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
+
+    hint.dispatchEvent('click')
+    assert.strictEqual(clicked, true)
+  })
+
+  it('should focus associated text inputs', () => {
+    const { sandbox, createMockElement } = setupPopupSandbox()
+
+    const hint = createMockElement('span', { id: 'testHint2', tagName: 'SPAN' })
+    const textInput = createMockElement('input', { type: 'text', id: 'testText' })
+    let focused = false
+    textInput.focus = () => {
+      focused = true
+    }
+
+    const origQuerySelectorAll = sandbox.document.querySelectorAll
+    sandbox.document.querySelectorAll = (sel) => {
+      if (sel === '.block-hint') return [hint]
+      return origQuerySelectorAll(sel)
+    }
+
+    const origQuerySelector = sandbox.document.querySelector
+    sandbox.document.querySelector = (sel) => {
+      if (sel.includes('testHint'))
+        return sel.includes('testHint2') || sel.includes('testHint3')
+          ? textInput
+          : sel.includes('testHint4')
+            ? null
+            : checkbox
+      return origQuerySelector(sel)
+    }
+
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
+
+    hint.dispatchEvent('click')
+    assert.strictEqual(focused, true)
+  })
+
+  it('should return early if hint is a LABEL', () => {
+    const { sandbox, createMockElement } = setupPopupSandbox()
+
+    const hint = createMockElement('label', { id: 'testHint3', tagName: 'LABEL' })
+    const textInput = createMockElement('input', { type: 'text', id: 'testText2' })
+    let focused = false
+    textInput.focus = () => {
+      focused = true
+    }
+
+    const origQuerySelectorAll = sandbox.document.querySelectorAll
+    sandbox.document.querySelectorAll = (sel) => {
+      if (sel === '.block-hint') return [hint]
+      return origQuerySelectorAll(sel)
+    }
+
+    const origQuerySelector = sandbox.document.querySelector
+    sandbox.document.querySelector = (sel) => {
+      if (sel.includes('testHint'))
+        return sel.includes('testHint2') || sel.includes('testHint3')
+          ? textInput
+          : sel.includes('testHint4')
+            ? null
+            : checkbox
+      return origQuerySelector(sel)
+    }
+
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
+
+    hint.dispatchEvent('click')
+    assert.strictEqual(focused, false)
+  })
+
+  it('should do nothing if associated input not found', () => {
+    const { sandbox, createMockElement } = setupPopupSandbox()
+
+    const hint = createMockElement('span', { id: 'testHint4', tagName: 'SPAN' })
+
+    const origQuerySelectorAll = sandbox.document.querySelectorAll
+    sandbox.document.querySelectorAll = (sel) => {
+      if (sel === '.block-hint') return [hint]
+      return origQuerySelectorAll(sel)
+    }
+
+    const origQuerySelector = sandbox.document.querySelector
+    sandbox.document.querySelector = (sel) => {
+      if (sel.includes('testHint'))
+        return sel.includes('testHint2') || sel.includes('testHint3')
+          ? textInput
+          : sel.includes('testHint4')
+            ? null
+            : checkbox
+      return origQuerySelector(sel)
+    }
+
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
+
+    // Should not throw
+    hint.dispatchEvent('click')
   })
 })
