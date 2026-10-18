@@ -226,11 +226,25 @@ async function runInPool(items, limit, worker) {
 function createLimiter(max) {
   let active = 0
   const queue = []
+  let head = 0 // ⚡ Bolt Optimization: Use head index pointer to avoid O(n) shift overhead
 
   function next() {
-    if (active >= max || queue.length === 0) return
+    if (active >= max || head >= queue.length) return
     active++
-    const { fn, resolve, reject } = queue.shift()
+    const { fn, resolve, reject } = queue[head]
+    queue[head] = null // ⚡ Bolt Optimization: Prevent memory leaks by removing reference to closure
+    head++
+
+    // ⚡ Bolt Optimization: Reset array when empty to recover memory
+    if (head >= queue.length) {
+      queue.length = 0
+      head = 0
+    } else if (head > 1000) {
+      // ⚡ Bolt Optimization: High-water mark cleanup for long-running queues
+      queue.splice(0, head)
+      head = 0
+    }
+
     Promise.resolve()
       .then(fn)
       .then(resolve, reject)
