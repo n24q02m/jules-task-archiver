@@ -135,6 +135,23 @@ chrome.storage.sync.get(
     })
   }
 )
+
+// --- Expand block-hint hit areas ---
+document.querySelectorAll('.block-hint').forEach((hint) => {
+  hint.addEventListener('click', (e) => {
+    if (hint.tagName === 'LABEL') return
+    e.preventDefault()
+    const target = document.querySelector(`[aria-describedby~="${hint.id}"]`)
+    if (target) {
+      if (target.type === 'checkbox' || target.type === 'radio') {
+        target.click()
+      } else {
+        target.focus()
+      }
+    }
+  })
+})
+
 // --- Save settings on change ---
 ghOwnerInput.addEventListener('change', () => {
   chrome.storage.sync.set({ ghOwner: ghOwnerInput.value.trim().slice(0, MAX_OWNER_LEN) })
