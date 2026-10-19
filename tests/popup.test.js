@@ -75,6 +75,9 @@ function createMockElement(tag = 'div', attrs = {}) {
     focus: () => {
       element.focused = true
     },
+    click: () => {
+      element.dispatchEvent('click')
+    },
     textContent: '',
     value: '',
     checked: false,
@@ -158,7 +161,7 @@ function createMockChrome(syncStorage, localStorage, sessionStorage, listeners) 
 /**
  * Creates a mock Document object.
  */
-function createMockDocument(elements, opModeButtons, radioStates) {
+function createMockDocument(elements, opModeButtons, blockHints, radioStates) {
   return {
     querySelector: (sel) => {
       if (sel === 'input[name="mode"]:checked') return { value: radioStates.mode }
@@ -170,6 +173,11 @@ function createMockDocument(elements, opModeButtons, radioStates) {
       if (sel === '#opMode button') {
         return {
           forEach: (cb) => opModeButtons.forEach(cb)
+        }
+      }
+      if (sel === '.block-hint') {
+        return {
+          forEach: (cb) => blockHints.forEach(cb)
         }
       }
       return { forEach: () => {} }
@@ -208,7 +216,11 @@ function setupPopupSandbox() {
     '#log': createMockElement('pre'),
     '#summary': createMockElement('div'),
     '.settings': createMockElement('section'),
-    '.setting-row': createMockElement('div')
+    '.setting-row': createMockElement('div'),
+    '#schedEnabled': createMockElement('input', { type: 'checkbox' }),
+    '#schedInterval': createMockElement('input', { type: 'number' }),
+    '#schedSuggestions': createMockElement('input', { type: 'checkbox' }),
+    '#schedMaxStarts': createMockElement('input', { type: 'number' })
   }
 
   // Parent element for elements that use .parentElement in popup.js
@@ -220,7 +232,12 @@ function setupPopupSandbox() {
     createMockElement('button', { dataset: { value: 'suggestions' } })
   ]
 
-  const document = createMockDocument(elements, opModeButtons, radioStates)
+  const blockHints = [
+    createMockElement('span', { id: 'forceHint', class: 'hint block-hint' }),
+    createMockElement('span', { id: 'ghOwnerHint', class: 'hint block-hint' })
+  ]
+
+  const document = createMockDocument(elements, opModeButtons, blockHints, radioStates)
   const chrome = createMockChrome(syncStorage, localStorage, sessionStorage, listeners)
 
   const sandbox = {
@@ -267,6 +284,44 @@ describe('setActiveOpMode', () => {
     sandbox.setActiveOpMode('suggestions')
     assert.strictEqual(elements['.settings'].classList.contains('hidden'), true)
     assert.strictEqual(elements['#force'].closest('.setting-row').classList.contains('hidden'), true)
+  })
+
+  it('should click associated input when block-hint is clicked', () => {
+    const { sandbox, elements } = setupPopupSandbox()
+
+    // Setup elements
+    const input = elements['#force']
+    input.type = 'checkbox'
+    sandbox.document.querySelector = (sel) => {
+      if (sel === '[aria-describedby~="forceHint"]') return input
+      if (sel === 'input[name="mode"]:checked') return { value: 'dry' }
+      if (sel === 'input[name="scope"]:checked') return { value: 'all' }
+      if (elements[sel]) return elements[sel]
+      return null
+    }
+
+    // Trigger popup.js
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
+
+    let clicked = false
+    input.addEventListener('click', () => {
+      clicked = true
+    })
+    input.click = () => {
+      clicked = true
+    }
+
+    // Click the hint
+    let forceHint = null
+    sandbox.document.querySelectorAll('.block-hint').forEach((hint) => {
+      if (hint.attributes.id === 'forceHint') forceHint = hint
+    })
+
+    forceHint.id = 'forceHint'
+
+    forceHint.dispatchEvent('click')
+
+    assert.strictEqual(clicked, true)
   })
 })
 
