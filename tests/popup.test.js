@@ -174,7 +174,9 @@ function createMockDocument(elements, opModeButtons, radioStates) {
       }
       if (sel === '.block-hint') {
         return {
-          forEach: () => {}
+          forEach: (cb) => {
+            if (elements['.block-hint']) elements['.block-hint'].forEach(cb)
+          }
         }
       }
       return { forEach: () => {} }
@@ -244,6 +246,103 @@ function setupPopupSandbox() {
 
   return { sandbox, elements, opModeButtons, syncStorage, localStorage, listeners, radioStates }
 }
+
+describe('block-hint click handler', () => {
+  it('should click associated checkbox input', () => {
+    const { sandbox, elements } = setupPopupSandbox()
+
+    const hint = createMockElement('span')
+    hint.id = 'testHint'
+    elements['.block-hint'] = [hint]
+
+    const input = createMockElement('input')
+    input.type = 'checkbox'
+    elements['[aria-describedby~="testHint"]'] = input
+
+    let clicked = false
+    input.click = () => {
+      clicked = true
+    }
+
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
+
+    hint.dispatchEvent('click')
+    assert.strictEqual(clicked, true)
+  })
+
+  it('should focus associated text input', () => {
+    const { sandbox, elements } = setupPopupSandbox()
+
+    const hint = createMockElement('span')
+    hint.id = 'testHint'
+    elements['.block-hint'] = [hint]
+
+    const input = createMockElement('input')
+    input.type = 'text'
+    elements['[aria-describedby~="testHint"]'] = input
+
+    let focused = false
+    input.focus = () => {
+      focused = true
+    }
+
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
+
+    hint.dispatchEvent('click')
+    assert.strictEqual(focused, true)
+  })
+
+  it('should ignore clicks if hint is a LABEL', () => {
+    const { sandbox, elements } = setupPopupSandbox()
+
+    const hint = createMockElement('label')
+    hint.tagName = 'LABEL'
+    hint.id = 'testHint'
+    elements['.block-hint'] = [hint]
+
+    const input = createMockElement('input')
+    input.type = 'checkbox'
+    elements['[aria-describedby~="testHint"]'] = input
+
+    let clicked = false
+    input.click = () => {
+      clicked = true
+    }
+
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
+
+    hint.dispatchEvent('click')
+    assert.strictEqual(clicked, false)
+  })
+
+  it('should not fail if input is not found', () => {
+    const { sandbox, elements } = setupPopupSandbox()
+
+    const hint = createMockElement('span')
+    hint.id = 'testHint'
+    elements['.block-hint'] = [hint]
+    // no associated input mock
+
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
+
+    // should not throw
+    hint.dispatchEvent('click')
+    assert.ok(true)
+  })
+
+  it('should not fail if hint has no id', () => {
+    const { sandbox, elements } = setupPopupSandbox()
+
+    const hint = createMockElement('span')
+    elements['.block-hint'] = [hint]
+
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
+
+    // should not throw
+    hint.dispatchEvent('click')
+    assert.ok(true)
+  })
+})
 
 describe('setActiveOpMode', () => {
   it('should toggle active class and aria-pressed on buttons', () => {
