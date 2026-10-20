@@ -67,3 +67,6 @@
 ## 2025-10-25 - Link Inline Validation Errors to Inputs
 **Learning:** Adding visual inline validation errors without linking them semantically to the input field makes them inaccessible to screen reader users, who won't be notified when an input becomes invalid during navigation.
 **Action:** Always link inline validation error elements to their respective input fields using `aria-describedby` (combining multiple IDs if a hint already exists, like `aria-describedby="hintId errorId"`) and apply `aria-live="polite"` to the error container so assistive technologies announce the error when it appears.
+## 2025-10-26 - Accessible Expanded Hit Areas
+**Learning:** Do not convert form hint elements into secondary `<label for="inputId">` elements to expand hit areas if the input already uses `aria-describedby` to link to the hint. Doing so causes screen readers to read the instructions redundantly. Keep instructions as non-label elements (e.g., `<span>`).
+**Action:** To expand the hit area, apply `cursor: pointer` to the hint and use a JavaScript click listener to programmatically click or focus the associated input by finding it using the CSS attribute selector `[aria-describedby~="hintId"]`. Prevent double-triggering by checking `tagName === 'LABEL'`.
