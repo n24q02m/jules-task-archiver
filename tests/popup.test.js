@@ -172,6 +172,11 @@ function createMockDocument(elements, opModeButtons, radioStates) {
           forEach: (cb) => opModeButtons.forEach(cb)
         }
       }
+      if (sel === '.block-hint') {
+        return {
+          forEach: () => {}
+        }
+      }
       return { forEach: () => {} }
     },
     createElement: (tag) => createMockElement(tag),
