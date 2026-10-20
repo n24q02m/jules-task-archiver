@@ -67,9 +67,11 @@
           placeholder="ghp_..."
           spellcheck="false"
           autocomplete="current-password"
-          aria-describedby="ghTokenHint"
+          aria-describedby="ghTokenHint ghTokenError"
           maxlength="255"
+          pattern="[a-zA-Z0-9_]+"
         />
+        <div id="ghTokenError" class="validation-error" aria-live="polite">Only alphanumeric characters and underscores allowed.</div>
       </div>
     </section>
 
