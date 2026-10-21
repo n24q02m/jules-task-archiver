@@ -342,3 +342,18 @@ chrome.runtime.sendMessage({ action: 'GET_STATE' }, (state) => {
     }
   }
 })
+
+// Programmatically click or focus inputs associated with hints
+document.querySelectorAll('.block-hint').forEach((hint) => {
+  hint.addEventListener('click', (e) => {
+    if (hint.tagName === 'LABEL') return
+    const input = document.querySelector(`[aria-describedby~="${hint.id}"]`)
+    if (input) {
+      if (input.type === 'checkbox' || input.type === 'radio') {
+        input.click()
+      } else {
+        input.focus()
+      }
+    }
+  })
+})

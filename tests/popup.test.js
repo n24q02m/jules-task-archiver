@@ -163,6 +163,13 @@ function createMockDocument(elements, opModeButtons, radioStates) {
     querySelector: (sel) => {
       if (sel === 'input[name="mode"]:checked') return { value: radioStates.mode }
       if (sel === 'input[name="scope"]:checked') return { value: radioStates.scope }
+      if (sel.includes('[aria-describedby~="')) {
+        const input = createMockElement('input')
+        input.type = 'checkbox'
+        input.click = () => {}
+        input.focus = () => {}
+        return input
+      }
       if (elements[sel]) return elements[sel]
       return createMockElement()
     },
@@ -170,6 +177,18 @@ function createMockDocument(elements, opModeButtons, radioStates) {
       if (sel === '#opMode button') {
         return {
           forEach: (cb) => opModeButtons.forEach(cb)
+        }
+      }
+      if (sel === '.block-hint') {
+        return {
+          forEach: (cb) => {
+            if (!elements['.block-hint']) {
+              const hint = createMockElement('span')
+              hint.id = 'dummyHint'
+              elements['.block-hint'] = hint
+            }
+            cb(elements['.block-hint'])
+          }
         }
       }
       return { forEach: () => {} }
@@ -582,5 +601,95 @@ describe('updateOpModeUI direct calls', () => {
     assert.strictEqual(opModeButtons[0].getAttribute('aria-pressed'), 'false')
     assert.ok(opModeButtons[1].classList.contains('active'))
     assert.strictEqual(opModeButtons[1].getAttribute('aria-pressed'), 'true')
+  })
+})
+
+describe('block-hint click handler', () => {
+  it('should focus the input when clicking a block-hint', () => {
+    const { sandbox, elements } = setupPopupSandbox()
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
+
+    let focused = false
+    elements['dummyHint_input'] = sandbox.document.createElement('input')
+    elements['dummyHint_input'].type = 'text'
+    elements['dummyHint_input'].focus = () => {
+      focused = true
+    }
+
+    // We need to dispatch click on the hint
+    // Since mock document creates it dynamically, we need a reference
+    let dummyHint
+    sandbox.document.querySelectorAll('.block-hint').forEach((hint) => {
+      dummyHint = hint
+    })
+
+    // We override querySelector to return our input for [aria-describedby~="dummyHint"]
+    const originalQuerySelector = sandbox.document.querySelector
+    sandbox.document.querySelector = (sel) => {
+      if (sel === '[aria-describedby~="dummyHint"]') {
+        return elements['dummyHint_input']
+      }
+      return originalQuerySelector(sel)
+    }
+
+    dummyHint.dispatchEvent('click')
+    assert.strictEqual(focused, true)
+  })
+
+  it('should click the input when clicking a block-hint for checkbox', () => {
+    const { sandbox, elements } = setupPopupSandbox()
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
+
+    let clicked = false
+    elements['dummyHint_input'] = sandbox.document.createElement('input')
+    elements['dummyHint_input'].type = 'checkbox'
+    elements['dummyHint_input'].click = () => {
+      clicked = true
+    }
+
+    let dummyHint
+    sandbox.document.querySelectorAll('.block-hint').forEach((hint) => {
+      dummyHint = hint
+    })
+
+    const originalQuerySelector = sandbox.document.querySelector
+    sandbox.document.querySelector = (sel) => {
+      if (sel === '[aria-describedby~="dummyHint"]') {
+        return elements['dummyHint_input']
+      }
+      return originalQuerySelector(sel)
+    }
+
+    dummyHint.dispatchEvent('click')
+    assert.strictEqual(clicked, true)
+  })
+
+  it('should do nothing if hint is a label', () => {
+    const { sandbox, elements } = setupPopupSandbox()
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
+
+    let clicked = false
+    elements['dummyHint_input'] = sandbox.document.createElement('input')
+    elements['dummyHint_input'].type = 'checkbox'
+    elements['dummyHint_input'].click = () => {
+      clicked = true
+    }
+
+    let dummyHint
+    sandbox.document.querySelectorAll('.block-hint').forEach((hint) => {
+      dummyHint = hint
+    })
+    dummyHint.tagName = 'LABEL'
+
+    const originalQuerySelector = sandbox.document.querySelector
+    sandbox.document.querySelector = (sel) => {
+      if (sel === '[aria-describedby~="dummyHint"]') {
+        return elements['dummyHint_input']
+      }
+      return originalQuerySelector(sel)
+    }
+
+    dummyHint.dispatchEvent('click')
+    assert.strictEqual(clicked, false)
   })
 })
