@@ -92,6 +92,21 @@ function updateOpModeUI(value) {
   }
 }
 
+// --- Expand hint hit areas programmatically ---
+document.querySelectorAll('.block-hint').forEach((hint) => {
+  hint.addEventListener('click', (_e) => {
+    if (hint.tagName === 'LABEL') return
+    const input = document.querySelector(`[aria-describedby~="${hint.id}"]`)
+    if (input) {
+      if (input.type === 'checkbox' || input.type === 'radio') {
+        input.click()
+      } else {
+        input.focus()
+      }
+    }
+  })
+})
+
 document.querySelectorAll('#opMode button').forEach((btn) => {
   btn.addEventListener('click', () => {
     setActiveOpMode(btn.dataset.value)
