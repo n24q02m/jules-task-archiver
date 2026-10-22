@@ -43,6 +43,7 @@ function createMockElement(tag = 'div', attrs = {}) {
       if (!element.listeners[type]) element.listeners[type] = []
       element.listeners[type].push(cb)
     },
+    click: () => {},
     dispatchEvent: (type, eventProps = {}) => {
       if (element.listeners?.[type]) {
         element.listeners[type].forEach((cb) => {
@@ -163,6 +164,7 @@ function createMockDocument(elements, opModeButtons, radioStates) {
     querySelector: (sel) => {
       if (sel === 'input[name="mode"]:checked') return { value: radioStates.mode }
       if (sel === 'input[name="scope"]:checked') return { value: radioStates.scope }
+      if (sel.startsWith('[aria-describedby~="')) return createMockElement('input')
       if (elements[sel]) return elements[sel]
       return createMockElement()
     },
@@ -170,6 +172,13 @@ function createMockDocument(elements, opModeButtons, radioStates) {
       if (sel === '#opMode button') {
         return {
           forEach: (cb) => opModeButtons.forEach(cb)
+        }
+      }
+      if (sel === '.block-hint') {
+        return {
+          forEach: (cb) => {
+            cb(createMockElement('span', { id: 'testHint' }))
+          }
         }
       }
       return { forEach: () => {} }
