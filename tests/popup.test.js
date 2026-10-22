@@ -388,7 +388,7 @@ describe('Initialization and Storage', () => {
 
 describe('Button Event Handlers', () => {
   it('tests expanding hint hit areas programmatically', () => {
-    const { sandbox, elements, radioStates } = setupPopupSandbox()
+    const { sandbox } = setupPopupSandbox()
 
     // Create elements needed for this test
     const labelHint = sandbox.document.createElement('label')
@@ -396,7 +396,9 @@ describe('Button Event Handlers', () => {
     spanHintCheck.id = 'spanHintCheck'
     const checkInput = sandbox.document.createElement('input')
     checkInput.type = 'checkbox'
-    checkInput.click = () => { checkInput.clicked = true }
+    checkInput.click = () => {
+      checkInput.clicked = true
+    }
 
     const spanHintText = sandbox.document.createElement('span')
     spanHintText.id = 'spanHintText'
@@ -407,27 +409,27 @@ describe('Button Event Handlers', () => {
     spanHintNoInput.id = 'spanHintNoInput'
 
     // Mock querySelector and querySelectorAll dynamically to inject these
-    const origQuerySelectorAll = sandbox.document.querySelectorAll;
+    const origQuerySelectorAll = sandbox.document.querySelectorAll
     sandbox.document.querySelectorAll = (sel) => {
       if (sel === '.block-hint') {
         return {
           forEach: (cb) => {
-            cb(labelHint);
-            cb(spanHintCheck);
-            cb(spanHintText);
-            cb(spanHintNoInput);
+            cb(labelHint)
+            cb(spanHintCheck)
+            cb(spanHintText)
+            cb(spanHintNoInput)
           }
         }
       }
-      return origQuerySelectorAll(sel);
-    };
+      return origQuerySelectorAll(sel)
+    }
 
-    const origQuerySelector = sandbox.document.querySelector;
+    const origQuerySelector = sandbox.document.querySelector
     sandbox.document.querySelector = (sel) => {
-      if (sel.includes('spanHintCheck')) return checkInput;
-      if (sel.includes('spanHintText')) return textInput;
-      return origQuerySelector(sel);
-    };
+      if (sel.includes('spanHintCheck')) return checkInput
+      if (sel.includes('spanHintText')) return textInput
+      return origQuerySelector(sel)
+    }
 
     vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
 
