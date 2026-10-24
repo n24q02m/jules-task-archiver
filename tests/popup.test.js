@@ -75,6 +75,13 @@ function createMockElement(tag = 'div', attrs = {}) {
     focus: () => {
       element.focused = true
     },
+    click: () => {
+      if (element.tagName === 'INPUT' && (element.type === 'checkbox' || element.type === 'radio')) {
+        element.checked = !element.checked
+        element.dispatchEvent('change')
+      }
+      element.dispatchEvent('click')
+    },
     textContent: '',
     value: '',
     checked: false,
@@ -159,10 +166,30 @@ function createMockChrome(syncStorage, localStorage, sessionStorage, listeners) 
  * Creates a mock Document object.
  */
 function createMockDocument(elements, opModeButtons, radioStates) {
+  const listeners = {}
   return {
+    addEventListener: (type, cb) => {
+      if (!listeners[type]) listeners[type] = []
+      listeners[type].push(cb)
+    },
+    dispatchEvent: (type, eventProps = {}) => {
+      if (listeners[type]) {
+        listeners[type].forEach((cb) => {
+          cb({ ...eventProps })
+        })
+      }
+    },
     querySelector: (sel) => {
       if (sel === 'input[name="mode"]:checked') return { value: radioStates.mode }
       if (sel === 'input[name="scope"]:checked') return { value: radioStates.scope }
+      if (sel.startsWith('[aria-describedby~="')) {
+        const id = sel.match(/\[aria-describedby~="([^"]+)"\]/)[1]
+        return (
+          Object.values(elements).find(
+            (el) => el?.getAttribute && (el.getAttribute('aria-describedby') || '').split(' ').includes(id)
+          ) || createMockElement()
+        )
+      }
       if (elements[sel]) return elements[sel]
       return createMockElement()
     },
