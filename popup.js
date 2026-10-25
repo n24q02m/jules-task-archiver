@@ -325,6 +325,22 @@ function renderSummary(results) {
   summaryDiv.appendChild(fragment)
 }
 
+// Programmatically link detached hints back to their inputs for expanded click targets
+document.querySelectorAll('.block-hint').forEach((hint) => {
+  if (!hint.id) return
+  hint.addEventListener('click', (e) => {
+    if (e.target.tagName === 'LABEL') return // Prevent double-triggering if already a label
+    const input = document.querySelector(`[aria-describedby~="${hint.id}"]`)
+    if (input) {
+      if (input.type === 'checkbox' || input.type === 'radio') {
+        input.click()
+      } else {
+        input.focus()
+      }
+    }
+  })
+})
+
 // --- Check for existing state on popup open ---
 chrome.runtime.sendMessage({ action: 'GET_STATE' }, (state) => {
   if (state && state.status !== 'idle') {
