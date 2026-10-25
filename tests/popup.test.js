@@ -75,15 +75,8 @@ function createMockElement(tag = 'div', attrs = {}) {
     focus: () => {
       element.focused = true
     },
-    click: () => {
-      if (element.type === 'checkbox' || element.type === 'radio') {
-        element.checked = !element.checked
-      }
-      element.dispatchEvent('change')
-    },
     textContent: '',
     value: '',
-    type: attrs.type || 'text',
     checked: false,
     disabled: false,
     focused: false,
@@ -170,7 +163,6 @@ function createMockDocument(elements, opModeButtons, radioStates) {
     querySelector: (sel) => {
       if (sel === 'input[name="mode"]:checked') return { value: radioStates.mode }
       if (sel === 'input[name="scope"]:checked') return { value: radioStates.scope }
-      if (sel.includes('[aria-describedby~=')) return createMockElement('input', { type: 'checkbox' })
       if (elements[sel]) return elements[sel]
       return createMockElement()
     },
@@ -178,13 +170,6 @@ function createMockDocument(elements, opModeButtons, radioStates) {
       if (sel === '#opMode button') {
         return {
           forEach: (cb) => opModeButtons.forEach(cb)
-        }
-      }
-      if (sel === '.block-hint') {
-        return {
-          forEach: (cb) => {
-            cb(createMockElement('span', { id: 'mockHint' }))
-          }
         }
       }
       return { forEach: () => {} }
