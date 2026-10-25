@@ -25,3 +25,6 @@
 ## 2026-10-13 - Array Shift vs Head Pointer in Queues
 **Learning:** In high-frequency queues (like rate limiters), using `Array.prototype.shift()` causes O(N) overhead due to elements shifting.
 **Action:** Replace `shift()` with a `head` index pointer. To prevent memory leaks, immediately set processed indices to `null` (e.g., `queue[head - 1] = null`) and reset the array when empty (`if (head >= queue.length) { queue.length = 0; head = 0; }`), in addition to using a high-water mark cleanup (e.g., `queue.splice(0, head)`).
+## 2026-10-25 - Array Shift vs Head Pointer in Queues (Duplicate/Rejected)
+**Learning:** While replacing `queue.shift()` with a `head` index pointer improves micro-benchmark performance (saving ~11ns per op), in bounded queues where operations are network-bound (like a concurrency pool of 5-12 workers), the CPU savings are entirely negligible end-to-end. This PR was rejected as a duplicate of an existing optimization (#838).
+**Action:** Before optimizing a queue, evaluate if the bottleneck is CPU-bound or I/O-bound. Micro-optimizations for bounded, I/O-bound queues may not yield measurable real-world benefits.
