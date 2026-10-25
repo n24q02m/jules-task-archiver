@@ -22,6 +22,6 @@
 ## 2025-02-25 - API Quota and Concurrent Network Requests Short-Circuiting
 **Learning:** When fetching paginated or partitioned network data concurrently (e.g., retrieving lists of items across multiple repos), running all concurrent workers to completion wastes API quota and increases latency if the global quota is already met midway through.
 **Action:** Implement a short-circuit check inside the concurrency pool worker to track globally discovered items and immediately resolve with a skip flag (e.g., `skipped: true`) if the quota limit has been reached. This prevents wasteful trailing network API calls that will be discarded.
-## 2025-02-25 - O(1) Queue Shift for Rate Limiters
-**Learning:** In high-frequency queues (like rate limiters), using `Array.prototype.shift()` causes O(N) overhead.
-**Action:** Replace it with a `head` index pointer. To prevent memory leaks, immediately set processed indices to `null` and reset the array when empty or past a high-water mark.
+## 2025-02-25 - Queue Micro-Optimizations in Shallow Network Bound Queues
+**Learning:** While replacing `queue.shift()` with a head index pointer yields O(1) performance and is a best practice for high-throughput queues, it offers no measurable end-to-end performance benefit when the queue depth is small (bounded by a small pool of concurrent workers) and the tasks themselves are I/O-bound network requests.
+**Action:** Before optimizing purely based on algorithmic complexity (like O(N) array shifts), verify that the data structure will actually scale to a size where the CPU overhead eclipses the latency of the tasks being queued. Avoid micro-optimizing queue logic for small concurrency limiters unless profiling shows it as a genuine bottleneck.

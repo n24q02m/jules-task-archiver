@@ -226,21 +226,11 @@ async function runInPool(items, limit, worker) {
 function createLimiter(max) {
   let active = 0
   const queue = []
-  let head = 0
 
   function next() {
-    if (active >= max || head >= queue.length) return
+    if (active >= max || queue.length === 0) return
     active++
-    const { fn, resolve, reject } = queue[head++]
-    queue[head - 1] = null
-
-    if (head >= queue.length) {
-      queue.length = 0
-      head = 0
-    } else if (head > 1000) {
-      queue.splice(0, head)
-      head = 0
-    }
+    const { fn, resolve, reject } = queue.shift()
     Promise.resolve()
       .then(fn)
       .then(resolve, reject)
