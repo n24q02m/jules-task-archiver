@@ -611,3 +611,44 @@ describe('updateOpModeUI direct calls', () => {
     assert.strictEqual(opModeButtons[1].getAttribute('aria-pressed'), 'true')
   })
 })
+
+describe('Block hint click forwarding', () => {
+  function clickHint(sandbox, hint) {
+    sandbox.document.dispatchEvent('click', { target: { closest: (sel) => (sel === '.block-hint' ? hint : null) } })
+  }
+
+  it('should toggle the checkbox described by a clicked hint', () => {
+    const { sandbox, elements } = setupPopupSandbox()
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
+    elements['#force'].type = 'checkbox'
+    elements['#force'].setAttribute('aria-describedby', 'forceHint')
+
+    clickHint(sandbox, { id: 'forceHint', tagName: 'SPAN' })
+    assert.strictEqual(elements['#force'].checked, true)
+
+    clickHint(sandbox, { id: 'forceHint', tagName: 'SPAN' })
+    assert.strictEqual(elements['#force'].checked, false)
+  })
+
+  it('should focus a text input described by a clicked hint', () => {
+    const { sandbox, elements } = setupPopupSandbox()
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
+    elements['#ghOwner'].type = 'text'
+    elements['#ghOwner'].setAttribute('aria-describedby', 'ghOwnerHint ghOwnerError')
+
+    clickHint(sandbox, { id: 'ghOwnerHint', tagName: 'SPAN' })
+    assert.strictEqual(elements['#ghOwner'].focused, true)
+  })
+
+  it('should ignore clicks outside a hint, on label hints and on hints without an id', () => {
+    const { sandbox, elements } = setupPopupSandbox()
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
+    elements['#force'].type = 'checkbox'
+    elements['#force'].setAttribute('aria-describedby', 'forceHint')
+
+    clickHint(sandbox, null)
+    clickHint(sandbox, { id: 'forceHint', tagName: 'LABEL' })
+    clickHint(sandbox, { id: '', tagName: 'SPAN' })
+    assert.strictEqual(elements['#force'].checked, false)
+  })
+})
