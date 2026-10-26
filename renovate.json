@@ -59,9 +59,7 @@
       "matchManagers": ["github-actions"],
       "allowedVersions": ">=10.0.0",
       "minimumReleaseAge": "7 days",
-      "matchPackageNames": [
-        "/^python-semantic-release//"
-      ]
+      "matchPackageNames": ["/^python-semantic-release//"]
     },
     {
       "description": "Disable runtime version updates from mise",
