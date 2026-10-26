@@ -22,3 +22,6 @@
 ## 2025-02-25 - API Quota and Concurrent Network Requests Short-Circuiting
 **Learning:** When fetching paginated or partitioned network data concurrently (e.g., retrieving lists of items across multiple repos), running all concurrent workers to completion wastes API quota and increases latency if the global quota is already met midway through.
 **Action:** Implement a short-circuit check inside the concurrency pool worker to track globally discovered items and immediately resolve with a skip flag (e.g., `skipped: true`) if the quota limit has been reached. This prevents wasteful trailing network API calls that will be discarded.
+## 2025-02-25 - Micro-optimizing shift() in small queues
+**Learning:** Replacing `Array.prototype.shift()` with a head-pointer for queues that hold only tens to a few hundred items (like task/repo queues) is a premature optimization. The `shift()` cost is ~11 ns per dequeue, which is completely dwarfed by network latency. The added complexity of high-water splices and manual nulling provides no observable gain.
+**Action:** Do not optimize `Array.prototype.shift()` unless the queue size is known to be massively large or it is in an extreme hot path where micro-seconds matter. Measure end-to-end impact before adding such complexity.
