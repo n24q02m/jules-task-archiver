@@ -337,8 +337,10 @@ input[type="password"]:invalid {
 
 input[type="text"]:invalid:focus,
 input[type="password"]:invalid:focus,
+input[type="number"]:invalid:focus,
 input[type="text"]:invalid:focus-visible,
-input[type="password"]:invalid:focus-visible {
+input[type="password"]:invalid:focus-visible,
+input[type="number"]:invalid:focus-visible {
   outline-color: #f87171;
   border-color: #f87171;
 }

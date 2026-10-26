@@ -94,9 +94,10 @@
           step="1"
           value="60"
           inputmode="numeric"
-          aria-describedby="schedIntervalHint"
+          aria-describedby="schedIntervalHint schedIntervalError"
         />
         <span class="hint" id="schedIntervalHint">minutes (1–1440)</span>
+        <div id="schedIntervalError" class="validation-error" aria-live="polite">Must be between 1 and 1440.</div>
       </div>
       <div class="setting-row">
         <label class="checkbox">
@@ -115,9 +116,10 @@
           step="1"
           value="20"
           inputmode="numeric"
-          aria-describedby="schedMaxStartsHint"
+          aria-describedby="schedMaxStartsHint schedMaxStartsError"
         />
         <span class="hint" id="schedMaxStartsHint">(1–500, shared across all accounts)</span>
+        <div id="schedMaxStartsError" class="validation-error" aria-live="polite">Must be between 1 and 500.</div>
       </div>
     </section>
 
