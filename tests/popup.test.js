@@ -75,6 +75,13 @@ function createMockElement(tag = 'div', attrs = {}) {
     focus: () => {
       element.focused = true
     },
+    click: () => {
+      if (element.tagName === 'INPUT' && (element.type === 'checkbox' || element.type === 'radio')) {
+        element.checked = !element.checked
+        element.dispatchEvent('change')
+      }
+      element.dispatchEvent('click')
+    },
     textContent: '',
     value: '',
     checked: false,
@@ -159,10 +166,30 @@ function createMockChrome(syncStorage, localStorage, sessionStorage, listeners) 
  * Creates a mock Document object.
  */
 function createMockDocument(elements, opModeButtons, radioStates) {
+  const listeners = {}
   return {
+    addEventListener: (type, cb) => {
+      if (!listeners[type]) listeners[type] = []
+      listeners[type].push(cb)
+    },
+    dispatchEvent: (type, eventProps = {}) => {
+      if (listeners[type]) {
+        listeners[type].forEach((cb) => {
+          cb({ ...eventProps })
+        })
+      }
+    },
     querySelector: (sel) => {
       if (sel === 'input[name="mode"]:checked') return { value: radioStates.mode }
       if (sel === 'input[name="scope"]:checked') return { value: radioStates.scope }
+      if (sel.startsWith('[aria-describedby~="')) {
+        const id = sel.match(/\[aria-describedby~="([^"]+)"\]/)[1]
+        return (
+          Object.values(elements).find(
+            (el) => el?.getAttribute && (el.getAttribute('aria-describedby') || '').split(' ').includes(id)
+          ) || createMockElement()
+        )
+      }
       if (elements[sel]) return elements[sel]
       return createMockElement()
     },
@@ -584,5 +611,46 @@ describe('updateOpModeUI direct calls', () => {
     assert.strictEqual(opModeButtons[0].getAttribute('aria-pressed'), 'false')
     assert.ok(opModeButtons[1].classList.contains('active'))
     assert.strictEqual(opModeButtons[1].getAttribute('aria-pressed'), 'true')
+  })
+})
+
+describe('Block hint click forwarding', () => {
+  function clickHint(sandbox, hint) {
+    sandbox.document.dispatchEvent('click', { target: { closest: (sel) => (sel === '.block-hint' ? hint : null) } })
+  }
+
+  it('should toggle the checkbox described by a clicked hint', () => {
+    const { sandbox, elements } = setupPopupSandbox()
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
+    elements['#force'].type = 'checkbox'
+    elements['#force'].setAttribute('aria-describedby', 'forceHint')
+
+    clickHint(sandbox, { id: 'forceHint', tagName: 'SPAN' })
+    assert.strictEqual(elements['#force'].checked, true)
+
+    clickHint(sandbox, { id: 'forceHint', tagName: 'SPAN' })
+    assert.strictEqual(elements['#force'].checked, false)
+  })
+
+  it('should focus a text input described by a clicked hint', () => {
+    const { sandbox, elements } = setupPopupSandbox()
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
+    elements['#ghOwner'].type = 'text'
+    elements['#ghOwner'].setAttribute('aria-describedby', 'ghOwnerHint ghOwnerError')
+
+    clickHint(sandbox, { id: 'ghOwnerHint', tagName: 'SPAN' })
+    assert.strictEqual(elements['#ghOwner'].focused, true)
+  })
+
+  it('should ignore clicks outside a hint, on label hints and on hints without an id', () => {
+    const { sandbox, elements } = setupPopupSandbox()
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
+    elements['#force'].type = 'checkbox'
+    elements['#force'].setAttribute('aria-describedby', 'forceHint')
+
+    clickHint(sandbox, null)
+    clickHint(sandbox, { id: 'forceHint', tagName: 'LABEL' })
+    clickHint(sandbox, { id: '', tagName: 'SPAN' })
+    assert.strictEqual(elements['#force'].checked, false)
   })
 })

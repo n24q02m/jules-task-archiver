@@ -162,6 +162,20 @@ schedMaxStartsInput.addEventListener('change', () => {
   chrome.storage.sync.set({ schedMaxStarts: maxStarts })
 })
 
+// --- Global click listener for block-hints ---
+document.addEventListener('click', (e) => {
+  const hint = e.target.closest('.block-hint')
+  if (!hint || hint.tagName === 'LABEL' || !hint.id) return
+  const input = document.querySelector(`[aria-describedby~="${hint.id}"]`)
+  if (input) {
+    if (input.type === 'checkbox' || input.type === 'radio') {
+      input.click()
+    } else {
+      input.focus()
+    }
+  }
+})
+
 // --- Start operation ---
 mainForm.addEventListener('submit', async (e) => {
   e.preventDefault()
