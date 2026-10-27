@@ -67,3 +67,6 @@
 ## 2025-10-25 - Link Inline Validation Errors to Inputs
 **Learning:** Adding visual inline validation errors without linking them semantically to the input field makes them inaccessible to screen reader users, who won't be notified when an input becomes invalid during navigation.
 **Action:** Always link inline validation error elements to their respective input fields using `aria-describedby` (combining multiple IDs if a hint already exists, like `aria-describedby="hintId errorId"`) and apply `aria-live="polite"` to the error container so assistive technologies announce the error when it appears.
+## 2024-05-24 - Number input invalid focus state visibility
+**Learning:** Number inputs with native HTML validation attributes (min/max) need explicit CSS handling for their `:invalid:focus` state, as the default focus outline can mask the red border indicating an invalid state.
+**Action:** When styling `:invalid` states, ensure to also apply `outline-color: #f87171;` for the `:focus` and `:focus-visible` pseudo-classes to ensure the error state remains clearly visible when the input is focused.

@@ -104,6 +104,12 @@ input[type="number"]:invalid {
   border-color: #f87171;
 }
 
+input[type="number"]:invalid:focus,
+input[type="number"]:invalid:focus-visible {
+  outline-color: #f87171;
+  border-color: #f87171;
+}
+
 .hint {
   color: #94a3b8;
   font-size: 11px;

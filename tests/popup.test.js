@@ -514,6 +514,13 @@ describe('Button Event Handlers', () => {
 describe('popup.html accessibility', () => {
   const popupHtml = fs.readFileSync(path.join(__dirname, '../popup.html'), 'utf8')
 
+  it('should link the number inputs to their inline validation errors via aria-describedby', () => {
+    assert.ok(popupHtml.includes('id="schedIntervalError"'))
+    assert.ok(popupHtml.includes('aria-describedby="schedIntervalHint schedIntervalError"'))
+    assert.ok(popupHtml.includes('id="schedMaxStartsError"'))
+    assert.ok(popupHtml.includes('aria-describedby="schedMaxStartsHint schedMaxStartsError"'))
+  })
+
   it('should link the GitHub owner input to its inline validation error via aria-describedby', () => {
     assert.ok(popupHtml.includes('id="ghOwnerError"'), 'owner validation error div should have an id')
     assert.ok(popupHtml.includes('aria-live="polite"'), 'owner validation error div should have aria-live="polite"')
