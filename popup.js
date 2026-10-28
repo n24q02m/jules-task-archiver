@@ -42,6 +42,7 @@ function readClampedNumber(input, min, max, fallback) {
 
 // --- Operation mode state ---
 let opMode = 'archive'
+let lastRenderedLogCount = 0
 
 function getRunningText() {
   const modeRadio = document.querySelector('input[name="mode"]:checked')
@@ -230,6 +231,7 @@ mainForm.addEventListener('submit', async (e) => {
   progressFill.style.width = '0%'
   progressFill.style.background = '' // Reset error color if present
   logPre.textContent = ''
+  lastRenderedLogCount = 0
 
   chrome.runtime.sendMessage({ action: 'START', options })
 })
@@ -243,6 +245,8 @@ resetBtn.addEventListener('click', () => {
   resetBtn.classList.add('hidden')
   progressSection.classList.add('hidden')
   summarySection.classList.add('hidden')
+  logPre.textContent = ''
+  lastRenderedLogCount = 0
   // Move focus back to the primary action so keyboard users are not stranded
   // on the now-hidden Reset button.
   startBtn.focus()
@@ -260,9 +264,18 @@ chrome.storage.onChanged.addListener((changes) => {
 function renderState(state) {
   // Log
   if (state.log?.length > 0) {
-    logPre.textContent = state.log.join('\n')
+    if (state.log.length < lastRenderedLogCount || lastRenderedLogCount === 0) {
+      logPre.textContent = state.log.join('\n')
+    } else if (state.log.length > lastRenderedLogCount) {
+      const newText = (lastRenderedLogCount > 0 ? '\n' : '') + state.log.slice(lastRenderedLogCount).join('\n')
+      logPre.appendChild(document.createTextNode(newText))
+    }
+    lastRenderedLogCount = state.log.length
     logPre.scrollTop = logPre.scrollHeight
     progressSection.classList.remove('hidden')
+  } else {
+    logPre.textContent = ''
+    lastRenderedLogCount = 0
   }
 
   // Current info
