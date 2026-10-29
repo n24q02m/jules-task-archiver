@@ -27,24 +27,24 @@
         <fieldset class="fieldset-reset">
           <legend id="execModeLabel">Execution Mode</legend>
           <div class="radio-group" role="radiogroup" aria-labelledby="execModeLabel">
-            <label><input type="radio" name="mode" value="dry" checked /> Dry Run</label>
-            <label><input type="radio" name="mode" value="run" /> Run</label>
+            <div class="checkbox"><input type="radio" name="mode" id="modeDry" value="dry" checked /><label for="modeDry">Dry Run</label></div>
+            <div class="checkbox"><input type="radio" name="mode" id="modeRun" value="run" /><label for="modeRun">Run</label></div>
           </div>
         </fieldset>
       </div>
       <div class="setting-row">
-        <label class="checkbox">
+        <div class="checkbox">
           <input type="checkbox" id="force" aria-describedby="forceHint" />
-          Force
-        </label>
+          <label for="force">Force</label>
+        </div>
       <span class="hint block-hint" id="forceHint">Archive every task, ignoring state and matching open Pull Requests</span>
       </div>
       <div class="setting-row">
         <fieldset class="fieldset-reset">
           <legend id="scopeLabel">Scope</legend>
           <div class="radio-group" role="radiogroup" aria-labelledby="scopeLabel">
-            <label><input type="radio" name="scope" value="current" /> Current tab</label>
-            <label><input type="radio" name="scope" value="all" checked /> All Jules tabs</label>
+            <div class="checkbox"><input type="radio" name="scope" id="scopeCurrent" value="current" /><label for="scopeCurrent">Current tab</label></div>
+            <div class="checkbox"><input type="radio" name="scope" id="scopeAll" value="all" checked /><label for="scopeAll">All Jules tabs</label></div>
           </div>
         </fieldset>
       </div>
@@ -78,10 +78,10 @@
     <section class="schedule">
       <h2>Schedule</h2>
       <div class="setting-row">
-        <label class="checkbox">
+        <div class="checkbox">
           <input type="checkbox" id="schedEnabled" aria-describedby="schedEnabledHint" />
-          Auto-archive on a schedule
-        </label>
+          <label for="schedEnabled">Auto-archive on a schedule</label>
+        </div>
         <span class="hint block-hint" id="schedEnabledHint">Periodically archives finished tasks across all Jules tabs (background alarm)</span>
       </div>
       <div class="setting-row">
@@ -100,10 +100,10 @@
         <div id="schedIntervalError" class="validation-error" aria-live="polite">Must be between 1 and 1440.</div>
       </div>
       <div class="setting-row">
-        <label class="checkbox">
+        <div class="checkbox">
           <input type="checkbox" id="schedSuggestions" aria-describedby="schedSuggestionsHint" />
-          Also start suggestions each tick
-        </label>
+          <label for="schedSuggestions">Also start suggestions each tick</label>
+        </div>
         <span class="hint block-hint" id="schedSuggestionsHint">Starts queued code suggestions after archiving, capped per tick</span>
       </div>
       <div class="setting-row">
