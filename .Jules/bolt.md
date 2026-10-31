@@ -25,3 +25,6 @@
 ## 2025-02-25 - Shift Overhead in Rate Limiter Queues
 **Learning:** In high-frequency rate limiters (`createLimiter`), using `queue.shift()` causes O(N) overhead as the array size grows, creating a measurable performance bottleneck.
 **Action:** Replace `shift()` with a `head` index pointer. Immediately set processed indices to `null` to avoid retaining closures (preventing memory leaks), and reset the array or use a high-water mark cleanup (e.g., `queue.splice(0, head)`) when the threshold is reached.
+## 2025-02-25 - DOM TextNode Append Overhead
+**Learning:** When rendering continuously growing arrays (like logs) to the DOM, replacing the entire `.textContent` (e.g., `logPre.textContent = arr.join('\n')`) on every update causes massive O(N) layout thrashing and string concatenation overhead, leading to UI jank.
+**Action:** Track the last rendered count and incrementally append only new elements using `document.createTextNode` and `appendChild` to maintain smooth UI performance.
