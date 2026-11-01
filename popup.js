@@ -42,6 +42,7 @@ function readClampedNumber(input, min, max, fallback) {
 
 // --- Operation mode state ---
 let opMode = 'archive'
+let lastLogCount = 0
 
 function getRunningText() {
   const modeRadio = document.querySelector('input[name="mode"]:checked')
@@ -230,6 +231,7 @@ mainForm.addEventListener('submit', async (e) => {
   progressFill.style.width = '0%'
   progressFill.style.background = '' // Reset error color if present
   logPre.textContent = ''
+  lastLogCount = 0
 
   chrome.runtime.sendMessage({ action: 'START', options })
 })
@@ -260,7 +262,20 @@ chrome.storage.onChanged.addListener((changes) => {
 function renderState(state) {
   // Log
   if (state.log?.length > 0) {
-    logPre.textContent = state.log.join('\n')
+    // ⚡ Bolt Optimization: Incrementally append new log lines to prevent O(N) layout
+    // thrashing caused by replacing the entire textContent on every update.
+    if (state.log.length < lastLogCount) {
+      // Handle the case where the log array was trimmed by background.js
+      logPre.textContent = state.log.join('\n')
+    } else if (state.log.length > lastLogCount) {
+      const newLines = state.log.slice(lastLogCount).join('\n')
+      if (lastLogCount === 0) {
+        logPre.textContent = newLines
+      } else {
+        logPre.appendChild(document.createTextNode(`\n${newLines}`))
+      }
+    }
+    lastLogCount = state.log.length
     logPre.scrollTop = logPre.scrollHeight
     progressSection.classList.remove('hidden')
   }

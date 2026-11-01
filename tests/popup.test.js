@@ -179,6 +179,7 @@ function createMockDocument(elements, opModeButtons, radioStates) {
         })
       }
     },
+    createTextNode: (text) => ({ textContent: text }),
     querySelector: (sel) => {
       if (sel === 'input[name="mode"]:checked') return { value: radioStates.mode }
       if (sel === 'input[name="scope"]:checked') return { value: radioStates.scope }
