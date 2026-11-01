@@ -28,6 +28,7 @@ env:
 permissions:
   contents: write
 
+# ci-policy: allow concurrency reason: serialize releases, never cancel one mid-publish
 concurrency:
   group: release
   cancel-in-progress: false
@@ -36,6 +37,7 @@ jobs:
   release:
     name: Semantic Release
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     outputs:
       released: ${{ steps.release.outputs.released }}
       tag: ${{ steps.release.outputs.tag }}
@@ -78,6 +80,7 @@ jobs:
     needs: release
     if: needs.release.outputs.released == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2

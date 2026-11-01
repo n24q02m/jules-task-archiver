@@ -6,13 +6,15 @@ on:
     types: [opened, synchronize, reopened, edited, ready_for_review]
   push:
     branches: [main]
-  issues:
-    types: [opened, reopened]
   workflow_dispatch: {}
 
 permissions:
   contents: read
   pull-requests: write
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
 
@@ -24,6 +26,7 @@ jobs:
     name: PR Title Lint
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
         env:
@@ -41,6 +44,7 @@ jobs:
     name: Lint & Format
     if: github.event_name == 'pull_request' || github.event_name == 'push'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
@@ -81,6 +85,7 @@ jobs:
     name: Unit Tests
     if: github.event_name == 'pull_request' || github.event_name == 'push'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
@@ -110,6 +115,7 @@ jobs:
     name: Dependency Review
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Harden Runner
         uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
@@ -124,43 +130,6 @@ jobs:
         with:
           fail-on-severity: moderate
           comment-summary-in-pr: always
-
-  email-notify:
-    name: Email Notification
-    if: >-
-      (github.event_name == 'issues' || github.event_name == 'pull_request')
-      && github.actor != github.repository_owner
-      && github.event.sender.type != 'Bot'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Harden Runner
-        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
-        with:
-          egress-policy: audit
-
-      - name: Parse SMTP credential
-        run: |
-          echo "SMTP_USER=${SMTP_CREDENTIAL%%:*}" >> $GITHUB_ENV
-          echo "SMTP_PASS=${SMTP_CREDENTIAL#*:}" >> $GITHUB_ENV
-        env:
-          SMTP_CREDENTIAL: ${{ secrets.SMTP_CREDENTIAL }}
-
-      - name: Send email notification
-        uses: dawidd6/action-send-mail@47af4a10b540781705f283a2cf1a9650713ac795 # v23
-        with:
-          server_address: smtp.gmail.com
-          server_port: 587
-          username: ${{ env.SMTP_USER }}
-          password: ${{ env.SMTP_PASS }}
-          subject: "[${{ github.event.repository.name }}] ${{ github.event_name == 'issues' && 'Issue' || 'PR' }}"
-          to: ${{ env.SMTP_USER }}
-          from: GitHub Notify <${{ env.SMTP_USER }}>
-          body: |
-            Event: ${{ github.event_name }}
-            Actor: ${{ github.actor }}
-            Title: ${{ github.event.issue.title || github.event.pull_request.title }}
-            URL: ${{ github.event.issue.html_url || github.event.pull_request.html_url }}
-            Action: ${{ github.event.action }}
 
   # Merged from bot-governance.yml (deleted).
   governance:
@@ -182,6 +151,7 @@ jobs:
     # governance for internal branches if this repository ever became one.
     if: github.event_name == 'pull_request' && github.event.action == 'opened' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Detect and govern bot PRs
         env:
