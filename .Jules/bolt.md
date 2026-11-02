@@ -25,6 +25,6 @@
 ## 2025-02-25 - Shift Overhead in Rate Limiter Queues
 **Learning:** In high-frequency rate limiters (`createLimiter`), using `queue.shift()` causes O(N) overhead as the array size grows, creating a measurable performance bottleneck.
 **Action:** Replace `shift()` with a `head` index pointer. Immediately set processed indices to `null` to avoid retaining closures (preventing memory leaks), and reset the array or use a high-water mark cleanup (e.g., `queue.splice(0, head)`) when the threshold is reached.
-## 2025-02-25 - DOM Update Thrashing
-**Learning:** When rendering continuously growing arrays (like logs) to the DOM, replacing the entire `.textContent` or `innerHTML` (e.g., `logPre.textContent = arr.join('\n')`) on every update causes massive O(N) layout thrashing and sluggish UI performance.
-**Action:** Track the last rendered count and incrementally append only new elements using `document.createTextNode` or `appendChild` to maintain smooth UI performance.
+## 2025-02-25 - DOM Rendering of Trimmed Arrays
+**Learning:** Incrementally appending array elements to the DOM using a simple `lastCount` index fails when the underlying array is also periodically trimmed (e.g., via `splice(0, n)`). If a trim occurs between renders, the array length may remain roughly the same, causing index tracking to skip lines or render incorrect ones. Furthermore, if the array is already tightly capped (e.g., at 2000 lines), full DOM replacement via `.textContent` might be an acceptable trade-off over complex diffing, and claims of "layout thrashing" must be substantiated with measurement.
+**Action:** Before optimizing DOM array rendering to be incremental, verify if the underlying array undergoes truncation or shifting. If it does, a simple index pointer is insufficient and will introduce bugs.
