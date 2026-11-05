@@ -38,6 +38,14 @@ function createMockElement(tag = 'div', attrs = {}) {
     removeAttribute: (name) => {
       delete element.attributes[name]
     },
+    querySelector: (sel) => {
+      if (sel === 'input') {
+        const input = createMockElement('input')
+        input.click = () => {}
+        return input
+      }
+      return null
+    },
     addEventListener: (type, cb) => {
       if (!element.listeners) element.listeners = {}
       if (!element.listeners[type]) element.listeners[type] = []
@@ -71,7 +79,6 @@ function createMockElement(tag = 'div', attrs = {}) {
       }
     },
     querySelectorAll: (_sel) => [],
-    querySelector: (_sel) => null,
     focus: () => {
       element.focused = true
     },
