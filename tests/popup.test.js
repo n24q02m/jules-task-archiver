@@ -242,7 +242,11 @@ function setupPopupSandbox() {
     '#log': createMockElement('pre'),
     '#summary': createMockElement('div'),
     '.settings': createMockElement('section'),
-    '.setting-row': createMockElement('div')
+    '.setting-row': createMockElement('div'),
+    '#schedEnabled': createMockElement('input', { type: 'checkbox' }),
+    '#schedInterval': createMockElement('input', { type: 'number' }),
+    '#schedSuggestions': createMockElement('input', { type: 'checkbox' }),
+    '#schedMaxStarts': createMockElement('input', { type: 'number' })
   }
 
   // Parent element for elements that use .parentElement in popup.js
@@ -271,7 +275,7 @@ function setupPopupSandbox() {
   }
   vm.createContext(sandbox)
 
-  return { sandbox, elements, opModeButtons, syncStorage, localStorage, listeners, radioStates }
+  return { sandbox, elements, opModeButtons, syncStorage, localStorage, listeners, radioStates, chrome }
 }
 
 describe('setActiveOpMode', () => {
@@ -623,7 +627,27 @@ describe('updateOpModeUI direct calls', () => {
 
 describe('Block hint click forwarding', () => {
   function clickHint(sandbox, hint) {
-    sandbox.document.dispatchEvent('click', { target: { closest: (sel) => (sel === '.block-hint' ? hint : null) } })
+    sandbox.document.dispatchEvent('click', {
+      target: {
+        tagName: 'SPAN',
+        closest: (sel) => {
+          if (sel === '.block-hint') return hint
+          return null
+        }
+      }
+    })
+  }
+
+  function clickCheckboxWrapper(sandbox, wrapper, targetTagName = 'DIV') {
+    sandbox.document.dispatchEvent('click', {
+      target: {
+        tagName: targetTagName,
+        closest: (sel) => {
+          if (sel === '.checkbox') return wrapper
+          return null
+        }
+      }
+    })
   }
 
   it('should toggle the checkbox described by a clicked hint', () => {
@@ -659,5 +683,95 @@ describe('Block hint click forwarding', () => {
     clickHint(sandbox, { id: 'forceHint', tagName: 'LABEL' })
     clickHint(sandbox, { id: '', tagName: 'SPAN' })
     assert.strictEqual(elements['#force'].checked, false)
+  })
+
+  it('should toggle the input inside a clicked checkbox wrapper', () => {
+    const { sandbox } = setupPopupSandbox()
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
+
+    let clicked = false
+    const mockInput = {
+      click: () => {
+        clicked = true
+      }
+    }
+    const wrapper = {
+      tagName: 'DIV',
+      querySelector: (sel) => (sel === 'input' ? mockInput : null)
+    }
+
+    clickCheckboxWrapper(sandbox, wrapper)
+    assert.strictEqual(clicked, true)
+  })
+
+  it('should ignore clicks if the wrapper has no input', () => {
+    const { sandbox } = setupPopupSandbox()
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
+
+    const wrapper = {
+      tagName: 'DIV',
+      querySelector: (_sel) => null
+    }
+
+    clickCheckboxWrapper(sandbox, wrapper)
+    // No error should be thrown and it should just return
+  })
+
+  it('should ignore clicks directly on the input or label within the wrapper', () => {
+    const { sandbox } = setupPopupSandbox()
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
+
+    let clicked = false
+    const mockInput = {
+      click: () => {
+        clicked = true
+      }
+    }
+    const wrapper = {
+      tagName: 'DIV',
+      querySelector: (sel) => (sel === 'input' ? mockInput : null)
+    }
+
+    clickCheckboxWrapper(sandbox, wrapper, 'INPUT')
+    assert.strictEqual(clicked, false)
+
+    clickCheckboxWrapper(sandbox, wrapper, 'LABEL')
+    assert.strictEqual(clicked, false)
+  })
+})
+
+describe('Schedule settings event handlers', () => {
+  it('should sync schedule settings on change', () => {
+    const { sandbox, elements, chrome } = setupPopupSandbox()
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
+
+    elements['#schedEnabled'].checked = true
+    elements['#schedEnabled'].dispatchEvent('change')
+    let storage = {}
+    chrome.storage.sync.get(['schedEnabled', 'schedIntervalMin', 'schedStartSuggestions', 'schedMaxStarts'], (res) => {
+      storage = res
+    })
+    assert.strictEqual(storage.schedEnabled, true)
+
+    elements['#schedInterval'].value = '90'
+    elements['#schedInterval'].dispatchEvent('change')
+    chrome.storage.sync.get(['schedIntervalMin'], (res) => {
+      storage = res
+    })
+    assert.strictEqual(storage.schedIntervalMin, 90)
+
+    elements['#schedSuggestions'].checked = true
+    elements['#schedSuggestions'].dispatchEvent('change')
+    chrome.storage.sync.get(['schedStartSuggestions'], (res) => {
+      storage = res
+    })
+    assert.strictEqual(storage.schedStartSuggestions, true)
+
+    elements['#schedMaxStarts'].value = '30'
+    elements['#schedMaxStarts'].dispatchEvent('change')
+    chrome.storage.sync.get(['schedMaxStarts'], (res) => {
+      storage = res
+    })
+    assert.strictEqual(storage.schedMaxStarts, 30)
   })
 })
