@@ -162,8 +162,16 @@ schedMaxStartsInput.addEventListener('change', () => {
   chrome.storage.sync.set({ schedMaxStarts: maxStarts })
 })
 
-// --- Global click listener for block-hints ---
+// --- Global click listeners for hit area expansion ---
 document.addEventListener('click', (e) => {
+  // Checkbox wrappers
+  const checkboxWrapper = e.target.closest('.checkbox')
+  if (checkboxWrapper && e.target.tagName !== 'INPUT' && e.target.tagName !== 'LABEL') {
+    const input = checkboxWrapper.querySelector('input')
+    if (input) input.click()
+  }
+
+  // Block hints
   const hint = e.target.closest('.block-hint')
   if (!hint || hint.tagName === 'LABEL' || !hint.id) return
   const input = document.querySelector(`[aria-describedby~="${hint.id}"]`)
