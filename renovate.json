@@ -1,76 +1,119 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended", ":semanticCommits"],
-  "schedule": ["before 5am"],
+  "extends": [
+    "config:recommended",
+    ":semanticCommits"
+  ],
+  "schedule": [
+    "before 5am"
+  ],
   "timezone": "Asia/Ho_Chi_Minh",
   "prConcurrentLimit": 5,
   "prHourlyLimit": 3,
-  "labels": ["dependencies"],
+  "labels": [
+    "dependencies"
+  ],
   "rangeStrategy": "bump",
   "lockFileMaintenance": {
     "enabled": true,
-    "schedule": ["before 5am"]
+    "schedule": [
+      "before 5am"
+    ]
   },
   "packageRules": [
     {
       "description": "Hold every update for 7 days so a malicious or yanked release is caught before it lands",
-      "matchPackageNames": ["*"],
+      "matchPackageNames": [
+        "*"
+      ],
       "minimumReleaseAge": "7 days"
     },
     {
       "description": "Auto-merge non-major devDependencies",
-      "matchDepTypes": ["devDependencies"],
-      "matchUpdateTypes": ["minor", "patch"],
+      "matchDepTypes": [
+        "devDependencies"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
       "automerge": true,
       "automergeType": "pr",
       "minimumReleaseAge": "7 days"
     },
     {
       "description": "Auto-merge non-major production dependencies",
-      "matchDepTypes": ["dependencies"],
-      "matchUpdateTypes": ["minor", "patch"],
+      "matchDepTypes": [
+        "dependencies"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
       "automerge": true,
       "automergeType": "pr",
       "minimumReleaseAge": "7 days"
     },
     {
       "description": "Group all non-major updates",
-      "matchUpdateTypes": ["minor", "patch"],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
       "groupName": "non-major dependencies",
       "groupSlug": "non-major",
       "minimumReleaseAge": "7 days"
     },
     {
       "description": "Pin GitHub Actions to SHA for security",
-      "matchManagers": ["github-actions"],
+      "matchManagers": [
+        "github-actions"
+      ],
       "pinDigests": true,
       "minimumReleaseAge": "7 days"
     },
     {
       "description": "Auto-merge GitHub Actions digest and pin updates",
-      "matchManagers": ["github-actions"],
-      "matchUpdateTypes": ["digest", "pin"],
+      "matchManagers": [
+        "github-actions"
+      ],
+      "matchUpdateTypes": [
+        "digest",
+        "pin"
+      ],
       "automerge": true,
       "automergeType": "pr",
       "minimumReleaseAge": "7 days"
     },
     {
       "description": "Pin PSR to v10",
-      "matchManagers": ["github-actions"],
+      "matchManagers": [
+        "github-actions"
+      ],
       "allowedVersions": ">=10.0.0",
       "minimumReleaseAge": "7 days",
-      "matchPackageNames": ["/^python-semantic-release//"]
+      "matchPackageNames": [
+        "/^python-semantic-release//"
+      ]
     },
     {
       "description": "Disable runtime version updates from mise",
-      "matchManagers": ["mise"],
-      "matchDepNames": ["python", "node", "java"],
+      "matchManagers": [
+        "mise"
+      ],
+      "matchDepNames": [
+        "python",
+        "node",
+        "java"
+      ],
       "enabled": false,
       "minimumReleaseAge": "7 days"
     },
     {
       "description": "Pin Node.js runtime to 24.x",
-      "matchPackageNames": ["node"],
+      "matchPackageNames": [
+        "node"
+      ],
       "allowedVersions": ">=24.0.0 <25.0.0",
       "minimumReleaseAge": "7 days"
     }

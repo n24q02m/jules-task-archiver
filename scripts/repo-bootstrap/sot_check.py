@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -18,7 +19,7 @@ LINE_BUDGETS = {"AGENTS.md": 200, "MEMORY.md": 200}
 SUSPECT_DIRS = ("utils", "common", "helpers", "core/shared")
 CODE_SUFFIXES = {".py", ".ts", ".js", ".go"}
 BASELINE_NAME = ".sot-baseline.json"
-SKIP_DIRS = {".git", "node_modules", ".venv", "dist", "build", "vendor", "target"}
+SKIP_DIRS = {".git", ".claude", "node_modules", ".venv", "dist", "build", "vendor", "target"}
 
 
 @dataclass(frozen=True)
@@ -29,10 +30,13 @@ class Finding:
 
 
 def _dirs(repo: Path):
-    for path in repo.rglob("*"):
-        rel = path.relative_to(repo)
-        if path.is_dir() and not SKIP_DIRS.intersection(rel.parts):
-            yield path, rel.as_posix()
+    # Prune while walking: rglob would still descend into node_modules and
+    # .claude/worktrees (full repo copies) and only filter the results after.
+    for root, names, _ in os.walk(repo):
+        names[:] = [n for n in names if n not in SKIP_DIRS]
+        for name in names:
+            path = Path(root, name)
+            yield path, path.relative_to(repo).as_posix()
 
 
 def scan(repo: Path) -> list[Finding]:

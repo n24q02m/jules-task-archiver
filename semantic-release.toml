@@ -1,8 +1,9 @@
 [semantic_release]
-version_variables = ["package.json:version"]
 tag_format = "v{version}"
-commit_message = "chore(release): v{version}"
+commit_message = "feat(release): v{version} [skip ci]"
 major_on_zero = false
+allow_zero_version = true
+version_variables = ["package.json:version"]
 
 [semantic_release.changelog]
 changelog_file = "CHANGELOG.md"
