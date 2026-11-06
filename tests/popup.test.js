@@ -71,7 +71,10 @@ function createMockElement(tag = 'div', attrs = {}) {
       }
     },
     querySelectorAll: (_sel) => [],
-    querySelector: (_sel) => null,
+    querySelector: (sel) => {
+      if (element.childrenObj?.[sel]) return element.childrenObj[sel]
+      return null
+    },
     focus: () => {
       element.focused = true
     },
@@ -614,10 +617,33 @@ describe('updateOpModeUI direct calls', () => {
   })
 })
 
-describe('Block hint click forwarding', () => {
+describe('Hit area click forwarding', () => {
   function clickHint(sandbox, hint) {
     sandbox.document.dispatchEvent('click', { target: { closest: (sel) => (sel === '.block-hint' ? hint : null) } })
   }
+
+  function clickCheckboxWrapper(sandbox, wrapper, targetTagName = 'DIV') {
+    sandbox.document.dispatchEvent('click', {
+      target: { tagName: targetTagName, closest: (sel) => (sel === '.checkbox' ? wrapper : null) }
+    })
+  }
+
+  it('should toggle the checkbox when clicking its un-nested wrapper', () => {
+    const { sandbox, elements } = setupPopupSandbox()
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
+    elements['#force'].type = 'checkbox'
+
+    const wrapper = createMockElement('div')
+    wrapper.childrenObj = { input: elements['#force'] }
+
+    clickCheckboxWrapper(sandbox, wrapper)
+    assert.strictEqual(elements['#force'].checked, true)
+
+    // Should ignore clicks on LABEL or INPUT itself (let native behavior handle it)
+    const prevChecked = elements['#force'].checked
+    clickCheckboxWrapper(sandbox, wrapper, 'LABEL')
+    assert.strictEqual(elements['#force'].checked, prevChecked)
+  })
 
   it('should toggle the checkbox described by a clicked hint', () => {
     const { sandbox, elements } = setupPopupSandbox()

@@ -33,10 +33,10 @@
         </fieldset>
       </div>
       <div class="setting-row">
-        <label class="checkbox">
+        <div class="checkbox">
           <input type="checkbox" id="force" aria-describedby="forceHint" />
-          Force
-        </label>
+          <label for="force">Force</label>
+        </div>
       <span class="hint block-hint" id="forceHint">Archive every task, ignoring state and matching open Pull Requests</span>
       </div>
       <div class="setting-row">
@@ -78,10 +78,10 @@
     <section class="schedule">
       <h2>Schedule</h2>
       <div class="setting-row">
-        <label class="checkbox">
+        <div class="checkbox">
           <input type="checkbox" id="schedEnabled" aria-describedby="schedEnabledHint" />
-          Auto-archive on a schedule
-        </label>
+          <label for="schedEnabled">Auto-archive on a schedule</label>
+        </div>
         <span class="hint block-hint" id="schedEnabledHint">Periodically archives finished tasks across all Jules tabs (background alarm)</span>
       </div>
       <div class="setting-row">
@@ -100,10 +100,10 @@
         <div id="schedIntervalError" class="validation-error" aria-live="polite">Must be between 1 and 1440.</div>
       </div>
       <div class="setting-row">
-        <label class="checkbox">
+        <div class="checkbox">
           <input type="checkbox" id="schedSuggestions" aria-describedby="schedSuggestionsHint" />
-          Also start suggestions each tick
-        </label>
+          <label for="schedSuggestions">Also start suggestions each tick</label>
+        </div>
         <span class="hint block-hint" id="schedSuggestionsHint">Starts queued code suggestions after archiving, capped per tick</span>
       </div>
       <div class="setting-row">
