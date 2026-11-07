@@ -1,0 +1,46 @@
+# Scaffold files this repo keeps as its own (read by repo-bootstrap apply.py).
+
+[[exempt]]
+path = ".github/workflows/ci.yml"
+reason = """
+Chrome extension built with plain Node and pnpm. The shared TypeScript ci.yml is the
+bun-based MCP server pipeline (bun install, bun run check, bun run build) and fails
+here; this repo's CI runs Biome, a Manifest V3 check, node --test with c8 coverage,
+PR title lint, dependency review and bot PR governance.
+"""
+
+[[exempt]]
+path = "Dockerfile"
+reason = "Chrome extension shipped as a zip on the GitHub release; there is no container image."
+
+[[exempt]]
+path = ".github/ISSUE_TEMPLATE/bug_report.md"
+reason = """
+A bug here needs the browser, its version, the extension version and the extension's
+console errors from chrome://extensions. The shared template asks for a Go version and a
+CLI `--version` output, which this Chrome extension has neither of.
+"""
+
+[[exempt]]
+path = ".github/PULL_REQUEST_TEMPLATE.md"
+reason = """
+The checklist is the manual test pass a Chrome extension needs (load unpacked, Dry Run and
+Archive modes, multi-account, with and without a GitHub token). The shared template only
+has generic checkboxes.
+"""
+
+[[exempt]]
+path = "CONTRIBUTING.md"
+reason = """
+Describes the real workflow for this zero-build extension: load it unpacked and check it
+with Biome. The shared template points at a `mise run setup` task this repo does not
+have.
+"""
+
+[[exempt]]
+path = "SECURITY.md"
+reason = """
+Carries the extension's own security notes (the GitHub token lives in
+chrome.storage.local, the only hosts it talks to, the isolated content-script world)
+that the shared template has no place for.
+"""
