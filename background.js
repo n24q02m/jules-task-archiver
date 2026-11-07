@@ -175,7 +175,7 @@ async function jFetch(url, options = {}) {
   try {
     // 🛡️ Sentinel: Prevent accidental token leakage via open redirects
     // Only restrict redirects when sending credentials, and ensure the restriction cannot be bypassed by `...rest`
-    const finalRedirect = token ? 'error' : rest.redirect || 'follow'
+    const finalRedirect = token || rest.credentials === 'include' ? 'error' : rest.redirect || 'follow'
     const res = await fetch(url, { headers: safeHeaders, signal: controller.signal, ...rest, redirect: finalRedirect })
     if (!res.ok) {
       throw new Error(`HTTP ${res.status}`)
