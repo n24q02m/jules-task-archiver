@@ -202,6 +202,12 @@ function createMockDocument(elements, opModeButtons, radioStates) {
       return { forEach: () => {} }
     },
     createElement: (tag) => createMockElement(tag),
+    createTextNode: (text) => {
+      const node = createMockElement('textnode')
+      node.textContent = text
+      node.nodeType = 3
+      return node
+    },
     createDocumentFragment: () => {
       const frag = createMockElement('documentfragment')
       frag.nodeType = 11
