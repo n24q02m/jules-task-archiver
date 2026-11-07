@@ -70,3 +70,6 @@
 ## 2025-10-26 - Inline Validation for Number Inputs
 **Learning:** Number inputs that have out-of-bounds values trigger HTML5 validation and may be styled with `:invalid`, but if they lack contextual error messages or if focus styles (`:focus` and `:focus-visible`) override the `:invalid` outline, users (including screen reader users) are left without clear feedback on why the input is rejected.
 **Action:** Always provide accessible inline validation error messages explicitly linked via `aria-describedby` and styled with CSS sibling combinators (`~ .validation-error`) for `input[type="number"]`. Furthermore, ensure the CSS specificity correctly handles `input[type="number"]:invalid:focus` and `input[type="number"]:invalid:focus-visible` to maintain visual error states.
+## 2025-10-27 - Hit Area Preservation when Un-nesting Form Inputs
+**Learning:** When un-nesting inputs from wrapper `<label>` tags (e.g., `<label class="checkbox">`) into explicit label pairings to fix screen reader issues, the hit area will shrink.
+**Action:** Transfer dimensions/styles by changing the tag to a `<div>` (e.g., `<div class="checkbox">`) and add a JavaScript click listener on the wrapper to programmatically proxy clicks to the input, ensuring users can still click the entire area.
