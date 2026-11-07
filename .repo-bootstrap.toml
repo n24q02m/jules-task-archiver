@@ -6,7 +6,9 @@ reason = """
 Chrome extension built with plain Node and pnpm. The shared TypeScript ci.yml is the
 bun-based MCP server pipeline (bun install, bun run check, bun run build) and fails
 here; this repo's CI runs Biome, a Manifest V3 check, node --test with c8 coverage,
-PR title lint, dependency review and bot PR governance.
+PR title lint, dependency review and bot PR governance. The template's main-integrity
+job and its `sha` dispatch input are carried here by hand, copied from the rendered
+template, so this file must be updated when that job changes in the template.
 """
 
 [[exempt]]
