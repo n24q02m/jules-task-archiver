@@ -18,6 +18,27 @@ repos:
         types_or: [javascript, json, css]
         pass_filenames: true
 
+  # oxlint (oxc): fast correctness linter complementing Biome. Biome is
+  # linter-only here; oxlint adds a second rule set (correctness/suspicious).
+  - repo: local
+    hooks:
+      - id: oxlint
+        name: oxlint check
+        entry: bun x oxlint
+        language: system
+        types_or: [javascript]
+        pass_filenames: false
+
+  # oxfmt (oxc): formatter of record (Prettier-compatible). Config: .oxfmtrc.json.
+  - repo: local
+    hooks:
+      - id: oxfmt
+        name: oxfmt check
+        entry: bun x oxfmt --check
+        language: system
+        types_or: [javascript, json, css, toml, yaml]
+        pass_filenames: false
+
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: cef0300fd0fc4d2a87a85fa2093c6b283ea36f4b # v5.0.0
     hooks:

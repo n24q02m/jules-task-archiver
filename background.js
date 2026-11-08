@@ -138,7 +138,7 @@ function extractAccountNum(url) {
     const pathname = new URL(url).pathname
     const match = ACCOUNT_NUM_REGEX.exec(pathname)
     return match ? match[1] : '0'
-  } catch (_e) {
+  } catch {
     return '0'
   }
 }
@@ -1551,7 +1551,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           sendResponse({ error: 'Security Error: Payload exceeds size limit' })
           break
         }
-      } catch (_e) {
+      } catch {
         sendResponse({ error: 'Security Error: Invalid payload' })
         break
       }

@@ -8,7 +8,13 @@
   },
   "main": "background.js",
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "lint:ox": "oxlint",
+    "fmt": "oxfmt",
+    "fmt:check": "oxfmt --check"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "oxfmt": "0.75.0",
+    "oxlint": "1.90.0"
+  }
 }

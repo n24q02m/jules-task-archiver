@@ -7,7 +7,7 @@
 function fixJsonControlChars(str) {
   // ⚡ Bolt Optimization: Bypass processing with a fast regex test for rare conditions.
   // biome-ignore lint/suspicious/noControlCharactersInRegex: Intentionally matching control characters
-  if (!/[\x00-\x1F]/.test(str)) return str
+  if (!/[\x00-\x1F]/.test(str)) return str // oxlint-disable-line no-control-regex -- intentional
 
   let inString = false
   let isEscaped = false

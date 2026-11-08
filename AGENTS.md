@@ -41,9 +41,16 @@ Background service worker makes all API calls. No DOM automation.
 ## Development
 
 ```bash
-# Lint + format
-npx @biomejs/biome check .
-npx @biomejs/biome check --write .
+# Install the pinned lint/format tools (oxlint, oxfmt)
+bun install --frozen-lockfile
+
+# Lint + format check (what CI runs)
+npx @biomejs/biome@2.4.16 check .
+bun run lint:ox
+bun run fmt:check
+
+# Format
+bun run fmt
 
 # Run tests
 node --test
@@ -64,8 +71,9 @@ No Docker, no npm/pypi, no MCP registry.
 
 ## Important Notes
 
-- Zero dependencies -- vanilla JS, no build step
-- Biome for linting (biome.json config): single quotes, no semicolons, 120 line width
+- Zero runtime dependencies -- vanilla JS, no build step; devDependencies are lint/format tools only
+- Biome is the linter (biome.json, formatter disabled); oxlint is a second correctness rule set (.oxlintrc.json)
+- oxfmt is the formatter (.oxfmtrc.json): single quotes, no semicolons, 120 line width
 - batchexecute responses have XSS prefix `)]}'` and may contain raw control chars in JSON strings
 - Service worker keepAlive: `setInterval` calling `chrome.runtime.getPlatformInfo()` every 25s
 - State persisted in `chrome.storage.session` -- survives SW restart

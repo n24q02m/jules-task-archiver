@@ -56,7 +56,7 @@ if (!window.__julesArchiver) {
           },
           window.location.origin
         )
-      } catch (_e) {
+      } catch {
         /* ignore parse errors */
       }
     }

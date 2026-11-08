@@ -10,18 +10,24 @@ Thank you for your interest in contributing to Jules Task Archiver!
 
 ## Development
 
-This is a zero-dependency Chrome Extension (Manifest V3). No build step required.
+This is a Chrome Extension (Manifest V3) with no runtime dependencies. No build step required.
 
 ### Code Style
 
-We use [Biome](https://biomejs.dev/) for linting and formatting:
+[Biome](https://biomejs.dev/) and [oxlint](https://oxc.rs/docs/guide/usage/linter) lint the code;
+[oxfmt](https://oxc.rs/docs/guide/usage/formatter) formats it. oxlint and oxfmt are pinned in
+`package.json`; install them with [Bun](https://bun.sh/):
 
 ```bash
+bun install --frozen-lockfile
+
 # Check
-npx @biomejs/biome check .
+npx @biomejs/biome@2.4.16 check .
+bun run lint:ox
+bun run fmt:check
 
 # Fix
-npx @biomejs/biome check --write .
+bun run fmt
 ```
 
 ### Commit Messages
@@ -43,7 +49,7 @@ We follow [Conventional Commits](https://www.conventionalcommits.org/):
 
 1. Create a feature branch from `main`
 2. Make your changes
-3. Run `npx @biomejs/biome check .` to verify code style
+3. Run the checks under Code Style above to verify code style
 4. Submit a PR with a clear description
 
 ## Reporting Issues
