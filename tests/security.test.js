@@ -353,6 +353,23 @@ describe('jFetch SSRF Security', () => {
     )
   })
 
+  it('should prevent credential leakage via open redirects when credentials are included', async () => {
+    const { sandbox } = setupEnvironment()
+
+    let fetchOptions = null
+    sandbox.fetch = async (_url, options) => {
+      fetchOptions = options
+      return { ok: true, json: async () => [], text: async () => ")]}'\\n\\n4\\n[[]]" }
+    }
+
+    await sandbox.jFetch('https://jules.google.com/u/1/tasks', { credentials: 'include', redirect: 'follow' })
+    assert.strictEqual(
+      fetchOptions.redirect,
+      'error',
+      'fetch should be configured to error on redirects to prevent cookie leakage, overriding user input'
+    )
+  })
+
   it('should allow default follow behavior for uncredentialed requests', async () => {
     const { sandbox } = setupEnvironment()
 
