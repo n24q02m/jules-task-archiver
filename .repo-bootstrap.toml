@@ -17,8 +17,9 @@ reason = "Chrome extension shipped as a zip on the GitHub release; there is no c
 path = ".github/ISSUE_TEMPLATE/bug_report.md"
 reason = """
 A bug here needs the browser, its version, the extension version and the extension's
-console errors from chrome://extensions. The shared template asks for a Go version and a
-CLI `--version` output, which this Chrome extension has neither of.
+console errors from chrome://extensions. The shared TypeScript template asks for a
+Node.js version and an npx/Docker/local-build install method, which this Chrome
+extension has neither of.
 """
 
 [[exempt]]
