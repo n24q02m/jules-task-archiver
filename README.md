@@ -8,6 +8,16 @@
 [![Renovate](https://img.shields.io/badge/renovate-enabled-brightgreen.svg)](https://renovatebot.com)
 [![semantic-release](https://img.shields.io/badge/semantic--release-conventionalcommits-e10079?logo=semantic-release)](https://github.com/semantic-release/semantic-release)
 
+> [!WARNING]
+> **Jules is shutting down, and this extension goes with it.** Google announced the
+> [Jules Turndown](https://jules.google/docs/changelog/) on October 29, 2026: sessions can be
+> finished until **November 11, 2026**, Jules is read-only after that, and it winds down on
+> **December 31, 2026**. A read-only Jules cannot start new sessions, so "Start Suggestions" has
+> nothing left to do after November 11; archiving works only for as long as Jules still accepts
+> the archive call. This repository receives no new features and will be
+> archived after December 31, 2026. To keep your Jules settings, memories, and session history,
+> use the official export described in the same changelog entry before the shutdown.
+
 <!-- BEGIN: AUTO-GENERATED-CROSS-PROMO -->
 <details>
   <summary><strong>Sister projects from n24q02m</strong> (click to expand)</summary>
