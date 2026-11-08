@@ -6,7 +6,14 @@ on:
     types: [opened, synchronize, reopened, edited, ready_for_review]
   push:
     branches: [main]
-  workflow_dispatch: {}
+  # `sha` is read by the main-integrity job only.
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "Commit for the main-integrity job to verify (default: the tip of the dispatched ref)"
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -47,7 +54,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
+        uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
         with:
           egress-policy: audit
 
@@ -88,7 +95,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
+        uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
         with:
           egress-policy: audit
 
@@ -118,7 +125,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
+        uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
         with:
           egress-policy: audit
 
@@ -235,3 +242,32 @@ jobs:
             gh pr comment "$PR_NUMBER" --repo "$REPO" \
               --body "**Possible duplicate**: found ${DUPES} open PR(s) with similar title ('${KEYWORD}'). Check before merging: \`gh pr list --search '${KEYWORD}' --state open --limit 1000\`"
           fi
+
+  # ============================================================================
+  # main-integrity: detective control for the default branch (scripts/main_integrity.py).
+  # Rendered into ci.yml from templates/fragments/main-integrity-job.yml. It used to
+  # be a third workflow file (main-integrity.yml); the two-file standard (ci.yml +
+  # cd.yml, spec 2026-10-30) keeps it here. It runs only on main:
+  # dispatch CI on main after a merge; `sha` audits one specific commit
+  # instead of the tip. On any other ref the job is skipped.
+  # ============================================================================
+  main-integrity:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+      checks: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: scripts/main_integrity.py
+          sparse-checkout-cone-mode: false
+      - name: Verify the commit on the branch came from a merged pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ inputs.sha || github.sha }}
+          BRANCH: ${{ github.ref_name }}
+        run: python3 scripts/main_integrity.py --repo "$REPO" --sha "$SHA" --branch "$BRANCH"
