@@ -146,9 +146,16 @@ popup.js (UI) <-> background.js (batchexecute client) <-> content.js (message re
 ## Development
 
 ```bash
-# Lint and format
-npx @biomejs/biome check .
-npx @biomejs/biome check --write .
+# Install the pinned lint/format tools (oxlint, oxfmt)
+bun install --frozen-lockfile
+
+# Lint and format check
+npx @biomejs/biome@2.4.16 check .
+bun run lint:ox
+bun run fmt:check
+
+# Format
+bun run fmt
 
 # Run tests
 node --test
@@ -156,7 +163,7 @@ node --test
 # Load unpacked in chrome://extensions for testing
 ```
 
-No build step, no dependencies. Pure vanilla JavaScript with `node:test` for unit tests.
+No build step, no runtime dependencies. Pure vanilla JavaScript with `node:test` for unit tests; the only devDependencies are the oxlint and oxfmt CLIs.
 
 ## Related Projects
 

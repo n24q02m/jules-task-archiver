@@ -80,7 +80,7 @@ function getAccountNum() {
   try {
     const match = ACCOUNT_NUM_REGEX.exec(new URL(location.href).pathname)
     return match ? match[1] : '0'
-  } catch (_e) {
+  } catch {
     return '0'
   }
 }

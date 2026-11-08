@@ -1,15 +1,26 @@
 # Local toolchain for the Node-based Chrome extension test suite.
-# CI uses Node.js 22 and the pinned Biome release below.
+# CI uses Node.js 22, the pinned Biome release below, and the oxlint/oxfmt
+# versions pinned in package.json (bun.lock).
 
 [tools]
 node = "22"
+bun = "latest"
+deno = "latest"
 
 [settings]
 trusted_config_paths = ["."]
 
+[tasks.setup]
+description = "Install the pinned lint and format tools"
+run = "bun install --frozen-lockfile"
+
 [tasks.lint]
-description = "Run the CI lint and format check"
-run = "npx @biomejs/biome@2.4.16 check ."
+description = "Run the CI lint and format checks"
+run = ["npx @biomejs/biome@2.4.16 check .", "bun run lint:ox", "bun run fmt:check"]
+
+[tasks.fix]
+description = "Format every file with oxfmt"
+run = "bun run fmt"
 
 [tasks.test]
 description = "Run the unit test suite"

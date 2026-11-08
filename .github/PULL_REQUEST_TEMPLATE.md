@@ -25,7 +25,7 @@
 
 ## Checklist
 
-- [ ] Code follows the project style (Biome check passes)
+- [ ] Code follows the project style (Biome, oxlint and oxfmt checks pass)
 - [ ] Commit messages follow Conventional Commits
 - [ ] Self-reviewed my own code
 - [ ] No hardcoded credentials or sensitive data

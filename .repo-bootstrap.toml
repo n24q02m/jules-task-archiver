@@ -5,8 +5,9 @@ path = ".github/workflows/ci.yml"
 reason = """
 Chrome extension built with plain Node and pnpm. The shared TypeScript ci.yml is the
 bun-based MCP server pipeline (bun install, bun run check, bun run build) and fails
-here; this repo's CI runs Biome, a Manifest V3 check, node --test with c8 coverage,
-PR title lint, dependency review and bot PR governance. The template's main-integrity
+here; this repo's CI runs Biome, oxlint, oxfmt and deno (the same lint and format
+steps as the template), a Manifest V3 check, node --test with c8 coverage, PR title
+lint, dependency review and bot PR governance. The template's main-integrity
 job and its `sha` dispatch input are carried here by hand, copied from the rendered
 template, so this file must be updated when that job changes in the template.
 """
@@ -36,7 +37,7 @@ has generic checkboxes.
 path = "CONTRIBUTING.md"
 reason = """
 Describes the real workflow for this zero-build extension: load it unpacked and check it
-with Biome. The shared template points at a `mise run setup` task this repo does not
+with Biome, oxlint and oxfmt. The shared template points at a `mise run setup` task this repo does not
 have.
 """
 

@@ -1,0 +1,14 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "rules": {
+    "unicorn/no-new-array": "off"
+  },
+  "overrides": [
+    {
+      "files": ["utils.js"],
+      "rules": {
+        "no-unused-vars": ["warn", { "varsIgnorePattern": "^fixJsonControlChars$" }]
+      }
+    }
+  ]
+}
