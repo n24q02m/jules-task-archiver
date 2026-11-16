@@ -81,5 +81,6 @@
   "commitMessageAction": "update",
   "commitMessageTopic": "{{depName}}",
   "semanticCommitType": "fix",
-  "semanticCommitScope": "deps"
+  "semanticCommitScope": "deps",
+  "platformAutomerge": false
 }
