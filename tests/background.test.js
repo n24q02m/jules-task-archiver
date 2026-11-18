@@ -16,6 +16,7 @@ function setupEnvironment(initialStorage = {}, initialSyncStorage = {}) {
   const storageChangeListeners = []
   const alarmListeners = []
   const alarmsStore = new Map()
+  const messageListeners = []
 
   const chromeMock = {
     storage: {
@@ -74,7 +75,7 @@ function setupEnvironment(initialStorage = {}, initialSyncStorage = {}) {
       }
     },
     runtime: {
-      onMessage: { addListener: () => {} },
+      onMessage: { addListener: (cb) => messageListeners.push(cb) },
       getPlatformInfo: async () => ({})
     },
     webNavigation: {
@@ -133,10 +134,15 @@ function setupEnvironment(initialStorage = {}, initialSyncStorage = {}) {
 
   vm.createContext(sandbox)
 
-  const scriptContent =
-    utilsScriptContent +
-    bgScriptContent +
-    `\n
+  // Load utils.js and background.js as two scripts, each under its own filename, the
+  // way the service worker loads them (background.js calls importScripts('utils.js')).
+  // Concatenating them into one script filed under background.js shifted every
+  // coverage range by the length of utils.js, so coverage was reported against the
+  // wrong lines of both files.
+  vm.runInContext(utilsScriptContent, sandbox, { filename: utilsScriptPath })
+  vm.runInContext(bgScriptContent, sandbox, { filename: bgScriptPath })
+
+  const testHooks = `
     globalThis.test_stateReadyPromise = stateReadyPromise;
     globalThis.test_state = () => state;
     globalThis.test_updateState = updateState;
@@ -211,8 +217,7 @@ function setupEnvironment(initialStorage = {}, initialSyncStorage = {}) {
     globalThis.test_DEFAULT_SCHEDULE = DEFAULT_SCHEDULE;
   `
 
-  const script = new vm.Script(scriptContent, { filename: bgScriptPath })
-  script.runInContext(sandbox)
+  vm.runInContext(testHooks, sandbox)
 
   return {
     sandbox,
@@ -220,6 +225,7 @@ function setupEnvironment(initialStorage = {}, initialSyncStorage = {}) {
     alarmsStore,
     alarmListeners,
     storageChangeListeners,
+    messageListeners,
     getSyncStorage: () => syncStorage
   }
 }
@@ -2469,5 +2475,626 @@ describe('alarm listener wiring', () => {
     alarmListeners[0]({ name: 'someone-elses-alarm' })
     await new Promise((r) => setImmediate(r))
     assert.strictEqual(sandbox.test_state().status, 'idle')
+  })
+})
+
+// =============================================================================
+// End-to-end orchestration over the batchexecute wire format
+// =============================================================================
+
+const JULES_TAB = { id: 1, url: 'https://jules.google.com/u/0/session' }
+
+// Serve batchexecute the way Jules does: route on the `rpcids` URL parameter, hand the
+// handler the decoded RPC payload, and wrap its answer in the `wrb.fr` envelope that
+// parseResponse unpacks. A handler answers `{ httpStatus }` to fail the request.
+// GitHub PR lookups (api.github.com) answer with `githubPulls`.
+function julesFetch(handlers, { calls = [], githubPulls = [] } = {}) {
+  return async (url, init = {}) => {
+    const target = new URL(url)
+    if (target.origin === 'https://api.github.com') {
+      return { ok: true, status: 200, json: async () => githubPulls }
+    }
+    const rpcId = target.searchParams.get('rpcids')
+    const freq = JSON.parse(new URLSearchParams(init.body).get('f.req'))
+    const payload = JSON.parse(freq[0][0][1])
+    calls.push({ rpcId, payload })
+    const answer = handlers[rpcId] ? await handlers[rpcId](payload) : null
+    if (answer?.httpStatus) return { ok: false, status: answer.httpStatus }
+    const envelope = JSON.stringify([['wrb.fr', rpcId, JSON.stringify(answer), null, null, null, 'generic']])
+    return { ok: true, status: 200, text: async () => `)]}'\n\n${envelope.length}\n${envelope}` }
+  }
+}
+
+function enabledSource(repo) {
+  return [`github/${repo}`, null, null, null, null, [true, true, [2], [true]]]
+}
+
+function disabledSource(repo) {
+  return [`github/${repo}`, null, null, null, null, [true, true, [1], [true]]]
+}
+
+function rawSuggestion(id, title) {
+  return [
+    id,
+    [title, 'desc', 'https://github.com/o/r', 'src/a.js', 10, 0.9, 'why', 'code()', 'javascript', 'dead-code', 1]
+  ]
+}
+
+function rawTask(id, title, repo, taskState) {
+  const raw = new Array(27).fill(null)
+  raw[0] = id
+  raw[4] = `github/${repo}`
+  raw[5] = taskState
+  raw[26] = title
+  return raw
+}
+
+// A clock that moves 1s per read, so every "has 500ms passed?" throttle check fires.
+function slowClock() {
+  let now = 1_000_000
+  return {
+    now: () => {
+      now += 1000
+      return now
+    }
+  }
+}
+
+function rpcCalls(calls, rpcId) {
+  return calls.filter((c) => c.rpcId === rpcId)
+}
+
+describe('processSuggestionsForTab end to end', () => {
+  it('starts discovered suggestions within quota and logs every per-repo outcome', async () => {
+    const { sandbox } = setupEnvironment()
+    const calls = []
+    sandbox.fetch = julesFetch(
+      {
+        KQOO7: () => [1, [86400], 100],
+        YqkSHd: () => [[enabledSource('o/a'), enabledSource('o/b'), enabledSource('o/c'), disabledSource('o/off')]],
+        hQP40d: ([repo]) => {
+          if (repo === 'github/o/a') return [[rawSuggestion('s1', 'Fix a'), rawSuggestion('s2', 'Broken start')]]
+          if (repo === 'github/o/b') return [[]]
+          return { httpStatus: 400 }
+        },
+        Rja83d: (payload) => (payload[0].includes('Broken start') ? { httpStatus: 400 } : [])
+      },
+      { calls }
+    )
+    sandbox.test_updateState({ status: 'running' })
+
+    const started = await sandbox.test_processSuggestionsForTab(JULES_TAB, {})
+
+    assert.strictEqual(started, 1)
+    const state = sandbox.test_state()
+    assert.strictEqual(state.progress.total, 2)
+    assert.strictEqual(state.progress.archived, 1)
+    const log = state.log.join('\n')
+    assert.ok(log.includes('[default] No StartSuggestion config cached. Using defaults.'))
+    assert.ok(log.includes('[default] Daily sessions: 1/100 used, 99 remaining'))
+    assert.ok(log.includes('[default] 3 repo(s) with Suggestions enabled: o/a, o/b, o/c'))
+    assert.ok(log.includes('[default] github/o/b: No suggestions found'))
+    assert.ok(log.includes('[default] ERROR fetching suggestions for github/o/c: batchexecute hQP40d failed: HTTP 400'))
+    assert.ok(log.includes('Started [default] Fix a'))
+    assert.ok(log.includes('[!] Failed to start "Broken start": batchexecute Rja83d failed: HTTP 400'))
+    assert.ok(log.includes('[default] TOTAL: 1 suggestions started'))
+    assert.deepStrictEqual(
+      rpcCalls(calls, 'Rja83d').map((c) => c.payload[4]),
+      ['github/o/a', 'github/o/a']
+    )
+  })
+
+  it('skips discovery entirely once the daily session limit is reached', async () => {
+    const { sandbox } = setupEnvironment()
+    const calls = []
+    sandbox.fetch = julesFetch({ KQOO7: () => [100, [86400], 100] }, { calls })
+
+    const started = await sandbox.test_processSuggestionsForTab(JULES_TAB, {})
+
+    assert.strictEqual(started, 0)
+    assert.ok(sandbox.test_state().log.includes('[default] Daily limit reached. Skipping suggestion discovery.'))
+    assert.deepStrictEqual(
+      calls.map((c) => c.rpcId),
+      ['KQOO7']
+    )
+  })
+
+  it('carries on without a quota guard when the quota lookup fails', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.fetch = julesFetch({
+      KQOO7: () => ({ httpStatus: 500 }),
+      YqkSHd: () => [[enabledSource('o/a')]],
+      hQP40d: () => [[]]
+    })
+
+    const started = await sandbox.test_processSuggestionsForTab(JULES_TAB, {})
+
+    assert.strictEqual(started, 0)
+    const log = sandbox.test_state().log.join('\n')
+    assert.ok(log.includes('[default] WARNING: Could not fetch daily quota: batchexecute KQOO7 failed: HTTP 500'))
+    assert.ok(log.includes('[default] github/o/a: No suggestions found'))
+    assert.ok(log.includes('[default] TOTAL: 0 suggestions started'))
+  })
+
+  it('stops discovering once the quota is covered and caps a dry run to the quota', async () => {
+    const startConfig = { modelConfig: [null, 'models/x'], featureFlags: [], experimentIds: [7] }
+    const { sandbox } = setupEnvironment({ startConfig })
+    const calls = []
+    const repos = Array.from({ length: 8 }, (_, i) => `o/r${i}`)
+    sandbox.fetch = julesFetch(
+      {
+        KQOO7: () => [98, [86400], 100],
+        YqkSHd: () => [repos.map(enabledSource)],
+        hQP40d: ([repo]) => [
+          [rawSuggestion(`${repo}-1`, `${repo} first`), rawSuggestion(`${repo}-2`, `${repo} second`)]
+        ]
+      },
+      { calls }
+    )
+
+    const started = await sandbox.test_processSuggestionsForTab(JULES_TAB, { dryRun: true })
+
+    assert.strictEqual(started, 0)
+    // Six repos are already in flight when the first answers; the last two are skipped.
+    assert.strictEqual(rpcCalls(calls, 'hQP40d').length, 6)
+    assert.strictEqual(rpcCalls(calls, 'Rja83d').length, 0)
+    const state = sandbox.test_state()
+    assert.strictEqual(state.progress.total, 0)
+    const log = state.log.join('\n')
+    assert.ok(!log.includes('No StartSuggestion config cached'))
+    assert.ok(log.includes('[default] Skipped discovering suggestions for 2 repo(s) (quota met)'))
+    assert.ok(log.includes('[default] Capping 12 suggestions to 2 (daily limit)'))
+    assert.strictEqual(state.log.filter((l) => l.includes('[DRY] Would start [default]')).length, 2)
+  })
+
+  it('honours the per-tick start budget and spends it', async () => {
+    const { sandbox } = setupEnvironment()
+    const calls = []
+    sandbox.fetch = julesFetch(
+      {
+        KQOO7: () => [0, [86400], 100],
+        YqkSHd: () => [[enabledSource('o/a')]],
+        hQP40d: () => [[rawSuggestion('s1', 'One'), rawSuggestion('s2', 'Two'), rawSuggestion('s3', 'Three')]],
+        Rja83d: () => []
+      },
+      { calls }
+    )
+    const options = { _remainingStarts: 2 }
+
+    const started = await sandbox.test_processSuggestionsForTab(JULES_TAB, options)
+
+    assert.strictEqual(started, 2)
+    assert.strictEqual(options._remainingStarts, 0)
+    assert.strictEqual(rpcCalls(calls, 'Rja83d').length, 2)
+    assert.ok(sandbox.test_state().log.includes('[default] Capping 3 suggestions to 2 (per-tick cap)'))
+  })
+
+  it('tracks the repo being worked on when starts are slow', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.Date = slowClock()
+    sandbox.fetch = julesFetch({
+      KQOO7: () => [0, [86400], 100],
+      YqkSHd: () => [[enabledSource('o/a'), enabledSource('o/b')]],
+      hQP40d: ([repo]) => [[rawSuggestion(`${repo}-1`, `${repo} fix`)]],
+      Rja83d: () => []
+    })
+
+    const started = await sandbox.test_processSuggestionsForTab(JULES_TAB, {})
+
+    assert.strictEqual(started, 2)
+    assert.strictEqual(sandbox.test_state().progress.archived, 2)
+    assert.strictEqual(sandbox.test_state().currentRepo, 'o/b')
+  })
+  it('stops before discovery when the page config cannot be read', async () => {
+    const { sandbox } = setupEnvironment()
+    const calls = []
+    sandbox.fetch = julesFetch({}, { calls })
+    sandbox.chrome.tabs.sendMessage = async (_tabId, msg) => (msg.action === 'PING' ? { ok: true } : {})
+
+    const started = await sandbox.test_processSuggestionsForTab(JULES_TAB, {})
+
+    assert.strictEqual(started, 0)
+    assert.strictEqual(calls.length, 0)
+    assert.ok(
+      sandbox
+        .test_state()
+        .log.includes(
+          '[default] ERROR: Could not extract page config (XSRF token missing). Try refreshing the Jules tab.'
+        )
+    )
+  })
+
+  it('stops before discovery when the repo list cannot be fetched', async () => {
+    const { sandbox } = setupEnvironment()
+    const calls = []
+    sandbox.fetch = julesFetch({ KQOO7: () => [0, [86400], 100], YqkSHd: () => ({ httpStatus: 400 }) }, { calls })
+
+    const started = await sandbox.test_processSuggestionsForTab(JULES_TAB, {})
+
+    assert.strictEqual(started, 0)
+    assert.deepStrictEqual(
+      calls.map((c) => c.rpcId),
+      ['KQOO7', 'YqkSHd'],
+      'no suggestion is listed or started without a repo list'
+    )
+    assert.ok(
+      sandbox.test_state().log.includes('[default] ERROR listing sources: batchexecute YqkSHd failed: HTTP 400')
+    )
+  })
+})
+
+describe('processTab end to end', () => {
+  it('lists what a dry run would archive without archiving anything', async () => {
+    const { sandbox } = setupEnvironment()
+    const calls = []
+    sandbox.fetch = julesFetch(
+      {
+        p1Takd: () => [
+          [
+            rawTask('t1', 'Done one', 'o/r', 12),
+            rawTask('t2', 'Done two', 'o/r', 2),
+            rawTask('t3', 'Running', 'o/r', 1)
+          ]
+        ]
+      },
+      { calls }
+    )
+
+    const archived = await sandbox.processTab(JULES_TAB, { dryRun: true })
+
+    assert.strictEqual(archived, 0)
+    assert.strictEqual(rpcCalls(calls, 'Tjmm5c').length, 0)
+    const log = sandbox.test_state().log.join('\n')
+    assert.ok(log.includes('[default] 3 total: 2 archivable, 1 active'))
+    assert.ok(log.includes('[default] DRY RUN - would archive 2 tasks'))
+    assert.ok(log.includes('  o/r: 2 tasks'))
+    assert.ok(log.includes('    [t1] Done one (state=12)'))
+    assert.ok(log.includes('    [t2] Done two (state=2)'))
+  })
+
+  it('archives nothing and explains why when no task is in a finished state', async () => {
+    const { sandbox } = setupEnvironment()
+    const calls = []
+    sandbox.fetch = julesFetch(
+      { p1Takd: () => [[rawTask('t1', 'A', 'o/r', 1), rawTask('t2', 'B', 'o/r', 7)]] },
+      { calls }
+    )
+
+    const archived = await sandbox.processTab(JULES_TAB, {})
+
+    assert.strictEqual(archived, 0)
+    assert.strictEqual(rpcCalls(calls, 'Tjmm5c').length, 0)
+    const log = sandbox.test_state().log
+    assert.ok(log.includes('[default] No archivable tasks among 2 (states seen: 1, 7).'))
+    assert.ok(log.includes('[default] Enable Force to archive regardless of state.'))
+  })
+
+  it('stops for an account that has no tasks', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.fetch = julesFetch({ p1Takd: () => [[]] })
+
+    const archived = await sandbox.processTab(JULES_TAB, {})
+
+    assert.strictEqual(archived, 0)
+    assert.ok(sandbox.test_state().log.includes('[default] No tasks found.'))
+  })
+
+  it('skips an account whose page config cannot be read', async () => {
+    const { sandbox } = setupEnvironment()
+    const calls = []
+    sandbox.fetch = julesFetch({}, { calls })
+    sandbox.chrome.tabs.sendMessage = async (_tabId, msg) => (msg.action === 'PING' ? { ok: true } : {})
+
+    const archived = await sandbox.processTab(JULES_TAB, {})
+
+    assert.strictEqual(archived, 0)
+    assert.strictEqual(calls.length, 0)
+    assert.ok(
+      sandbox
+        .test_state()
+        .log.includes(
+          '[default] ERROR: Could not extract page config (XSRF token missing). Try refreshing the Jules tab.'
+        )
+    )
+  })
+
+  it('archives finished tasks in one batch and counts progress on a slow clock', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.Date = slowClock()
+    const calls = []
+    sandbox.fetch = julesFetch(
+      {
+        p1Takd: () => [
+          [rawTask('t1', 'One', 'o/r', 12), rawTask('t2', 'Two', 'o/r', 4), rawTask('t3', 'Three', 'o/s', null)]
+        ],
+        Tjmm5c: () => []
+      },
+      { calls }
+    )
+
+    const archived = await sandbox.processTab(JULES_TAB, {})
+
+    assert.strictEqual(archived, 3)
+    const archiveCalls = rpcCalls(calls, 'Tjmm5c')
+    assert.strictEqual(archiveCalls.length, 1)
+    assert.deepStrictEqual(archiveCalls[0].payload, [['t1', 't2', 't3'], 1])
+    const state = sandbox.test_state()
+    assert.strictEqual(state.progress.total, 3)
+    assert.strictEqual(state.progress.archived, 3)
+    assert.ok(state.log.includes('  Archived [default] [t3] Three'))
+    assert.ok(state.log.includes('\n[default] TOTAL: 3 archived'))
+  })
+})
+
+describe('startOperation end to end', () => {
+  it('records a failing account in the summary and still finishes the run', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.chrome.tabs.query = async () => [JULES_TAB]
+    sandbox.fetch = julesFetch({ p1Takd: () => [[rawTask('t1', 'Done', 'o/r', 12)]] })
+    sandbox.chrome.storage.local.get = async () => {
+      throw new Error('storage unavailable')
+    }
+
+    await sandbox.test_startOperation({ opMode: 'archive' })
+
+    const state = sandbox.test_state()
+    assert.strictEqual(state.status, 'done')
+    assert.strictEqual(JSON.stringify(state.results), '[{"label":"default","count":0,"err":"storage unavailable"}]')
+    assert.ok(state.log.includes('ERROR [default]: storage unavailable'))
+    assert.ok(state.log.includes('  default: ERROR: storage unavailable'))
+  })
+
+  it('reports started suggestions in the summary', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.chrome.tabs.query = async () => [JULES_TAB]
+    sandbox.fetch = julesFetch({
+      KQOO7: () => [0, [86400], 10],
+      YqkSHd: () => [[enabledSource('o/a')]],
+      hQP40d: () => [[rawSuggestion('s1', 'Fix a')]],
+      Rja83d: () => []
+    })
+
+    await sandbox.test_startOperation({ opMode: 'suggestions' })
+
+    const state = sandbox.test_state()
+    assert.strictEqual(state.status, 'done')
+    assert.strictEqual(state.results[0].count, 1)
+    assert.ok(state.log.includes('  default: 1 started'))
+    assert.ok(state.log.includes('\n  GRAND TOTAL: 1 tasks started'))
+  })
+
+  it('fails the run and stops the keep-alive when the tab lookup throws', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.chrome.tabs.query = async () => {
+      throw new Error('tabs API unavailable')
+    }
+
+    await sandbox.test_startOperation({ opMode: 'archive' })
+
+    const state = sandbox.test_state()
+    assert.strictEqual(state.status, 'error')
+    assert.strictEqual(state.error, 'tabs API unavailable')
+    assert.ok(state.log.includes('FATAL ERROR: tabs API unavailable'))
+    assert.strictEqual(sandbox.test_getKeepAliveInterval(), null)
+  })
+
+  it('announces dry-run and force mode in the run banner', () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.test_initOperationState({ opMode: 'archive', dryRun: true, force: true })
+    const log = sandbox.test_state().log
+    assert.strictEqual(log[0], '=== DRY RUN MODE ===')
+    assert.ok(log.includes('=== FORCE MODE (skip PR check) ==='))
+  })
+
+  it('reports "Unknown error" for a failure without a message', () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.test_handleOperationError('')
+    assert.strictEqual(sandbox.test_state().error, 'Unknown error')
+    assert.ok(sandbox.test_state().log.includes('FATAL ERROR: Unknown error'))
+  })
+})
+
+describe('runtime message handler', () => {
+  function dispatch(listener, msg, sender = {}) {
+    const responses = []
+    const returned = listener(msg, sender, (r) => responses.push(r))
+    return { returned, responses }
+  }
+
+  it('starts an operation requested by the popup', async () => {
+    const { sandbox, messageListeners } = setupEnvironment()
+    const { responses } = dispatch(messageListeners[0], { action: 'START', options: { opMode: 'archive' } })
+
+    assert.strictEqual(responses[0].ok, true)
+    assert.strictEqual(sandbox.test_state().status, 'running')
+    await new Promise((r) => setImmediate(r))
+    // The mock browser has no Jules tabs, so the started run ends with that error.
+    assert.strictEqual(sandbox.test_state().status, 'error')
+    assert.strictEqual(sandbox.test_state().error, 'No Jules tabs found')
+  })
+
+  it('answers GET_STATE from the popup asynchronously with the restored state', async () => {
+    const { messageListeners } = setupEnvironment({ archiveState: { status: 'done', log: ['finished'] } })
+    const { returned, responses } = dispatch(messageListeners[0], { action: 'GET_STATE' })
+
+    assert.strictEqual(returned, true, 'keeps the message channel open for the async reply')
+    await new Promise((r) => setImmediate(r))
+    assert.strictEqual(responses[0].status, 'done')
+    assert.strictEqual(responses[0].log[0], 'finished')
+  })
+
+  it('rejects a CACHE_START_CONFIG message that carries no config', () => {
+    const { messageListeners, sessionSetData } = setupEnvironment()
+    const { responses } = dispatch(messageListeners[0], { action: 'CACHE_START_CONFIG' }, { tab: { id: 1 } })
+
+    assert.strictEqual(responses[0].error, 'Security Error: Invalid payload')
+    assert.ok(!sessionSetData.some((d) => 'startConfig' in d))
+  })
+
+  it('resets state, clears the PR cache and stops the keep-alive on RESET', () => {
+    const { sandbox, messageListeners, sessionSetData } = setupEnvironment()
+    sandbox.test_initOperationState({ opMode: 'archive' })
+    sandbox.test_prCache.set('o/r', Promise.resolve([]))
+
+    const { responses } = dispatch(messageListeners[0], { action: 'RESET' })
+
+    assert.strictEqual(responses[0].ok, true)
+    const state = sandbox.test_state()
+    assert.strictEqual(state.status, 'idle')
+    assert.strictEqual(state.log.length, 0)
+    assert.strictEqual(sandbox.test_prCache.size, 0)
+    assert.strictEqual(sandbox.test_getKeepAliveInterval(), null)
+    assert.strictEqual(sessionSetData[sessionSetData.length - 1].archiveState.status, 'idle')
+  })
+
+  it('ignores unknown actions without responding', () => {
+    const { messageListeners } = setupEnvironment()
+    const { returned, responses } = dispatch(messageListeners[0], { action: 'NOPE' })
+    assert.strictEqual(returned, undefined)
+    assert.strictEqual(responses.length, 0)
+  })
+})
+
+describe('alarm and storage listeners', () => {
+  function captureConsoleErrors(sandbox) {
+    const errors = []
+    sandbox.console = { log: () => {}, error: (...args) => errors.push(args) }
+    return errors
+  }
+
+  it('runs a scheduled archive when its own alarm fires', async () => {
+    const { sandbox, alarmListeners } = setupEnvironment({}, { schedEnabled: true })
+    alarmListeners[0]({ name: sandbox.test_SCHEDULE_ALARM_NAME })
+    await new Promise((r) => setImmediate(r))
+
+    const state = sandbox.test_state()
+    assert.strictEqual(state.status, 'error')
+    assert.strictEqual(state.error, 'No Jules tabs found')
+    assert.ok(state.log.includes('=== SCHEDULED (chrome.alarms) ==='))
+  })
+
+  it('logs a scheduled tick that fails instead of throwing', async () => {
+    const { sandbox, alarmListeners } = setupEnvironment({}, { schedEnabled: true })
+    await new Promise((r) => setImmediate(r))
+    const errors = captureConsoleErrors(sandbox)
+    sandbox.chrome.storage.sync.get = async () => {
+      throw new Error('sync storage unavailable')
+    }
+
+    alarmListeners[0]({ name: sandbox.test_SCHEDULE_ALARM_NAME })
+    await new Promise((r) => setImmediate(r))
+
+    assert.strictEqual(errors.length, 1)
+    assert.strictEqual(errors[0][0], '[JTA] Scheduled tick failed:')
+    assert.strictEqual(errors[0][1].message, 'sync storage unavailable')
+  })
+
+  it('reconciles the alarm only for schedule keys changed in sync storage', async () => {
+    const { sandbox, alarmsStore, storageChangeListeners } = setupEnvironment({}, { schedEnabled: true })
+    await new Promise((r) => setImmediate(r))
+    alarmsStore.clear()
+    const [onChanged] = storageChangeListeners
+
+    onChanged({ schedEnabled: { newValue: true } }, 'local')
+    onChanged({ ghOwner: { newValue: 'someone' } }, 'sync')
+    await new Promise((r) => setImmediate(r))
+    assert.strictEqual(alarmsStore.size, 0, 'non-sync areas and unrelated keys leave the alarm alone')
+
+    onChanged({ schedEnabled: { newValue: true } }, 'sync')
+    await new Promise((r) => setImmediate(r))
+    assert.ok(alarmsStore.has(sandbox.test_SCHEDULE_ALARM_NAME))
+  })
+
+  it('logs an alarm reconcile that fails after a settings change', async () => {
+    const { sandbox, storageChangeListeners } = setupEnvironment()
+    await new Promise((r) => setImmediate(r))
+    const errors = captureConsoleErrors(sandbox)
+    sandbox.chrome.storage.sync.get = async () => {
+      throw new Error('sync storage unavailable')
+    }
+
+    storageChangeListeners[0]({ schedIntervalMin: { newValue: 5 } }, 'sync')
+    await new Promise((r) => setImmediate(r))
+
+    assert.strictEqual(errors.length, 1)
+    assert.strictEqual(errors[0][0], '[JTA] Alarm sync failed:')
+  })
+})
+
+describe('edge cases of the wire helpers', () => {
+  it('turns a request that outlives its timeout into a retryable NetworkError', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.fetch = (_url, init) =>
+      new Promise((_resolve, reject) => {
+        init.signal.addEventListener('abort', () => reject(init.signal.reason))
+      })
+
+    await assert.rejects(sandbox.test_jFetch('https://jules.google.com/x', { timeout: 5 }), {
+      message: 'NetworkError: Request timed out'
+    })
+    assert.strictEqual(sandbox.test_isRetryable('NetworkError: Request timed out'), true)
+  })
+
+  it('runs a long limiter backlog in FIFO order across queue compaction', async () => {
+    const { sandbox } = setupEnvironment()
+    const limit = sandbox.test_createLimiter(1)
+    const order = []
+    const total = 1205
+    const results = await Promise.all(
+      Array.from({ length: total }, (_, i) =>
+        limit(async () => {
+          order.push(i)
+          return i * 2
+        })
+      )
+    )
+
+    assert.deepStrictEqual(
+      order,
+      Array.from({ length: total }, (_, i) => i)
+    )
+    assert.strictEqual(results[total - 1], (total - 1) * 2)
+  })
+
+  it('returns -1 for an empty payload and for an unterminated string', () => {
+    const { sandbox } = setupEnvironment()
+    assert.strictEqual(sandbox.test_findJsonEnd(''), -1)
+    assert.strictEqual(sandbox.test_findJsonEnd('["abc'), -1)
+  })
+
+  it('escapes control characters after an escaped quote, tabs and other control characters', () => {
+    const { sandbox } = setupEnvironment()
+    assert.strictEqual(sandbox.test_fixJsonControlChars('["a\\"\nb"]'), '["a\\"\\nb"]')
+    assert.strictEqual(sandbox.test_fixJsonControlChars('["a\u0001b"]'), '["a\\u0001b"]')
+    assert.strictEqual(sandbox.test_fixJsonControlChars('["a\tb"]'), '["a\\tb"]')
+  })
+
+  it('treats a missing schedule as the defaults', () => {
+    const { sandbox } = setupEnvironment()
+    const cfg = sandbox.test_normalizeSchedule(undefined)
+    assert.strictEqual(cfg.schedEnabled, false)
+    assert.strictEqual(cfg.schedIntervalMin, 60)
+  })
+
+  it('takes the repo name from a source path with extra segments', () => {
+    const { sandbox } = setupEnvironment()
+    const raw = rawTask('t1', 'T', 'owner/repo/tree/main', 12)
+    const task = sandbox.test_parseTask(raw)
+    assert.strictEqual(task.owner, 'owner')
+    assert.strictEqual(task.repoName, 'repo')
+  })
+
+  it('maps pull requests without a title or head branch to empty strings', async () => {
+    const { sandbox } = setupEnvironment()
+    sandbox.fetch = julesFetch({}, { githubPulls: [{}] })
+    const prs = await sandbox.test_getOpenPRs('o', 'r', undefined)
+    assert.strictEqual(JSON.stringify(prs), '[{"title":"","titleLower":"","branch":""}]')
+  })
+
+  it('restores a persisted state that has no log as an empty log', async () => {
+    const { sandbox } = setupEnvironment({ archiveState: { status: 'done' } })
+    await sandbox.test_stateReadyPromise
+    assert.strictEqual(sandbox.test_state().status, 'done')
+    assert.strictEqual(sandbox.test_state().log.length, 0)
   })
 })

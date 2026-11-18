@@ -167,6 +167,9 @@ bun run fmt
 # Run tests
 node --test
 
+# Run tests with the coverage gate (what CI runs; thresholds live in .c8rc.json)
+npx --yes c8@10.1.3 node --test
+
 # Load unpacked in chrome://extensions for testing
 ```
 

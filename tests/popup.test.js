@@ -165,7 +165,7 @@ function createMockChrome(syncStorage, localStorage, sessionStorage, listeners) 
 /**
  * Creates a mock Document object.
  */
-function createMockDocument(elements, opModeButtons, radioStates) {
+function createMockDocument(elements, opModeButtons, radioStates, modeRadios = []) {
   const listeners = {}
   return {
     addEventListener: (type, cb) => {
@@ -197,6 +197,11 @@ function createMockDocument(elements, opModeButtons, radioStates) {
       if (sel === '#opMode button') {
         return {
           forEach: (cb) => opModeButtons.forEach(cb)
+        }
+      }
+      if (sel === 'input[name="mode"]') {
+        return {
+          forEach: (cb) => modeRadios.forEach(cb)
         }
       }
       return { forEach: () => {} }
@@ -235,7 +240,11 @@ function setupPopupSandbox() {
     '#log': createMockElement('pre'),
     '#summary': createMockElement('div'),
     '.settings': createMockElement('section'),
-    '.setting-row': createMockElement('div')
+    '.setting-row': createMockElement('div'),
+    '#schedEnabled': createMockElement('input'),
+    '#schedInterval': createMockElement('input'),
+    '#schedSuggestions': createMockElement('input'),
+    '#schedMaxStarts': createMockElement('input')
   }
 
   // Parent element for elements that use .parentElement in popup.js
@@ -247,7 +256,9 @@ function setupPopupSandbox() {
     createMockElement('button', { dataset: { value: 'suggestions' } })
   ]
 
-  const document = createMockDocument(elements, opModeButtons, radioStates)
+  const modeRadios = [createMockElement('input', { value: 'dry' }), createMockElement('input', { value: 'run' })]
+
+  const document = createMockDocument(elements, opModeButtons, radioStates, modeRadios)
   const chrome = createMockChrome(syncStorage, localStorage, sessionStorage, listeners)
 
   const sandbox = {
@@ -264,7 +275,7 @@ function setupPopupSandbox() {
   }
   vm.createContext(sandbox)
 
-  return { sandbox, elements, opModeButtons, syncStorage, localStorage, listeners, radioStates }
+  return { sandbox, elements, opModeButtons, modeRadios, syncStorage, localStorage, listeners, radioStates }
 }
 
 describe('setActiveOpMode', () => {
@@ -652,5 +663,258 @@ describe('Block hint click forwarding', () => {
     clickHint(sandbox, { id: 'forceHint', tagName: 'LABEL' })
     clickHint(sandbox, { id: '', tagName: 'SPAN' })
     assert.strictEqual(elements['#force'].checked, false)
+  })
+})
+
+describe('operation and execution mode controls', () => {
+  it('switches and persists the operation mode when its button is clicked', () => {
+    const { sandbox, elements, opModeButtons, syncStorage } = setupPopupSandbox()
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
+
+    opModeButtons[1].dispatchEvent('click')
+
+    assert.strictEqual(syncStorage.opMode, 'suggestions')
+    assert.ok(opModeButtons[1].classList.contains('active'))
+    assert.strictEqual(elements['.settings'].classList.contains('hidden'), true)
+    assert.strictEqual(elements['#startBtn'].textContent, 'Dry Run Suggestions')
+  })
+
+  it('relabels the start button when the execution mode radio changes', () => {
+    const { sandbox, elements, modeRadios, radioStates } = setupPopupSandbox()
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
+
+    radioStates.mode = 'run'
+    modeRadios[1].dispatchEvent('change')
+    assert.strictEqual(elements['#startBtn'].textContent, 'Start Archiving')
+
+    radioStates.mode = 'dry'
+    modeRadios[0].dispatchEvent('change')
+    assert.strictEqual(elements['#startBtn'].textContent, 'Dry Run Archive')
+  })
+
+  it('keeps the running label while an operation is in progress', () => {
+    const { sandbox, elements, modeRadios, radioStates } = setupPopupSandbox()
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
+
+    radioStates.mode = 'run'
+    elements['#startBtn'].textContent = '⏳ Dry Running Archive...'
+    modeRadios[1].dispatchEvent('change')
+    assert.strictEqual(elements['#startBtn'].textContent, '⏳ Dry Running Archive...')
+
+    elements['#startBtn'].disabled = true
+    elements['#startBtn'].textContent = 'Busy'
+    modeRadios[1].dispatchEvent('change')
+    assert.strictEqual(elements['#startBtn'].textContent, 'Busy')
+  })
+})
+
+describe('saved settings', () => {
+  it('restores schedule settings, operation mode and the local token on open', () => {
+    const { sandbox, elements, opModeButtons, syncStorage, localStorage } = setupPopupSandbox()
+    Object.assign(syncStorage, {
+      schedEnabled: true,
+      schedIntervalMin: 30,
+      schedStartSuggestions: true,
+      schedMaxStarts: 5,
+      opMode: 'suggestions'
+    })
+    localStorage.ghToken = 'local-token'
+
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
+
+    assert.strictEqual(elements['#schedEnabled'].checked, true)
+    assert.strictEqual(elements['#schedInterval'].value, '30')
+    assert.strictEqual(elements['#schedSuggestions'].checked, true)
+    assert.strictEqual(elements['#schedMaxStarts'].value, '5')
+    assert.ok(opModeButtons[1].classList.contains('active'))
+    assert.strictEqual(elements['#ghToken'].value, 'local-token')
+  })
+
+  it('leaves schedule inputs at their defaults when nothing is saved', () => {
+    const { sandbox, elements, opModeButtons } = setupPopupSandbox()
+    elements['#schedInterval'].value = '60'
+    elements['#schedMaxStarts'].value = '20'
+
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
+
+    assert.strictEqual(elements['#schedEnabled'].checked, false)
+    assert.strictEqual(elements['#schedInterval'].value, '60')
+    assert.strictEqual(elements['#schedSuggestions'].checked, false)
+    assert.strictEqual(elements['#schedMaxStarts'].value, '20')
+    assert.ok(!opModeButtons[1].classList.contains('active'))
+    assert.strictEqual(elements['#ghToken'].value, '')
+  })
+
+  it('trims and bounds the owner and token before persisting them on change', () => {
+    const { sandbox, elements, syncStorage, localStorage } = setupPopupSandbox()
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
+
+    elements['#ghOwner'].value = `  ${'o'.repeat(50)}  `
+    elements['#ghOwner'].dispatchEvent('change')
+    elements['#ghToken'].value = ` ${'t'.repeat(300)} `
+    elements['#ghToken'].dispatchEvent('change')
+
+    assert.strictEqual(syncStorage.ghOwner, 'o'.repeat(39))
+    assert.strictEqual(localStorage.ghToken, 't'.repeat(255))
+    assert.strictEqual(syncStorage.ghToken, undefined, 'the token never goes to sync storage')
+  })
+
+  it('persists the schedule toggles as booleans', () => {
+    const { sandbox, elements, syncStorage } = setupPopupSandbox()
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
+
+    elements['#schedEnabled'].checked = true
+    elements['#schedEnabled'].dispatchEvent('change')
+    elements['#schedSuggestions'].checked = true
+    elements['#schedSuggestions'].dispatchEvent('change')
+    assert.strictEqual(syncStorage.schedEnabled, true)
+    assert.strictEqual(syncStorage.schedStartSuggestions, true)
+
+    elements['#schedEnabled'].checked = false
+    elements['#schedEnabled'].dispatchEvent('change')
+    assert.strictEqual(syncStorage.schedEnabled, false)
+  })
+
+  it('clamps the schedule interval to 1-1440 minutes and falls back to 60', () => {
+    const { sandbox, elements, syncStorage } = setupPopupSandbox()
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
+    const input = elements['#schedInterval']
+
+    for (const [typed, saved] of [
+      ['15', 15],
+      ['5000', 1440],
+      ['0', 1],
+      ['soon', 60]
+    ]) {
+      input.value = typed
+      input.dispatchEvent('change')
+      assert.strictEqual(syncStorage.schedIntervalMin, saved, `typed ${typed}`)
+      assert.strictEqual(input.value, String(saved))
+    }
+  })
+
+  it('clamps the per-tick start cap to 1-500 and falls back to 20', () => {
+    const { sandbox, elements, syncStorage } = setupPopupSandbox()
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
+    const input = elements['#schedMaxStarts']
+
+    for (const [typed, saved] of [
+      ['7', 7],
+      ['999', 500],
+      ['-3', 1],
+      ['', 20]
+    ]) {
+      input.value = typed
+      input.dispatchEvent('change')
+      assert.strictEqual(syncStorage.schedMaxStarts, saved, `typed ${typed}`)
+      assert.strictEqual(input.value, String(saved))
+    }
+  })
+})
+
+describe('start scope', () => {
+  it('targets the active tab when the scope is the current tab', async () => {
+    const { sandbox, elements, radioStates } = setupPopupSandbox()
+    let sentMessage = null
+    const queries = []
+    sandbox.chrome.runtime.sendMessage = (msg) => {
+      sentMessage = msg
+    }
+    sandbox.chrome.tabs.query = async (opts) => {
+      queries.push(opts)
+      return [{ id: 123 }]
+    }
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
+
+    radioStates.scope = 'current'
+    await elements['#mainForm'].dispatchEvent('submit', { preventDefault: () => {} })
+    await new Promise((r) => setImmediate(r))
+
+    assert.strictEqual(JSON.stringify(queries), '[{"active":true,"currentWindow":true}]')
+    assert.strictEqual(sentMessage.options.scope, 'current')
+    assert.strictEqual(sentMessage.options.activeTabId, 123)
+  })
+
+  it('starts without a target tab when no tab is active', async () => {
+    const { sandbox, elements, radioStates } = setupPopupSandbox()
+    let sentMessage = null
+    sandbox.chrome.runtime.sendMessage = (msg) => {
+      sentMessage = msg
+    }
+    sandbox.chrome.tabs.query = async () => []
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
+
+    radioStates.scope = 'current'
+    await elements['#mainForm'].dispatchEvent('submit', { preventDefault: () => {} })
+    await new Promise((r) => setImmediate(r))
+
+    assert.strictEqual(sentMessage.action, 'START')
+    assert.strictEqual(sentMessage.options.activeTabId, undefined)
+  })
+})
+
+describe('live state updates', () => {
+  it('renders archiveState changes and ignores unrelated or cleared ones', () => {
+    const { sandbox, elements, listeners } = setupPopupSandbox()
+    vm.runInContext(popupJs, sandbox, { filename: popupJsPath })
+    const [onChanged] = listeners.storage
+
+    onChanged({ ghOwner: { newValue: 'x' } })
+    onChanged({ archiveState: { oldValue: { status: 'done' } } })
+    assert.strictEqual(elements['#log'].textContent, '')
+
+    onChanged({
+      archiveState: { newValue: { status: 'running', log: ['started'], currentTab: 'default', currentRepo: 'o/r' } }
+    })
+    assert.strictEqual(elements['#log'].textContent, 'started')
+    assert.strictEqual(elements['#currentInfo'].textContent, 'default > o/r')
+    assert.strictEqual(elements['#progressSection'].classList.contains('hidden'), false)
+  })
+})
+
+describe('reopening the popup during or after a run', () => {
+  function openWithState(state) {
+    const env = setupPopupSandbox()
+    // popup.html ships the reset button hidden until a run has finished.
+    env.elements['#resetBtn'].classList.add('hidden')
+    env.sandbox.chrome.runtime.sendMessage = (msg, cb) => {
+      if (msg.action === 'GET_STATE') cb(state)
+    }
+    vm.runInContext(popupJs, env.sandbox, { filename: popupJsPath })
+    return env
+  }
+
+  it('shows a live suggestions run as busy', () => {
+    const { elements, radioStates, sandbox } = openWithState({
+      status: 'running',
+      options: { opMode: 'suggestions' },
+      log: ['tick']
+    })
+
+    assert.strictEqual(elements['#startBtn'].disabled, true)
+    assert.strictEqual(elements['#startBtn'].getAttribute('aria-busy'), 'true')
+    assert.strictEqual(elements['#startBtn'].textContent, '⏳ Dry Running Suggestions...')
+    assert.strictEqual(elements['#resetBtn'].classList.contains('hidden'), true)
+    assert.strictEqual(elements['#log'].textContent, 'tick')
+
+    radioStates.mode = 'run'
+    assert.strictEqual(sandbox.getRunningText(), '⏳ Running Suggestions...')
+  })
+
+  it('shows a finished run with its summary and the reset button', () => {
+    const { elements } = openWithState({ status: 'done', results: [{ label: 'default', count: 2 }] })
+
+    assert.strictEqual(elements['#currentInfo'].textContent, 'Complete')
+    assert.strictEqual(elements['#resetBtn'].classList.contains('hidden'), false)
+    assert.strictEqual(elements['#summary'].children[1].textContent, 'TOTAL: 2 processed')
+    assert.strictEqual(elements['#startBtn'].textContent, 'Dry Run Archive')
+  })
+
+  it('stays untouched when the background is idle', () => {
+    const { elements } = openWithState({ status: 'idle' })
+
+    assert.strictEqual(elements['#startBtn'].disabled, false)
+    assert.strictEqual(elements['#currentInfo'].textContent, '')
+    assert.strictEqual(elements['#resetBtn'].classList.contains('hidden'), true)
   })
 })

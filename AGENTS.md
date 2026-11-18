@@ -55,6 +55,9 @@ bun run fmt
 # Run tests
 node --test
 
+# Run tests with the coverage gate (what CI runs; thresholds live in .c8rc.json)
+npx --yes c8@10.1.3 node --test
+
 # Load extension
 # chrome://extensions -> Developer mode -> Load unpacked -> select this folder
 ```
@@ -78,3 +81,4 @@ No Docker, no npm/pypi, no MCP registry.
 - Service worker keepAlive: `setInterval` calling `chrome.runtime.getPlatformInfo()` every 25s
 - State persisted in `chrome.storage.session` -- survives SW restart
 - Tests use `vm.createContext` sandbox to mock Chrome APIs
+- Load each source file into the sandbox with its own `vm.runInContext(code, sandbox, { filename })` call; concatenating files into one script breaks c8's line mapping

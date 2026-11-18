@@ -178,15 +178,17 @@ function setupEnvironment(initialTabs = {}) {
 
   vm.createContext(sandbox)
 
-  const scriptContent =
-    utilsScriptContent +
-    bgScriptContent +
+  // Two scripts under their own filenames, as the service worker loads them, so
+  // coverage is reported against the right lines of each file.
+  vm.runInContext(utilsScriptContent, sandbox, { filename: utilsScriptPath })
+  vm.runInContext(bgScriptContent, sandbox, { filename: bgScriptPath })
+  vm.runInContext(
     `
     globalThis.test_ensureContentScript = ensureContentScript;
     globalThis.test_JULES_ORIGIN = JULES_ORIGIN;
-  `
-
-  vm.runInContext(scriptContent, sandbox, { filename: bgScriptPath })
+  `,
+    sandbox
+  )
   return { sandbox, chromeMock, onMessageListeners }
 }
 
