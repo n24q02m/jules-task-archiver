@@ -310,3 +310,40 @@ describe('content.js Message Listeners', () => {
     )
   })
 })
+
+describe('content.js config message validation', () => {
+  it('caches a trusted JULES_ARCHIVER_CONFIG broadcast', () => {
+    const sandbox = setupEnvironment()
+    const config = { at: 'token', timestamp: 1 }
+
+    sandbox.fireMessage({ type: 'JULES_ARCHIVER_CONFIG', config })
+
+    assert.deepStrictEqual(normalize(sandbox.test_cachedConfig.get()), config)
+  })
+
+  it('drops *_CONFIG messages that carry no config payload', () => {
+    const sandbox = setupEnvironment()
+    sandbox.test_cachedConfig.set({ at: 'kept' })
+
+    sandbox.fireMessage({ type: 'JULES_ARCHIVER_CONFIG' })
+    sandbox.fireMessage({ type: 'JULES_START_CONFIG', config: null })
+
+    assert.deepStrictEqual(normalize(sandbox.test_cachedConfig.get()), { at: 'kept' })
+    assert.strictEqual(sandbox.getSentMessages().length, 0)
+  })
+
+  it('keeps waiting for the archiver config when another trusted message arrives first', async () => {
+    const sandbox = setupEnvironment()
+    const promise = sandbox.extractConfig()
+    const startConfig = { experimentIds: [1] }
+    const config = { at: 'fresh', timestamp: Date.now() }
+
+    sandbox.fireMessage({ type: 'JULES_START_CONFIG', config: startConfig })
+    assert.strictEqual(sandbox.getListenerCount('message'), 2, 'the one-shot config handler is still registered')
+    sandbox.fireMessage({ type: 'JULES_ARCHIVER_CONFIG', config })
+
+    assert.deepStrictEqual(normalize(await promise), config)
+    assert.strictEqual(sandbox.getListenerCount('message'), 1)
+    assert.strictEqual(sandbox.getSentMessages()[0].action, 'CACHE_START_CONFIG')
+  })
+})

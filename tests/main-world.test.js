@@ -271,3 +271,23 @@ describe('main-world.js', () => {
     assert.strictEqual(windowMock.fetch, firstFetch, 'Fetch should not be wrapped again')
   })
 })
+
+describe('main-world.js start config capture', () => {
+  it('broadcasts empty experiment and feature lists when the payload has none', async () => {
+    const { sandbox, messages, windowMock } = setupSandbox({})
+    vm.runInContext(mainWorldJs, sandbox, { filename: mainWorldJsPath })
+
+    const payload = ['prompt only']
+    const body = `f.req=${encodeURIComponent(JSON.stringify([[['Rja83d', JSON.stringify(payload)]]]))}`
+    await windowMock.fetch('https://jules.google.com/_/Swebot/data/batchexecute?rpcids=Rja83d', {
+      method: 'POST',
+      body
+    })
+
+    const startMsg = messages.find((m) => m.data.type === 'JULES_START_CONFIG')
+    assert.ok(startMsg, 'JULES_START_CONFIG message should be sent')
+    assert.strictEqual(startMsg.data.config.modelConfig, undefined)
+    assert.strictEqual(startMsg.data.config.experimentIds.length, 0)
+    assert.strictEqual(startMsg.data.config.featureFlags.length, 0)
+  })
+})
