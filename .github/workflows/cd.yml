@@ -24,6 +24,17 @@ on:
         options:
           - beta
           - stable
+      force:
+        description: "Force release level (when no version-worthy commits)"
+        required: false
+        type: choice
+        default: "none"
+        options:
+          - none
+          - prerelease
+          - patch
+          - minor
+          - major
       publish_existing_tag:
         description: "Recovery only: publish an already-created tag (e.g. v3.1.0), skipping semantic-release. Use when the auto-computed version's tag name is permanently reserved by a GitHub immutable release."
         required: false
@@ -58,6 +69,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
+        with:
+          egress-policy: audit
+          disable-telemetry: true
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
@@ -82,6 +99,7 @@ jobs:
         uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
         with:
           egress-policy: audit
+          disable-telemetry: true
 
       - name: Generate GitHub App Token
         id: app-token
@@ -108,6 +126,7 @@ jobs:
           config_file: semantic-release.toml
           prerelease: ${{ env.RELEASE_TYPE == 'beta' }}
           prerelease_token: beta
+          force: ${{ inputs.force != 'none' && inputs.force || '' }}
 
       - uses: python-semantic-release/publish-action@99d4062dd393b5a7a62c5fe9ed78fb364b5674f2 # v10.7.0
         if: inputs.publish_existing_tag == '' && steps.release.outputs.released == 'true'
@@ -146,6 +165,7 @@ jobs:
         uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
         with:
           egress-policy: audit
+          disable-telemetry: true
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -158,6 +178,21 @@ jobs:
 
       - run: bun install --frozen-lockfile
       - run: bun run build
+      # A build that compiles test files into the published directory ships them in
+      # the tarball, and CD stays green. List what `npm publish` would pack and stop
+      # before publishing when any path is a test file. The build ran above, so
+      # lifecycle scripts are skipped: npm prints their output on stdout ahead of the
+      # JSON.
+      - name: Refuse to publish test files
+        run: |
+          npm pack --dry-run --json --ignore-scripts > "$RUNNER_TEMP/npm-pack.json"
+          node -e '
+            const [{ files }] = JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"))
+            const tests = files.map((file) => file.path).filter((path) => path.includes(".test."))
+            for (const path of tests) console.log(`::error::npm package would ship test file ${path}`)
+            if (tests.length > 0) process.exit(1)
+            console.log(`npm package: ${files.length} files, no test files`)
+          ' "$RUNNER_TEMP/npm-pack.json"
       # OIDC trusted publishing -- no NPM_TOKEN needed. Verify with `gh secret
       # list` on this repo: no npm token should be set. --provenance needs
       # id-token: write, granted above.
@@ -175,7 +210,7 @@ jobs:
       && vars.PUBLISH_NPM == 'true'
       && vars.PUBLISH_MCP_REGISTRY == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     permissions:
       id-token: write
     steps:
@@ -183,6 +218,7 @@ jobs:
         uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43 # v2.22.3
         with:
           egress-policy: audit
+          disable-telemetry: true
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -199,6 +235,34 @@ jobs:
               end
             ]
           ' server.json > server.json.tmp && mv server.json.tmp server.json
+
+      # The MCP Registry validates every non-OCI package below against its package
+      # registry at publish time and rejects the publish ("version ... was not found
+      # (status: 404)") while that registry does not yet serve a version published
+      # seconds earlier. Poll the exact URLs it validates before publishing.
+      - name: Wait for the package registry to serve the release
+        env:
+          VERSION: ${{ needs.release.outputs.version }}
+        run: |
+          set -uo pipefail
+          while read -r kind id; do
+            case "$kind" in
+              npm) url="https://registry.npmjs.org/${id//\//%2F}/${VERSION}" ;;
+              pypi) url="https://pypi.org/pypi/${id}/${VERSION}/json" ;;
+              *) echo "::error::server.json package '$id' has registryType '$kind', which this step cannot check"; exit 1 ;;
+            esac
+            status=000
+            for _ in $(seq 1 40); do
+              status="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 "$url")" || status=000
+              if [ "$status" = "200" ]; then
+                echo "$url answers 200"
+                continue 2
+              fi
+              sleep 15
+            done
+            echo "::error::$url still answers $status after 10 minutes"
+            exit 1
+          done < <(jq -r '.packages[] | select(.registryType != "oci") | "\(.registryType) \(.identifier)"' server.json)
 
       - name: Install MCP Publisher
         run: |
