@@ -106,12 +106,13 @@ class GhClient:
         self.infra_errors.append(message)
         return GhInfraError(message)
 
-    def _run(self, args: list[str]) -> str:
+    def _run(self, args: list[str], *, stdin: str | None = None) -> str:
         if self._timed_out:
             raise self._infra_error("gh unavailable after an earlier timeout")
         try:
             result = subprocess.run(
                 ["gh", *args],
+                input=stdin,
                 capture_output=True,
                 text=True,
                 encoding="utf-8",
@@ -138,16 +139,30 @@ class GhClient:
         return result.stdout
 
     def api(
-        self, path: str, *, method: str = "GET", fields: dict[str, str] | None = None
+        self,
+        path: str,
+        *,
+        method: str = "GET",
+        fields: dict[str, str] | None = None,
+        body: dict[str, Any] | None = None,
     ) -> Any:
-        """Call `gh api <path>` with optional method + fields. Returns parsed JSON."""
-        cache_key = ("api", path, method, tuple(sorted((fields or {}).items())))
+        """Call `gh api <path>` with optional method + fields. Returns parsed JSON.
+
+        `body` goes to gh as a JSON document on stdin (`--input -`): it keeps JSON
+        types (a boolean stays a boolean) and has no size limit, where every `-f`
+        field is a command-line argument and Windows caps the whole command line
+        at 32,767 characters.
+        """
+        body_json = json.dumps(body, sort_keys=True) if body is not None else None
+        cache_key = ("api", path, method, tuple(sorted((fields or {}).items())), body_json)
         if cache_key in self._cache:
             return self._cache[cache_key]
         args = ["api", path, "-X", method]
         for k, v in (fields or {}).items():
             args += ["-f", f"{k}={v}"]
-        out = self._run(args)
+        if body_json is not None:
+            args += ["--input", "-"]
+        out = self._run(args, stdin=body_json)
         try:
             parsed = json.loads(out) if out.strip() else None
         except json.JSONDecodeError:

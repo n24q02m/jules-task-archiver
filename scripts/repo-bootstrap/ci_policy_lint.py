@@ -229,6 +229,29 @@ def check(workflow_yaml: str, *, role: str | None = None, visibility: str | None
     return [v for v in found if v.rule not in waived.get(v.line, set())]
 
 
+def check_contexts(workflow_yaml: str) -> list[str]:
+    """The check context every job in the workflow produces.
+
+    GitHub names a job's check after its `name`, falling back to the job id, so
+    that pair is what a ruleset's `required_status_checks` has to name. Empty
+    when the text is not a workflow at all: a caller asking "does this repo
+    produce context X" gets "no" rather than an exception.
+    """
+    try:
+        root = yaml.compose(workflow_yaml)
+    except yaml.YAMLError:
+        return []
+    jobs = _get(root, "jobs") if isinstance(root, yaml.MappingNode) else None
+    if jobs is None or not isinstance(jobs[1], yaml.MappingNode):
+        return []
+    contexts: list[str] = []
+    for job_key, job in _pairs(jobs[1]):
+        job_id = _scalar(job_key) or ""
+        named = _get(job, "name") if isinstance(job, yaml.MappingNode) else None
+        contexts.append((_scalar(named[1]) if named else None) or job_id)
+    return [c for c in contexts if c]
+
+
 def check_file(path: Path, label: str | None = None, visibility: str | None = None) -> list[str]:
     shown = label or str(path)
     try:
