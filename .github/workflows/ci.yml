@@ -84,9 +84,7 @@ jobs:
         run: npx @biomejs/biome@2.4.16 check .
 
       # Stack standard: JS/Node repos run biome (lint) plus oxlint (second correctness rule set)
-      # and oxfmt (formatter of record), with bun AND deno available.
-      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
-      - run: deno --version
+      # and oxfmt (formatter of record); bun is the only runtime, deno is not part of the stack.
       - name: oxlint
         run: bun run lint:ox || bun x oxlint
       - name: oxfmt check
